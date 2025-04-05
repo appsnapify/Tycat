@@ -21,36 +21,59 @@ export async function GET(request: NextRequest) {
     
     if (!eventId) {
       return NextResponse.json({ 
+        success: false,
         error: 'ID do evento é obrigatório' 
       }, { status: 400 });
     }
     
     console.log(`API GuestCount - Buscando contagem para evento: ${eventId}`);
     
-    // 1. Buscar na tabela guests
-    const { data: guestsData, error: guestsError } = await supabaseAdmin
+    // 1. Buscar total de convidados na tabela guests
+    const { data: guestsData, error: guestsError, count: totalCount } = await supabaseAdmin
       .from('guests')
-      .select('id', { count: 'exact' })
+      .select('*', { count: 'exact', head: false })
       .eq('event_id', eventId);
     
     if (guestsError) {
       console.error(`API GuestCount - Erro ao buscar guests: ${guestsError.message}`);
       return NextResponse.json({ 
+        success: false,
         error: guestsError.message 
       }, { status: 500 });
     }
     
+    // 2. Buscar convidados com check-in
+    const { data: checkedInData, error: checkedInError, count: checkedInCount } = await supabaseAdmin
+      .from('guests')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('checked_in', true);
+    
+    if (checkedInError) {
+      console.error(`API GuestCount - Erro ao buscar checked in: ${checkedInError.message}`);
+      return NextResponse.json({ 
+        success: false,
+        error: checkedInError.message 
+      }, { status: 500 });
+    }
+    
+    // Calcular manualmente a contagem, já que o Supabase às vezes não retorna count corretamente
+    const total = totalCount ?? (guestsData?.length || 0);
+    const checkedIn = checkedInCount ?? 0;
+    
     // Retornar a contagem com cache-control para evitar cache
-    console.log(`API GuestCount - Encontrados ${guestsData.length} convidados para evento ${eventId}`);
-    return new NextResponse(
-      JSON.stringify({
-        count: guestsData.length,
+    console.log(`API GuestCount - Encontrados ${total} convidados para evento ${eventId}, com ${checkedIn} check-ins`);
+    
+    return NextResponse.json(
+      {
+        success: true,
+        count: total,
+        checkedIn: checkedIn,
         timestamp: new Date().toISOString()
-      }),
+      },
       {
         status: 200,
         headers: {
-          'Content-Type': 'application/json',
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0',
@@ -61,6 +84,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('API GuestCount - Erro:', error);
     return NextResponse.json({ 
+      success: false,
       error: 'Erro interno no servidor' 
     }, { status: 500 });
   }

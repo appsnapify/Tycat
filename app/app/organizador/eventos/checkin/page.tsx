@@ -128,41 +128,39 @@ export default function CheckInPage() {
     fetchEvents()
   }, [currentOrganization])
 
-  // Buscar estatísticas do evento selecionado
+  // useEffect para buscar estatísticas quando um evento é selecionado
   useEffect(() => {
     async function fetchStats() {
-      if (!selectedEvent) return
+      if (!selectedEvent) return;
 
       try {
-        // Total de convidados
-        const { data: totalData, error: totalError } = await supabase
-          .from('guests')
-          .select('id', { count: 'exact' })
-          .eq('event_id', selectedEvent)
+        console.log("Buscando estatísticas para o evento:", selectedEvent);
         
-        // Convidados com check-in
-        const { data: checkedInData, error: checkedInError } = await supabase
-          .from('guests')
-          .select('id', { count: 'exact' })
-          .eq('event_id', selectedEvent)
-          .eq('checked_in', true)
+        // Usar a API dedicada que já está funcionando
+        const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
         
-        if (totalError || checkedInError) {
-          console.error('Erro ao buscar estatísticas:', totalError || checkedInError)
-          return
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}: ${await response.text()}`);
         }
         
-        setStats({
-          total: totalData?.length || 0,
-          checkedIn: checkedInData?.length || 0
-        })
+        const data = await response.json();
+        console.log("Estatísticas recebidas:", data);
+        
+        if (data.success) {
+          setStats({
+            total: data.count || 0,
+            checkedIn: data.checkedIn || 0
+          });
+        } else {
+          console.error("Erro ao buscar estatísticas:", data.error);
+        }
       } catch (err) {
-        console.error('Erro ao buscar estatísticas:', err)
+        console.error('Erro ao buscar estatísticas:', err);
       }
     }
     
-    fetchStats()
-  }, [selectedEvent])
+    fetchStats();
+  }, [selectedEvent]);
 
   // Carregar convidados
   useEffect(() => {
@@ -734,11 +732,11 @@ export default function CheckInPage() {
                               onError={handleScanError}
                             />
                             
-                            {/* Overlay com instruções */}
-                            <div className="absolute bottom-5 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/75 text-white text-sm rounded-full max-w-72 shadow-lg backdrop-blur-sm">
+                            {/* Overlay simplificado */}
+                            <div className="absolute bottom-5 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/75 text-white text-sm rounded-full max-w-60 shadow-lg backdrop-blur-sm">
                               <div className="flex items-center justify-center">
                                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                                Posicione o QR code no centro da tela (distância de 10-20cm)
+                                Aponte para o QR code
                               </div>
                             </div>
                           </div>
