@@ -56,7 +56,13 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         // Inicializar o scanner
         console.log("Iniciando scanner de QR code...");
         scannerRef.current = new Html5Qrcode(scannerId, { 
-          verbose: true // Ativar logs detalhados para debugging
+          verbose: true, // Ativar logs detalhados para debugging
+          formatsToSupport: [
+            Html5Qrcode.FORMATS.QR_CODE,
+            Html5Qrcode.FORMATS.DATA_MATRIX,
+            Html5Qrcode.FORMATS.CODE_39,
+            Html5Qrcode.FORMATS.CODE_93
+          ]
         });
         
         // Definir o tamanho baseado no tipo de dispositivo
@@ -66,42 +72,66 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         console.log(`Dimensões do container: ${containerWidth}x${containerHeight}px`);
         
         // Calcular dimensões otimizadas para cada tipo de dispositivo
+        // Usar tamanho menor para melhorar a detecção
         let qrboxSize = {
-          width: Math.min(250, containerWidth - 40),
-          height: Math.min(250, containerHeight - 40)
+          width: Math.min(200, containerWidth - 40),
+          height: Math.min(200, containerHeight - 40)
         };
         
         // Em dispositivos móveis, usar uma área de escaneamento maior
         if (isMobile) {
           qrboxSize = {
-            width: Math.min(280, containerWidth - 20), 
-            height: Math.min(280, containerHeight - 20)
+            width: Math.min(250, containerWidth - 20), 
+            height: Math.min(250, containerHeight - 20)
           };
         }
         
         console.log("Tamanho da área de escaneamento:", qrboxSize);
         
-        // Iniciar a câmera com configurações otimizadas para mobile
+        // Tentar listar câmeras disponíveis
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          console.log("Câmeras disponíveis:", devices);
+          
+          if (devices && devices.length === 0) {
+            console.warn("Nenhuma câmera encontrada!");
+          }
+        } catch (err) {
+          console.error("Erro ao listar câmeras:", err);
+        }
+        
+        // Iniciar a câmera com configurações otimizadas para detecção
+        console.log("Iniciando câmera com configurações:", {
+          facingMode: 'environment',
+          fps: isMobile ? 15 : 10,
+          qrbox: qrboxSize,
+          aspectRatio: isMobile ? 4/3 : 1.0
+        });
+        
         await scannerRef.current.start(
-          { 
-            facingMode: 'environment',  // Usar câmera traseira
-            aspectRatio: isMobile ? 4/3 : 1.0 // Ajustar aspect ratio para mobile
-          },
+          { facingMode: 'environment' },  // Apenas uma propriedade aqui
           {
-            fps: isMobile ? 20 : 15, // Aumentar FPS em dispositivos móveis
+            fps: isMobile ? 15 : 10, // Reduzir FPS para processamento mais preciso
             qrbox: qrboxSize,
             disableFlip: false,
-            showTorchButtonIfSupported: true,
-            showZoomSliderIfSupported: true,
+            aspectRatio: isMobile ? 4/3 : 1.0, // Movido para cá
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            },
+            rememberLastUsedCamera: true,
           },
           (decodedText) => {
-            console.log("[QR-SCANNER] Código detectado:", decodedText);
+            console.log("[QR-SCANNER] SUCESSO! Código detectado:", decodedText);
             if (decodedText && decodedText.trim().length > 0) {
               // Vibrar em dispositivos móveis quando detectar um código (opcional)
               if (isMobile && navigator.vibrate) {
                 navigator.vibrate(200);
               }
-              onScan({ text: decodedText.trim() });
+              
+              // Aqui garantimos que onScan recebe um texto não-vazio
+              const trimmedText = decodedText.trim();
+              console.log("[QR-SCANNER] Enviando para processamento:", trimmedText);
+              onScan({ text: trimmedText });
             } else {
               console.warn("[QR-SCANNER] Código detectado vazio");
             }
@@ -124,11 +154,9 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
             videoStyle.maxHeight = isMobile ? '100%' : '300px';
             videoStyle.objectFit = 'cover';
             
-            // Ajustes específicos para mobile
-            if (isMobile) {
-              videoStyle.borderRadius = '8px';
-              videoStyle.transform = 'scaleX(-1)'; // Espelhar horizontalmente em dispositivos móveis para tornar mais natural
-            }
+            // Remover transformações que podem afetar a detecção
+            videoStyle.transform = ''; // Remover espelhamento que pode afetar a leitura
+            
           } else {
             console.warn("[QR-SCANNER] Elemento de vídeo não encontrado");
           }
@@ -137,6 +165,9 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
           if (scannerRef.current) {
             console.log("[QR-SCANNER] Estado do scanner:", scannerRef.current.isScanning ? "ativo" : "inativo");
           }
+          
+          // Instrução para o usuário
+          console.log("[QR-SCANNER] INSTRUÇÕES: Aponte a câmera diretamente para o QR code, mantendo-o centralizado e a uma distância de 10-20cm.");
         }, 500);
         
         console.log("Scanner QR iniciado com sucesso");

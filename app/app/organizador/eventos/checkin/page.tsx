@@ -302,11 +302,12 @@ export default function CheckInPage() {
     setScanning(false)
   }
 
-  const handleScan = (qrCodeData: string) => {
-    console.log('QR Code escaneado com sucesso:', qrCodeData);
+  const handleScan = (qrCodeData: { text: string }) => {
+    const text = qrCodeData?.text || '';
+    console.log('QR Code escaneado com sucesso:', text);
     
     // Garantir que temos um texto limpo para processar
-    const cleanedData = qrCodeData?.trim();
+    const cleanedData = text?.trim();
     if (!cleanedData) {
       console.log('QR Code vazio ou inválido');
       toast({
@@ -314,16 +315,18 @@ export default function CheckInPage() {
         description: "O QR code está vazio ou não pode ser lido",
         variant: "destructive"
       });
+      // Não parar o scanner, permitir tentar novamente
       return;
     }
     
     // Parar o scanner temporariamente para evitar escaneamentos duplicados
     setScanning(false);
     
-    // Mostrar feedback visual
+    // Mostrar feedback visual mais claro
     toast({
-      title: "QR Code detectado",
+      title: "QR Code detectado!",
       description: "Processando código...",
+      variant: "default"
     });
     
     // Processar o código lido
@@ -561,11 +564,23 @@ export default function CheckInPage() {
     
     // Feedback específico baseado no tipo de erro
     if (error.name === "NotAllowedError") {
-      toast.error("Permissão para acessar a câmera foi negada");
+      toast({
+        title: "Erro",
+        description: "Permissão para acessar a câmera foi negada",
+        variant: "destructive"
+      });
     } else if (error.name === "NotFoundError") {
-      toast.error("Nenhuma câmera encontrada");
+      toast({
+        title: "Erro", 
+        description: "Nenhuma câmera encontrada",
+        variant: "destructive"
+      });
     } else {
-      toast.error(`Erro no scanner: ${error.message || 'Erro desconhecido'}`);
+      toast({
+        title: "Erro",
+        description: `Erro no scanner: ${error.message || 'Erro desconhecido'}`,
+        variant: "destructive"
+      });
     }
     
     // Mudar para modo manual em caso de falha no scanner
@@ -589,6 +604,18 @@ export default function CheckInPage() {
   return (
     <div className="max-w-4xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Check-in de Convidados</h1>
+      
+      {/* Status de conectividade do scanner - novo */}
+      {scanning && (
+        <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-300">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+            <p className="text-sm text-blue-800">
+              Scanner ativo - aponte diretamente para o QR code, mantendo a uma distância de 10-20cm
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Seleção de evento */}
       <Card className="mb-4 md:mb-6 shadow-sm">
@@ -691,8 +718,11 @@ export default function CheckInPage() {
                             />
                             
                             {/* Overlay com instruções */}
-                            <div className="absolute bottom-3 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/60 text-white text-sm rounded-full max-w-64 shadow-lg backdrop-blur-sm">
-                              Aponte para o QR code
+                            <div className="absolute bottom-3 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/60 text-white text-sm rounded-full max-w-72 shadow-lg backdrop-blur-sm">
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                Aponte para o QR code (distância de 10-20cm)
+                              </div>
                             </div>
                           </div>
                         </div>
