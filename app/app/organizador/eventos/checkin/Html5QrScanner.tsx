@@ -218,8 +218,10 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         }
         
         .qr-scanner-mobile {
-          min-height: 85vh;
+          min-height: 90vh;
           border-radius: 12px;
+          margin: -1rem -1rem 0 -1rem; /* Expandir além das margens do container pai */
+          width: calc(100% + 2rem);
         }
         
         .scanner-area {
@@ -235,7 +237,8 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         }
         
         .qr-scanner-mobile .scanner-area {
-          min-height: 85vh;
+          min-height: 90vh;
+          border-radius: 0;
         }
         
         .scanner-loading {
@@ -268,12 +271,31 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         
         /* Ajustes mobile */
         .qr-scanner-mobile :global(#html5-qr-code-scanner) {
-          min-height: 85vh !important;
+          min-height: 90vh !important;
+          width: 100% !important;
+          overflow: hidden !important;
         }
         
         .qr-scanner-mobile :global(#html5-qr-code-scanner video) {
-          max-height: 85vh !important;
+          max-height: none !important; /* Remover limite de altura */
+          height: 90vh !important;
+          width: 100% !important;
           object-fit: cover !important;
+        }
+        
+        /* Ajustar elementos da UI do scanner para mobile */
+        .qr-scanner-mobile :global(#html5-qr-code-scanner section) {
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 90vh !important;
+        }
+        
+        .qr-scanner-mobile :global(#html5-qr-code-scanner section div) {
+          width: 100% !important;
+        }
+        
+        .qr-scanner-mobile :global(#html5-qr-code-scanner section div:first-child) {
+          height: 90vh !important;
         }
         
         /* Melhorar a visibilidade da área de escaneamento */
@@ -284,6 +306,8 @@ export default function Html5QrScanner({ onScan, onError }: Html5QrScannerProps)
         
         .qr-scanner-mobile :global(.qr-border) {
           border: 8px solid #4f46e5 !important;
+          width: 280px !important;
+          height: 280px !important;
         }
       `}</style>
     </div>

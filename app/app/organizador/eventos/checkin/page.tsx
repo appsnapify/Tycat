@@ -48,6 +48,21 @@ interface Event {
   organization_id: string;
 }
 
+// Media query para telas pequenas
+const responsiveStyle = `
+@media (max-width: 640px) {
+  .aspect-video {
+    aspect-ratio: auto !important;
+    height: 90vh !important;
+    max-height: calc(100vh - 300px) !important;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: calc(100% + 2rem);
+    border-radius: 0;
+  }
+}
+`;
+
 export default function CheckInPage() {
   const [scanning, setScanning] = useState(false)
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera')
@@ -603,6 +618,8 @@ export default function CheckInPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
+      <style jsx global>{responsiveStyle}</style>
+      
       <h1 className="text-2xl font-bold mb-6">Check-in de Convidados</h1>
       
       {/* Status de conectividade do scanner - novo */}
@@ -697,7 +714,7 @@ export default function CheckInPage() {
                 <TabsContent value="camera">
                   <div className="space-y-4">
                     {scanning ? (
-                      <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative md:aspect-video sm:aspect-auto sm:min-h-[70vh]">
+                      <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative md:aspect-video sm:aspect-auto sm:min-h-[80vh] max-w-full">
                         {/* Scanner real de QR code */}
                         <div className="w-full h-full">
                           <div className="absolute top-3 right-3 z-10">
@@ -718,10 +735,10 @@ export default function CheckInPage() {
                             />
                             
                             {/* Overlay com instruções */}
-                            <div className="absolute bottom-3 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/60 text-white text-sm rounded-full max-w-72 shadow-lg backdrop-blur-sm">
+                            <div className="absolute bottom-5 left-0 right-0 mx-auto text-center px-4 py-2 bg-black/75 text-white text-sm rounded-full max-w-72 shadow-lg backdrop-blur-sm">
                               <div className="flex items-center justify-center">
                                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                                Aponte para o QR code (distância de 10-20cm)
+                                Posicione o QR code no centro da tela (distância de 10-20cm)
                               </div>
                             </div>
                           </div>
