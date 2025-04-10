@@ -1,0 +1,14 @@
+[REGRAS_CRÍTICAS]
+1. NÃO INICIAR SERVIDORES: O assistente NUNCA deve executar npm run dev, npm start, ou qualquer comando que inicie servidores sem autorização explícita.
+2. NÃO MODIFICAR CÓDIGO SEM PERMISSÃO: O assistente NUNCA deve modificar código, configurações ou dados sem aprovação prévia.
+3. PERGUNTAR ANTES DE EXECUTAR: Antes de sugerir qualquer comando terminal, perguntar "Posso executar este comando?"
+4. NÃO EDITAR PÁGINAS/FLUXOS: Não editar páginas, fluxos, imagens ou dados sensíveis sem consultar primeiro.
+
+[VIOLAÇÕES]
+Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lembrado destas restrições.
+
+[WORKFLOW_SEGURO]
+1. ANALISAR: Primeiro analisar o problema sem modificar nada
+2. PROPOR: Propor soluções específicas e aguardar aprovação
+3. IMPLEMENTAR: Implementar apenas após aprovação explícita
+4. VERIFICAR: Confirmar mudanças realizadas sem iniciar servidores 

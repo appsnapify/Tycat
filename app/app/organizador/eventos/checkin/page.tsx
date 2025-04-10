@@ -63,6 +63,40 @@ const responsiveStyle = `
 }
 `;
 
+// Verificar se um evento já ocorreu
+function isEventPast(event: any): boolean {
+  if (!event) return false;
+  
+  // Se o evento tiver status, usar ele como primeira verificação
+  if (event.status === 'completed') {
+    return true;
+  }
+  
+  // Se não tiver status ou data, não é possível verificar
+  if (!event.date) return false;
+  
+  // Criar data do evento com horário 23:59:59 para considerar o evento como passado no dia seguinte
+  const eventDate = new Date(event.date);
+  eventDate.setHours(23, 59, 59);
+  
+  // Se tiver end_date, usar em vez da date
+  if (event.end_date) {
+    const endDate = new Date(event.end_date);
+    endDate.setHours(23, 59, 59);
+    
+    // Adicionar 8 horas de margem para eventos noturnos
+    endDate.setHours(endDate.getHours() + 8);
+    
+    return new Date() > endDate;
+  }
+  
+  // Adicionar 8 horas de margem para eventos noturnos
+  eventDate.setHours(eventDate.getHours() + 8);
+  
+  const today = new Date();
+  return eventDate < today;
+}
+
 export default function CheckInPage() {
   const [scanning, setScanning] = useState(false)
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera')
@@ -226,6 +260,18 @@ export default function CheckInPage() {
               checkedIn: data?.filter((g: any) => g.checked_in).length || 0
             });
             
+            // Verificar se o evento já ocorreu
+            const isPast = isEventPast(data);
+            if (isPast) {
+              toast({
+                title: "Evento Realizado",
+                description: "Este evento já ocorreu, o check-in não está mais disponível.",
+                variant: "destructive"
+              });
+              router.push('/app/organizador/eventos');
+              return;
+            }
+            
             setLoading(false);
           }
         })
@@ -379,12 +425,16 @@ export default function CheckInPage() {
       let guestId: string | null = null;
       let qrData: any = null;
       
+      // Primeiro passo: tentar limpar o código (pode ter espaços, quebras de linha etc.)
+      const cleanedCode = code.trim();
+      console.log("Código limpo:", cleanedCode);
+      
       try {
         // Tentar extrair os dados do QR code como JSON
-        qrData = JSON.parse(code);
+        qrData = JSON.parse(cleanedCode);
         console.log("QR data parseado com sucesso:", qrData);
         
-        // Extrair o ID do convidado do JSON
+        // Estratégia 1: Extrair o ID do convidado do JSON usando campos conhecidos
         if (qrData.guestId) {
           guestId = qrData.guestId;
           console.log("ID extraído do campo guestId:", guestId);
@@ -392,37 +442,110 @@ export default function CheckInPage() {
           // Alguns QR codes podem usar 'id' em vez de 'guestId'
           guestId = qrData.id;
           console.log("ID extraído do campo id:", guestId);
-        } else if (qrData.eventId && qrData.eventId === selectedEvent) {
-          // Se o eventId corresponder ao evento selecionado, podemos ter mais confiança
-          // de que este é realmente um QR code válido para este evento
-          console.log("Event ID corresponde, procurando por qualquer campo de ID");
+        } else if (qrData.guest_id) {
+          guestId = qrData.guest_id;
+          console.log("ID extraído do campo guest_id:", guestId);
+        } else if (qrData.guestID) {
+          guestId = qrData.guestID;
+          console.log("ID extraído do campo guestID:", guestId);
+        } else if (qrData.guest && qrData.guest.id) {
+          // Formato aninhado { guest: { id: "..." } }
+          guestId = qrData.guest.id;
+          console.log("ID extraído do campo aninhado guest.id:", guestId);
+        } else if (qrData.eventId) {
+          // Se temos um eventId, vamos verificar se corresponde ao evento selecionado
+          console.log(`QR code contém eventId: ${qrData.eventId}, evento selecionado: ${selectedEvent}`);
           
-          // Procurar por qualquer propriedade que contenha "id" no nome e pareça um UUID
+          if (qrData.eventId === selectedEvent) {
+            console.log("Event ID corresponde, procurando por qualquer campo de ID");
+            
+            // Estratégia 2: Procurar por qualquer propriedade que pareça um UUID
+            for (const key in qrData) {
+              if (typeof qrData[key] === 'string' && 
+                  qrData[key].match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) &&
+                  !key.toLowerCase().includes('event')) {
+                guestId = qrData[key];
+                console.log(`ID encontrado no campo ${key}:`, guestId);
+                break;
+              }
+            }
+          } else {
+            console.log("Event ID não corresponde ao evento selecionado, continuando a busca...");
+          }
+        }
+        
+        // Estratégia 3: Se ainda não encontramos, vamos buscar qualquer UUID em qualquer campo
+        if (!guestId) {
+          console.log("Buscando UUID em qualquer campo...");
+          
           for (const key in qrData) {
-            if (key.toLowerCase().includes('id') && 
-                typeof qrData[key] === 'string' && 
+            // Verificar se o valor é string e se parece um UUID
+            if (typeof qrData[key] === 'string' && 
                 qrData[key].match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+              // Ignorar se for o evento
+              if (key.toLowerCase().includes('event') || 
+                  key.toLowerCase() === 'id' && qrData[key] === selectedEvent) {
+                console.log(`Campo ${key} parece ID de evento, ignorando:`, qrData[key]);
+                continue;
+              }
+              
               guestId = qrData[key];
-              console.log(`ID encontrado no campo ${key}:`, guestId);
+              console.log(`UUID encontrado no campo ${key}:`, guestId);
               break;
+            }
+            
+            // Verificar campos aninhados
+            if (typeof qrData[key] === 'object' && qrData[key] !== null) {
+              for (const nestedKey in qrData[key]) {
+                if (typeof qrData[key][nestedKey] === 'string' && 
+                    qrData[key][nestedKey].match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                  guestId = qrData[key][nestedKey];
+                  console.log(`UUID encontrado em campo aninhado ${key}.${nestedKey}:`, guestId);
+                  break;
+                }
+              }
             }
           }
         }
       } catch (e) {
         console.error("Erro ao parsear QR code como JSON:", e, "Texto original:", code);
-        // Se não for JSON, verificar se o código parece ser um UUID
-        if (code.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        
+        // Estratégia 4: Se não for JSON, verificar se o código em si parece um UUID
+        if (cleanedCode.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
           console.log("O código parece ser um UUID válido, usando diretamente");
-          guestId = code;
+          guestId = cleanedCode;
         } else {
           console.log("Tentando extrair UUID do texto do QR code");
-          // Verificar se o texto do QR contém um UUID em algum lugar
-          const uuidMatch = code.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+          
+          // Estratégia 5: Verificar se o texto do QR contém um UUID em algum lugar
+          const uuidMatch = cleanedCode.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
           if (uuidMatch) {
             guestId = uuidMatch[0];
             console.log("UUID encontrado no QR code:", guestId);
           } else {
-            console.log("Conteúdo completo do QR code (não é JSON nem contém UUID):", code);
+            // Estratégia 6: verificar formatos numéricos (código de evento ou convidado)
+            const numericMatch = cleanedCode.match(/\d+/);
+            if (numericMatch) {
+              console.log("Encontrado código numérico:", numericMatch[0]);
+              
+              // Verificar nossa lista de convidados por este código
+              if (guests.length > 0) {
+                const guestByNumericCode = guests.find(g => 
+                  g.code === numericMatch[0] || 
+                  g.guest_code === numericMatch[0] || 
+                  g.ticket_number === Number(numericMatch[0])
+                );
+                
+                if (guestByNumericCode) {
+                  guestId = guestByNumericCode.id;
+                  console.log("Encontrado convidado por código numérico:", guestId);
+                }
+              }
+            }
+            
+            if (!guestId) {
+              console.log("Conteúdo completo do QR code (não contém UUID):", cleanedCode);
+            }
           }
         }
       }
@@ -431,7 +554,7 @@ export default function CheckInPage() {
         console.error("Não foi possível extrair um ID de convidado válido do QR code. Conteúdo:", code);
         toast({
           title: "QR Code inválido",
-          description: "O QR code não contém um ID de convidado válido. Tente novamente ou use o código manual.",
+          description: "Não foi possível identificar um convidado com este QR code. Tente novamente ou use o código manual.",
           variant: "destructive"
         });
         
@@ -459,30 +582,30 @@ export default function CheckInPage() {
         })
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Erro na resposta da API:", response.status, errorText);
+      const responseText = await response.text();
+      console.log("Resposta bruta da API:", responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Erro ao parsear resposta JSON:", e);
+        data = { success: false, error: "Erro ao processar resposta do servidor" };
+      }
+      
+      if (!response.ok || !data.success) {
+        console.error("Erro na resposta da API:", response.status, data);
         
-        try {
-          // Tentar parsear o erro como JSON para mostrar mensagem mais informativa
-          const errorData = JSON.parse(errorText);
-          toast({
-            title: "Erro no check-in",
-            description: errorData.error || "Não foi possível realizar o check-in",
-            variant: "destructive"
-          });
-        } catch (e) {
-          toast({
-            title: "Erro no check-in",
-            description: `Erro ${response.status}: ${errorText.substring(0, 100)}`,
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Erro no check-in",
+          description: data.error || `Erro ${response.status}: Não foi possível realizar o check-in`,
+          variant: "destructive"
+        });
         
         setLastResult({
           success: false,
-          message: `Erro ${response.status}: Falha ao processar check-in`,
-          error: errorText
+          message: data.error || `Erro ${response.status}: Falha ao processar check-in`,
+          error: data.error || responseText
         });
         
         // Reiniciar scanner após 3 segundos
@@ -497,8 +620,7 @@ export default function CheckInPage() {
         return;
       }
       
-      const data = await response.json();
-      console.log("Resposta da API:", data);
+      console.log("Resposta de sucesso da API:", data);
       
       setLastResult({
         success: true,
@@ -613,6 +735,19 @@ export default function CheckInPage() {
       return 'Horário inválido'
     }
   }
+
+  useEffect(() => {
+    // Cleanup para melhorar performance ao sair da página
+    return () => {
+      // Limpar timeout ou intervalos pendentes
+      if (typeof window !== 'undefined') {
+        const highestId = window.setTimeout(() => {}, 0);
+        for (let i = highestId; i >= 0; i--) {
+          window.clearTimeout(i);
+        }
+      }
+    };
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto p-4">

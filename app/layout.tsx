@@ -13,11 +13,33 @@ export const metadata: Metadata = {
   description: 'Plataforma de gestão de eventos',
 }
 
+// Adicionar logs para depurar problemas de carregamento
+if (typeof window !== 'undefined') {
+  // Só executar no cliente
+  console.log('[RootLayout] Inicializando app no navegador');
+  
+  // Verificar se temos tokens no localStorage
+  try {
+    const hasSupabaseSession = Object.keys(localStorage).some(key => 
+      key.startsWith('sb-') || key.startsWith('supabase.')
+    );
+    
+    console.log('[RootLayout] Tokens Supabase detectados:', hasSupabaseSession);
+  } catch (e) {
+    console.warn('[RootLayout] Erro ao verificar localStorage:', e);
+  }
+}
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Registrar quando o layout é montado
+  if (typeof window !== 'undefined') {
+    console.log('[RootLayout] Renderizando componente');
+  }
+  
   return (
     <html lang="pt">
       <body className={inter.className}>

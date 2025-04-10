@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 interface Organization {
   id: string
@@ -43,14 +44,22 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
         
         // Verificar primeiro a tabela user_organizations para confirmar relações
-        const { data: userOrgsCheck, error: userOrgsCheckError } = await supabase
-          .from('user_organizations')
-          .select('organization_id')
-          .eq('user_id', user.id)
-        
-        if (userOrgsCheckError) {
-          console.error('Erro ao verificar relações de organizações:', userOrgsCheckError)
-          throw userOrgsCheckError
+        let userOrgsCheck;
+        try {
+          const { data, error } = await supabase
+            .from('user_organizations')
+            .select('organization_id')
+            .eq('user_id', user.id)
+            
+          if (error) {
+            console.warn('Aviso ao verificar relações de organizações:', error)
+            // Continuar mesmo com erro
+          }
+          
+          userOrgsCheck = data || [];
+        } catch (e) {
+          console.error('Erro ao acessar relações de organizações:', e)
+          userOrgsCheck = [];
         }
         
         console.log('Relações de organizações encontradas:', userOrgsCheck?.length || 0)
@@ -68,35 +77,41 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         console.log('IDs das organizações:', orgIds)
         
         // Buscar detalhes das organizações diretamente
-        const { data: orgsData, error: orgsError } = await supabase
-          .from('organizations')
-          .select('*')
-          .in('id', orgIds)
-        
-        if (orgsError) {
-          console.error('Erro ao buscar detalhes das organizações:', orgsError)
-          throw orgsError
-        }
-        
-        console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
-        
-        if (orgsData && orgsData.length > 0) {
-          setOrganizations(orgsData)
+        try {
+          const { data: orgsData, error: orgsError } = await supabase
+            .from('organizations')
+            .select('id, name, slug, logotipo, banner_url, address')
+            .in('id', orgIds)
           
-          // Se não há organização selecionada, selecione a primeira
-          if (!currentOrganization) {
-            console.log('Selecionando a primeira organização:', orgsData[0].name, orgsData[0].id)
-            setCurrentOrganization(orgsData[0])
-          } else {
-            // Verificar se a organização atual ainda está na lista
-            const orgStillExists = orgsData.some(org => org.id === currentOrganization.id)
-            if (!orgStillExists) {
-              console.log('Organização atual não existe mais, selecionando a primeira:', orgsData[0].name)
-              setCurrentOrganization(orgsData[0])
-            }
+          if (orgsError) {
+            console.warn('Aviso ao buscar detalhes das organizações:', orgsError)
+            // Continuar mesmo com erro
           }
-        } else {
-          console.log('Nenhuma organização encontrada')
+          
+          console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
+          
+          if (orgsData && orgsData.length > 0) {
+            setOrganizations(orgsData)
+            
+            // Se não há organização selecionada, selecione a primeira
+            if (!currentOrganization) {
+              console.log('Selecionando a primeira organização:', orgsData[0].name, orgsData[0].id)
+              setCurrentOrganization(orgsData[0])
+            } else {
+              // Verificar se a organização atual ainda está na lista
+              const orgStillExists = orgsData.some(org => org.id === currentOrganization.id)
+              if (!orgStillExists) {
+                console.log('Organização atual não existe mais, selecionando a primeira:', orgsData[0].name)
+                setCurrentOrganization(orgsData[0])
+              }
+            }
+          } else {
+            console.log('Nenhuma organização encontrada')
+            setOrganizations([])
+            setCurrentOrganization(null)
+          }
+        } catch (e) {
+          console.error('Erro ao processar detalhes das organizações:', e)
           setOrganizations([])
           setCurrentOrganization(null)
         }

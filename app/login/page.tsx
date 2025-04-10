@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Mail, Lock } from 'lucide-react'
+import { ArrowLeft, Mail, Lock, AlertTriangle, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { resetSession } from '@/lib/auth'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { createClient } from '@supabase/supabase-js'
 
 interface FormData {
   email: string
@@ -21,6 +23,8 @@ export default function LoginPage() {
   const router = useRouter()
   const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
@@ -43,19 +47,70 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null) // Limpar erros anteriores
+    setDebugInfo(null)
 
     try {
       await signIn(formData.email, formData.password)
     } catch (error: any) {
       console.error('Erro ao fazer login:', error)
       
-      if (error?.message?.includes('Invalid login credentials')) {
+      if (error?.message?.includes('Invalid login credentials') || 
+          error?.message?.includes('Email ou senha incorretos')) {
+        setError('Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.')
         toast.error('Email ou senha incorretos')
+      } else if (error?.message?.includes('rate limit')) {
+        setError('Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.')
+        toast.error('Limite de tentativas excedido')
       } else {
-        toast.error('Erro ao iniciar sessão. Por favor, tente novamente.')
+        setError(`Ocorreu um erro ao fazer login: ${error.message}`)
+        toast.error('Erro ao iniciar sessão')
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Função para limpar campos e erro
+  const resetForm = () => {
+    setFormData({ email: '', password: '' })
+    setError(null)
+    setDebugInfo(null)
+  }
+
+  // Função para testar a conexão direta com o Supabase
+  const testSupabaseConnection = async () => {
+    setDebugInfo("Testando conexão com Supabase...");
+    try {
+      // Criar um cliente Supabase diretamente
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      
+      // Tentar obter informação pública para testar a conexão
+      const { data, error } = await supabase.from('profiles').select('count').limit(1)
+      
+      if (error) {
+        setDebugInfo(`Erro na conexão: ${error.message}`);
+        return;
+      }
+      
+      // Verificar se há tokens no localStorage
+      const tokens = Object.keys(localStorage)
+        .filter(key => key.startsWith('sb-') || key.includes('supabase'))
+        .map(key => `${key}: ${localStorage.getItem(key) ? "Existe" : "Vazio"}`)
+        .join('\n');
+      
+      // Mostrar informações de depuração
+      setDebugInfo(`
+Conexão com Supabase: OK
+URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}
+Tokens no localStorage:
+${tokens || "Nenhum token encontrado"}
+      `);
+    } catch (error: any) {
+      setDebugInfo(`Erro ao testar conexão: ${error.message}`);
     }
   }
 
@@ -84,7 +139,23 @@ export default function LoginPage() {
           </Link>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {debugInfo && (
+            <Alert className="mt-4 bg-blue-50 text-blue-800 border-blue-300">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <pre className="whitespace-pre-wrap text-xs">{debugInfo}</pre>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6 mt-6">
             <div>
               <Label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 E-mail
@@ -129,12 +200,11 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.back()}
-                disabled={isLoading}
+                onClick={() => testSupabaseConnection()}
                 className="flex items-center"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
+                <Info className="h-4 w-4 mr-2" />
+                Testar Conexão
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? 'A iniciar sessão...' : 'Iniciar Sessão'}

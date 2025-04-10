@@ -271,38 +271,73 @@ export async function PUT(request: NextRequest) {
     if (!body.id) {
       console.log('API Check-in - Erro: ID do convidado faltando');
       return NextResponse.json(
-        { error: 'ID do convidado é obrigatório' },
+        { success: false, error: 'ID do convidado é obrigatório' },
         { status: 400 }
       )
     }
 
     console.log(`API Check-in - Atualizando convidado com ID ${body.id} para checked_in: ${body.checked_in}`);
+    console.log(`API Check-in - Evento ID: ${body.event_id}`);
     
-    // Primeiro, verificamos se o convidado já foi check-in
+    // Validar evento ID
+    if (!body.event_id) {
+      console.log('API Check-in - Erro: ID do evento faltando');
+      return NextResponse.json(
+        { success: false, error: 'ID do evento é obrigatório' },
+        { status: 400 }
+      )
+    }
+    
+    // Verificar se o convidado existe em qualquer uma das tabelas possíveis
+    // 1. Primeiro, tentar na tabela guests
+    console.log(`API Check-in - Buscando convidado na tabela 'guests'...`);
     const { data: existingGuest, error: fetchError } = await supabase
       .from('guests')
       .select('*')
       .eq('id', body.id)
-      .single();
+      .maybeSingle(); // Use maybeSingle para não lançar erro se não encontrar
     
-    if (fetchError) {
-      console.log(`API Check-in - Erro ao buscar convidado: ${fetchError.message}`);
+    // 2. Se não encontrar na tabela guests, tente na guest_list_guests
+    if (fetchError || !existingGuest) {
+      console.log(`API Check-in - Convidado não encontrado na tabela 'guests' ou erro: ${fetchError?.message}`);
+      console.log(`API Check-in - Tentando buscar na tabela 'guest_list_guests'...`);
       
-      // Tentar buscar na tabela guest_list_guests como fallback
       const { data: guestListGuest, error: guestListError } = await supabase
         .from('guest_list_guests')
         .select('*')
         .eq('id', body.id)
-        .single();
+        .maybeSingle();
         
+      if (guestListError) {
+        console.log(`API Check-in - Erro ao buscar na tabela 'guest_list_guests': ${guestListError.message}`);
+      }
+      
+      // Se encontrou na tabela guest_list_guests
       if (!guestListError && guestListGuest) {
+        console.log(`API Check-in - Convidado encontrado na tabela 'guest_list_guests': ${guestListGuest.name}`);
+        
+        // Verificar se o convidado pertence ao evento selecionado
+        if (guestListGuest.event_id && guestListGuest.event_id !== body.event_id) {
+          console.log(`API Check-in - Erro: Convidado pertence a outro evento: ${guestListGuest.event_id}`);
+          return NextResponse.json({ 
+            success: false, 
+            error: `Este convidado pertence a outro evento.` 
+          }, { status: 400 });
+        }
+        
+        // Verificar se já fez check-in
+        const alreadyCheckedIn = guestListGuest?.checked_in === true || guestListGuest?.is_checked_in === true;
+        console.log(`API Check-in - Convidado ${guestListGuest.name} já fez check-in antes? ${alreadyCheckedIn}`);
+        
         // Processar check-in na tabela guest_list_guests
         const updateData = { 
           checked_in: body.checked_in,
           is_checked_in: body.checked_in,
-          check_in_time: new Date().toISOString(),
+          check_in_time: alreadyCheckedIn ? guestListGuest.check_in_time : new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
+        
+        console.log(`API Check-in - Atualizando na tabela 'guest_list_guests' com:`, updateData);
         
         const { data, error } = await supabase
           .from('guest_list_guests')
@@ -311,23 +346,42 @@ export async function PUT(request: NextRequest) {
           .select();
           
         if (error) {
+          console.log(`API Check-in - Erro na atualização: ${error.message}`);
           return NextResponse.json(
-            { error: error.message },
+            { success: false, error: error.message },
             { status: 500 }
           )
         }
         
+        console.log(`API Check-in - Atualização bem-sucedida na 'guest_list_guests':`, data);
         return NextResponse.json({ 
           success: true, 
           data: data[0],
-          message: `Check-in de ${guestListGuest.name} realizado com sucesso`
+          alreadyCheckedIn,
+          message: alreadyCheckedIn 
+            ? `${guestListGuest.name} já realizou check-in anteriormente` 
+            : `Check-in de ${guestListGuest.name} realizado com sucesso`
         })
       }
       
+      // Se chegou aqui, não encontrou em nenhuma tabela
+      console.log(`API Check-in - Convidado não encontrado em nenhuma tabela.`);
       return NextResponse.json(
-        { error: `Convidado não encontrado: ${fetchError.message}` },
+        { success: false, error: `Convidado não encontrado nas tabelas guests ou guest_list_guests.` },
         { status: 404 }
       )
+    }
+    
+    // Se chegou aqui, encontrou na tabela guests
+    console.log(`API Check-in - Convidado encontrado na tabela 'guests': ${existingGuest.name}`);
+    
+    // Verificar se o convidado pertence ao evento selecionado
+    if (existingGuest.event_id && existingGuest.event_id !== body.event_id) {
+      console.log(`API Check-in - Erro: Convidado pertence a outro evento: ${existingGuest.event_id}`);
+      return NextResponse.json({ 
+        success: false, 
+        error: `Este convidado pertence ao evento ${existingGuest.event_id}, não ao evento ${body.event_id}.` 
+      }, { status: 400 });
     }
     
     // Verificar se já fez check-in (verificar tanto checked_in quanto is_checked_in para compatibilidade)
@@ -353,7 +407,7 @@ export async function PUT(request: NextRequest) {
     if (error) {
       console.log(`API Check-in - Erro na atualização: ${error.message}`);
       return NextResponse.json(
-        { error: error.message },
+        { success: false, error: error.message },
         { status: 500 }
       )
     }
@@ -370,7 +424,7 @@ export async function PUT(request: NextRequest) {
   } catch (err) {
     console.error('API Check-in - Erro interno:', err);
     return NextResponse.json(
-      { error: 'Erro interno do servidor', details: String(err) },
+      { success: false, error: 'Erro interno do servidor', details: String(err) },
       { status: 500 }
     )
   }

@@ -1,0 +1,286 @@
+ # Sistema Completo de Gestão de Equipes, Promotores e Comissões
+
+## 1. Dashboards a Serem Implementados
+
+### Dashboard do Organizador
+**URL**: `/app/organizador/dashboard`
+
+**Componentes principais:**
+- **Visão Geral**: KPIs de eventos, vendas, receita
+- **Equipes**: Equipes próprias e externas vinculadas
+- **Comissões**: Pendentes, pagas, histórico de pagamentos
+- **Eventos**: Ativos, próximos, passados
+
+**Seções específicas a implementar:**
+1. **Header**: Logo, navegação, perfil, notificações
+2. **Sidebar**: Menu completo de navegação
+3. **Painel "Equipes"**:
+   - Lista de equipes com métricas
+   - Código da organização para vinculação
+   - Botões de ação (pagar, configurar)
+4. **Painel "Comissões"**:
+   - Valores pendentes por equipe
+   - Histórico de pagamentos
+   - Geração de recibos
+5. **Modal "Adicionar Equipe"**:
+   - Campo para código de equipe
+   - Configuração de comissões
+   - Tipo de comissão (percentual, fixo, patamares)
+
+### Dashboard do Chefe de Equipe
+**URL**: `/app/chefe-equipe/dashboard`
+
+**Componentes principais:**
+- **Visão Geral**: KPIs de vendas, comissões, equipe
+- **Gestão de Equipe**: Membros, desempenho, códigos
+- **Organizações**: Vinculações, eventos, comissões
+- **Financeiro**: Saldos, pagamentos, relatórios
+
+**Seções específicas a implementar:**
+1. **Header**: Logo, navegação, perfil, notificações
+2. **Sidebar**: Menu completo de navegação
+3. **Painel "Minha Equipe"**:
+   - Código de equipe para compartilhar
+   - Lista de promotores com métricas
+   - Botão para adicionar promotores
+4. **Painel "Organizações"**:
+   - Organizações vinculadas
+   - Eventos ativos por organização
+   - Campo para adicionar nova organização
+5. **Painel "Financeiro"**:
+   - Resumo de comissões (pendentes/pagas)
+   - Split entre equipe e promotores
+   - Histórico de pagamentos
+6. **Painel "Relatórios"**:
+   - Desempenho por promotor
+   - Desempenho por organização/evento
+   - Exportação de relatórios
+
+### Dashboard do Promotor
+**URL**: `/app/promotor/dashboard`
+
+**Componentes principais:**
+- **Visão Geral**: KPIs de vendas, comissões
+- **Equipes**: Listagem de equipes que participa
+- **Eventos**: Eventos ativos para promoção
+- **Financeiro**: Comissões, pagamentos, histórico
+
+**Seções específicas a implementar:**
+1. **Header**: Logo, navegação, perfil, notificações
+2. **Sidebar**: Menu completo de navegação
+3. **Painel "Minhas Equipes"**:
+   - Lista de equipes que participa
+   - Taxa de comissão em cada equipe
+   - Campo para juntar-se a nova equipe
+4. **Painel "Eventos Ativos"**:
+   - Eventos disponíveis para promoção
+   - Links e QR codes para compartilhar
+   - Estatísticas de vendas por evento
+5. **Painel "Financeiro"**:
+   - Saldo disponível e pendente
+   - Histórico de comissões
+   - Confirmação de recebimentos
+
+## 2. Interfaces de Gerenciamento
+
+### Interface de Gestão de Equipes (Chefe)
+```
+-------------------------------------------
+|      Gerenciar Equipe: Promoters Elite  |
+|                                         |
+| Código da Equipe: TEAM-X7Z9Y [Regenerar]|
+| [Copiar] [Compartilhar]                 |
+|                                         |
+| Membros (12):                           |
+| [+ Adicionar Promotor]                  |
+|                                         |
+| Nome | Função | Vendas | Comissão | Ação |
+| ---- | ------ | ------ | -------- | ---- |
+| João | Chefe  | 35     | € 920    | [⚙️] |
+| Maria| Promot.| 42     | € 1.120  | [⚙️] |
+| [Ver Todos]                             |
+|                                         |
+| Configuração de Comissões:              |
+| • Split Padrão: 30% Equipe / 70% Promotor |
+| • Comissão Personalizada Por Membro:    |
+|   → Maria: 75% (exceção)                |
+| [Editar Configurações]                  |
+|                                         |
+| Convites Pendentes:                     |
+| • email@exemplo.com - enviado 25/03     |
+| [Reenviar] [Cancelar]                   |
+-------------------------------------------
+```
+
+### Interface de Pagamento de Comissões (Organizador)
+```
+-------------------------------------------
+|      Pagar Comissões                    |
+|                                         |
+| Equipe: Promoters Elite                 |
+|                                         |
+| Período: [01/03/2025] até [31/03/2025]  |
+| Total Pendente: € 1.200,00              |
+|                                         |
+| Detalhamento:                           |
+| [✓] Festa Zalu - Maria - € 350,00       |
+| [✓] Festa Zalu - Carlos - € 580,00      |
+| [✓] Festa Gold - Maria - € 270,00       |
+|                                         |
+| Total Selecionado: € 1.200,00           |
+|                                         |
+| Método de Pagamento: Dinheiro Físico    |
+|                                         |
+| [X] Gerar recibo para impressão         |
+| [X] Enviar email de notificação         |
+|                                         |
+| Notas: [____________________]           |
+|                                         |
+| [Cancelar]     [Confirmar Pagamento]    |
+-------------------------------------------
+```
+
+### Interface de Confirmação de Recebimento (Promotor/Chefe)
+```
+-------------------------------------------
+|      Confirmar Recebimento              |
+|                                         |
+| Código do Recibo: [____________]        |
+|                                         |
+| [Verificar]                             |
+|                                         |
+| → Recibo #12345 - Zalu Club             |
+| → Valor: € 1.200,00                     |
+| → Data: 05/04/2025                      |
+|                                         |
+| Confirmação:                            |
+| [X] Confirmo o recebimento em dinheiro  |
+|     do valor total especificado.        |
+|                                         |
+| Observações: [________________]         |
+|                                         |
+| [Cancelar]      [Confirmar Recebimento] |
+-------------------------------------------
+```
+
+## 3. Relatórios Detalhados
+
+### Relatório de Desempenho (Chefe de Equipe)
+```
+-------------------------------------------
+|      Relatório de Desempenho            |
+|                                         |
+| Período: [Março/2025]                   |
+| Visualização: [Por Promotor ▼]          |
+|                                         |
+| Gráfico: Vendas por Promotor            |
+| [Gráfico de barras: Maria 42, Carlos 38,|
+|  Paulo 25, Ana 15]                      |
+|                                         |
+| Gráfico: Comissões Geradas              |
+| [Gráfico de barras com valores]         |
+|                                         |
+| Tendência: Vendas Diárias               |
+| [Gráfico de linha dos últimos 30 dias]  |
+|                                         |
+| Top Eventos:                            |
+| 1. Festa Zalu: 55 ingressos             |
+| 2. Festa Gold: 35 ingressos             |
+| 3. Show Premium: 30 ingressos           |
+|                                         |
+| [Exportar Relatório]                    |
+-------------------------------------------
+```
+
+### Relatório Financeiro (Organizador)
+```
+-------------------------------------------
+|      Relatório Financeiro               |
+|                                         |
+| Período: [Março/2025]                   |
+| Equipe: [Todas ▼]                       |
+|                                         |
+| Total de Comissões: € 8.750,00          |
+| → Pagas: € 6.400,00                     |
+| → Pendentes: € 2.350,00                 |
+|                                         |
+| Distribuição por Evento:                |
+| • Festa Zalu: € 4.250,00 (48.6%)        |
+| • Festa Gold: € 2.350,00 (26.9%)        |
+| • Show Premium: € 2.150,00 (24.5%)      |
+|                                         |
+| Distribuição por Equipe:                |
+| • Promoters Elite: € 5.200,00 (59.4%)   |
+| • Team VIP: € 2.300,00 (26.3%)          |
+| • Promotores Zalu: € 1.250,00 (14.3%)   |
+|                                         |
+| Histórico de Pagamentos:                |
+| Data    | Equipe | Valor    | Status    |
+| 05/03   | Elite  | € 1.850  | Confirmado|
+| 15/03   | VIP    | € 1.200  | Confirmado|
+| 25/03   | Elite  | € 2.050  | Pendente  |
+|                                         |
+| [Exportar para PDF] [Excel]             |
+-------------------------------------------
+```
+
+## 4. Plano de Implementação
+
+### Fase 1: Estrutura de Dados
+- Criar tabelas no Supabase (teams, team_members, organization_teams, etc.)
+- Implementar funções RPC para operações comuns
+- Configurar políticas de segurança (RLS)
+
+### Fase 2: Autenticação e Autorização
+- Implementar sistema de perfis (organizador, chefe, promotor)
+- Configurar permissões para cada perfil
+- Criar sistema de convites e códigos
+
+### Fase 3: Dashboards Principais
+- Desenvolver layout responsivo
+- Implementar componentes de cada dashboard
+- Criar sistema de navegação
+
+### Fase 4: Sistema de Comissões
+- Implementar engine de cálculo de comissões
+- Criar sistema de split equipe/promotor
+- Desenvolver wallet virtual para rastreamento
+
+### Fase 5: Sistema de Pagamentos
+- Implementar geração de recibos
+- Criar fluxo de confirmação de recebimento
+- Desenvolver histórico de transações
+
+### Fase 6: Relatórios e Analytics
+- Implementar dashboards analíticos
+- Criar relatórios exportáveis
+- Desenvolver visualizações gráficas
+
+## 5. Tecnologias a Utilizar
+
+- **Frontend**: Next.js, React, TailwindCSS
+- **Backend**: Supabase (PostgreSQL, Funções, Autenticação)
+- **Gráficos**: Chart.js ou Recharts
+- **Exportação**: jsPDF, ExcelJS
+- **QR Codes**: qrcode.react
+
+## 6. Testes e Validação
+
+- Testes unitários para cálculos de comissão
+- Testes de fluxo para pagamentos
+- Validação de segurança para códigos de equipe/recibos
+- Testes de carga para relatórios grandes
+
+## 7. Diretrizes Importantes de Implementação
+
+- **Manter a estrutura do site**: Todas as novas funcionalidades devem seguir o design e padrões existentes do site, garantindo uma experiência de usuário consistente.
+
+- **Preservar a mecânica atual**: As funcionalidades existentes devem continuar funcionando sem interrupção, integrando as novas características de forma harmoniosa.
+
+- **Garantir funcionalidade dos botões**: Todos os botões e elementos interativos criados devem ser totalmente funcionais e conectados às suas respectivas ações no backend.
+
+- **Evitar dead code**: Não incluir código que não tenha utilidade ou funções não utilizadas, mantendo a base de código limpa e eficiente.
+
+- **Implementação gradual e cuidadosa**: Realizar todas as modificações com atenção aos detalhes, testando cada nova funcionalidade antes de prosseguir para a próxima etapa.
+
+- **Documentação clara**: Manter documentação detalhada de todas as novas funcionalidades e alterações para facilitar manutenção futura.

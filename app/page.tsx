@@ -5,9 +5,19 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
+import { LogOut } from 'lucide-react'
 
 export default function HomePage() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // Não é necessário redirecionar, pois o hook useAuth já faz isso
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -24,9 +34,15 @@ export default function HomePage() {
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
-              <Link href="/app/organizador/dashboard">
-                <Button>Dashboard</Button>
+              <>
+                <Link href="/app/organizador/dashboard">
+                  <Button>Dashboard</Button>
               </Link>
+                <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </Button>
+              </>
             ) : (
               <>
               <Link href="/login">

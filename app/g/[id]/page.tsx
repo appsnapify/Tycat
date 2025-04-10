@@ -3,7 +3,7 @@
 // Essencialmente a mesma página que a de eventos normais, mas com foco em guest list
 // Reutilizamos o mesmo código com pequenas adaptações
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { CalendarIcon, Clock, MapPin, Share2, UserCheck, Users, ChevronDown } from 'lucide-react'
@@ -62,6 +62,21 @@ interface Event {
   guest_list_settings?: any
 }
 
+// Lista de países com bandeiras e prefixos - Movido para fora do componente para não recriar em cada render
+const countries = [
+  { code: 'PT', name: 'Portugal', prefix: '+351', flag: '🇵🇹' },
+  { code: 'BR', name: 'Brasil', prefix: '+55', flag: '🇧🇷' },
+  { code: 'US', name: 'Estados Unidos', prefix: '+1', flag: '🇺🇸' },
+  { code: 'ES', name: 'Espanha', prefix: '+34', flag: '🇪🇸' },
+  { code: 'IT', name: 'Itália', prefix: '+39', flag: '🇮🇹' },
+  { code: 'FR', name: 'França', prefix: '+33', flag: '🇫🇷' },
+  { code: 'UK', name: 'Reino Unido', prefix: '+44', flag: '🇬🇧' },
+  { code: 'DE', name: 'Alemanha', prefix: '+49', flag: '🇩🇪' },
+  { code: 'CV', name: 'Cabo Verde', prefix: '+238', flag: '🇨🇻' },
+  { code: 'AO', name: 'Angola', prefix: '+244', flag: '🇦🇴' },
+  { code: 'MZ', name: 'Moçambique', prefix: '+258', flag: '🇲🇿' },
+];
+
 // Este componente lida com a lógica de dados da página
 function GuestListPageContent({ eventId }: { eventId: string }) {
   const router = useRouter()
@@ -72,22 +87,6 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [guestCount, setGuestCount] = useState<number>(0)
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
-  
-  // Lista de países com bandeiras e prefixos
-  const countries = [
-    { code: 'PT', name: 'Portugal', prefix: '+351', flag: '🇵🇹' },
-    { code: 'BR', name: 'Brasil', prefix: '+55', flag: '🇧🇷' },
-    { code: 'US', name: 'Estados Unidos', prefix: '+1', flag: '🇺🇸' },
-    { code: 'ES', name: 'Espanha', prefix: '+34', flag: '🇪🇸' },
-    { code: 'IT', name: 'Itália', prefix: '+39', flag: '🇮🇹' },
-    { code: 'FR', name: 'França', prefix: '+33', flag: '🇫🇷' },
-    { code: 'UK', name: 'Reino Unido', prefix: '+44', flag: '🇬🇧' },
-    { code: 'DE', name: 'Alemanha', prefix: '+49', flag: '🇩🇪' },
-    { code: 'CV', name: 'Cabo Verde', prefix: '+238', flag: '🇨🇻' },
-    { code: 'AO', name: 'Angola', prefix: '+244', flag: '🇦🇴' },
-    { code: 'MZ', name: 'Moçambique', prefix: '+258', flag: '🇲🇿' },
-  ];
-  
   const [selectedCountry, setSelectedCountry] = useState(countries[0]); // Portugal por padrão
   
   // Configuração do formulário
@@ -101,121 +100,99 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   
   // Buscar dados do evento e contagem de convidados
   useEffect(() => {
+    let isMounted = true;
+    
     async function loadEvent() {
       try {
+        if (!isMounted) return;
         setLoading(true)
         
-        // Verificar se a tabela 'guests' existe e criar se necessário
-        const { data: tableExists, error: checkError } = await supabase
-          .from('guests')
-          .select('*')
-          .limit(1)
+        // Otimização: buscar evento e contagem em paralelo
+        const [eventResult, countResult] = await Promise.all([
+          // Buscar evento
+          supabase
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .eq('is_active', true)
+            .eq('type', 'guest-list')
+            .single(),
+          
+          // Buscar contagem
+          supabase
+            .from('guests')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+        ]);
         
-        if (checkError && checkError.code === '42P01') { // Código para "relation does not exist"
-          console.log("Tabela 'guests' não encontrada, tentando criar...");
-          
-          // Criar a tabela guests
-          const createTableQuery = `
-            CREATE TABLE IF NOT EXISTS guests (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-              name TEXT NOT NULL,
-              phone TEXT NOT NULL,
-              qr_code TEXT NOT NULL,
-              checked_in BOOLEAN DEFAULT FALSE,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-          `;
-          
-          try {
-            // Este é um exemplo simplificado - em produção você precisaria de
-            // permissões adequadas e um método mais seguro para criar a tabela
-            await supabase.rpc('execute_sql', { query: createTableQuery });
-            console.log("Tabela 'guests' criada com sucesso!");
-          } catch (createError) {
-            console.error("Erro ao criar tabela 'guests':", createError);
-          }
+        // Verificar erros no carregamento do evento
+        if (eventResult.error || !eventResult.data) {
+          throw new Error(eventResult.error?.message || 'Guest list não encontrada ou não está ativa');
         }
         
-        // Buscar evento do Supabase
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .eq('id', eventId)
-          .eq('is_active', true)
-          .eq('type', 'guest-list')
-          .single()
-          
-        if (error) {
-          throw new Error('Guest list não encontrada ou não está ativa')
-        }
+        if (!isMounted) return;
         
-        if (!data) {
-          throw new Error('Guest list não encontrada')
-        }
+        console.log("Dados da guest list carregados:", eventResult.data);
+        setEvent(eventResult.data);
         
-        console.log("Dados da guest list carregados:", data)
-        setEvent(data)
-        
-        // Buscar contagem de convidados
-        const { count, error: countError } = await supabase
-          .from('guests')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_id', eventId)
-        
-        if (!countError) {
-          setGuestCount(count || 0)
+        // Definir contagem se disponível
+        if (!countResult.error) {
+          setGuestCount(countResult.count || 0);
         }
       } catch (err) {
-        console.error("Erro ao carregar guest list:", err)
-        setError(err instanceof Error ? err.message : 'Erro ao carregar guest list')
+        if (!isMounted) return;
+        console.error("Erro ao carregar guest list:", err);
+        setError(err instanceof Error ? err.message : 'Erro ao carregar guest list');
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     
-    loadEvent()
-  }, [eventId])
+    loadEvent();
+    
+    // Cleanup para evitar vazamentos de memória
+    return () => {
+      isMounted = false;
+    };
+  }, [eventId]);
   
-  // Função para formatar data
-  const formatDate = (dateString: string) => {
-    if (!dateString) return ''
-    const date = new Date(dateString)
+  // Funções de formatação memoizadas para evitar recálculos desnecessários
+  const formatDate = useMemo(() => (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    })
-  }
+    });
+  }, []);
   
-  // Função para formatar hora
-  const formatTime = (timeString: string) => {
-    if (!timeString) return ''
+  const formatTime = useMemo(() => (timeString: string) => {
+    if (!timeString) return '';
     
     // Se for uma string de hora (formato HH:MM:SS)
     if (timeString.includes(':') && !timeString.includes('-') && !timeString.includes('T')) {
-      const [hours, minutes] = timeString.split(':')
-      return `${hours}:${minutes}`
+      const [hours, minutes] = timeString.split(':');
+      return `${hours}:${minutes}`;
     }
     
     // Se for uma string de data completa
-    const date = new Date(timeString)
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  }
+    const date = new Date(timeString);
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }, []);
   
   // Função para registrar convidado
   const onSubmit = async (data: GuestFormValues) => {
-    if (!event) return
+    if (!event) return;
     
-    setSubmitting(true)
+    setSubmitting(true);
     try {
-      console.log("Cliente - Iniciando registro de convidado:", data)
-      
       // Sanitizar o número de telefone e adicionar o prefixo do país
-      const sanitizedPhone = data.phone.replace(/\D/g, '')
-      const fullPhone = `${selectedCountry.prefix}${sanitizedPhone}`
+      const sanitizedPhone = data.phone.replace(/\D/g, '');
+      const fullPhone = `${selectedCountry.prefix}${sanitizedPhone}`;
       
       // Preparar dados do convidado
       const guestData = {
@@ -223,112 +200,82 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
         name: data.name,
         phone: fullPhone,
         created_at: new Date().toISOString()
-      }
-      
-      console.log("Cliente - Enviando dados para API:", guestData)
+      };
       
       // Registrar através da API
-      try {
-        const response = await fetch('/api/guests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(guestData),
-        });
-        
-        console.log("Cliente - Status da resposta da API:", response.status)
-        
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.error("Cliente - Erro da API:", errorData)
-          throw new Error(errorData.error || response.statusText)
-        }
-        
-        const result = await response.json()
-        console.log("Cliente - Resultado da API:", result)
-        console.log("Cliente - Origem dos dados:", result.source)
-        console.log("Cliente - Mensagem da API:", result.message)
-        
-        if (result.error) {
-          console.error("Cliente - Erro retornado pela API:", result.error)
-        }
-        
-        // Verificar a URL do QR code
-        if (result.qrCodeUrl) {
-          console.log("Cliente - QR Code recebido da API, tamanho:", result.qrCodeUrl.length);
-          console.log("Cliente - Começo do QR Code:", result.qrCodeUrl.substring(0, 50) + "...");
-          setQrCodeUrl(result.qrCodeUrl)
-        } else {
-          console.error("Cliente - QR Code não recebido da API")
-        }
-        
-        // Verificar se precisamos salvar localmente
-        if (result.source === "local_storage" && result.data) {
-          console.log("Cliente - Salvando dados do convidado no localStorage");
-          
-          try {
-            // Obter lista existente ou iniciar nova
-            const storageKey = `guests_${event.id}`;
-            const existingGuests = localStorage.getItem(storageKey);
-            const guestsList = existingGuests ? JSON.parse(existingGuests) : [];
-            
-            // Adicionar novo convidado à lista
-            guestsList.push(result.data);
-            
-            // Salvar lista atualizada
-            localStorage.setItem(storageKey, JSON.stringify(guestsList));
-            
-            console.log(`Cliente - Convidado salvo localmente. Total: ${guestsList.length}`);
-          } catch (storageError) {
-            console.error("Cliente - Erro ao salvar no localStorage:", storageError);
-          }
-        }
-        
-        // Atualizar UI para sucesso
-        setRegistrationSuccess(true)
-        setGuestCount(prevCount => prevCount + 1)
-        
-        toast({
-          title: result.message || "Registro confirmado!",
-          description: "Você foi adicionado à guest list com sucesso.",
-        })
-        
-        // Limpar formulário
-        form.reset()
-      } catch (error) {
-        console.error("Cliente - Erro ao comunicar com API:", error)
-        
-        // Exibir erro ao usuário
-        toast({
-          title: "Erro na comunicação",
-          description: "Não foi possível conectar ao servidor. Tente novamente mais tarde.",
-          variant: "destructive"
-        })
+      const response = await fetch('/api/guests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(guestData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || response.statusText);
       }
+      
+      const result = await response.json();
+      
+      // Verificar a URL do QR code
+      if (result.qrCodeUrl) {
+        setQrCodeUrl(result.qrCodeUrl);
+      }
+      
+      // Verificar se precisamos salvar localmente
+      if (result.source === "local_storage" && result.data) {
+        try {
+          // Obter lista existente ou iniciar nova
+          const storageKey = `guests_${event.id}`;
+          const existingGuests = localStorage.getItem(storageKey);
+          const guestsList = existingGuests ? JSON.parse(existingGuests) : [];
+          
+          // Adicionar novo convidado à lista
+          guestsList.push(result.data);
+          
+          // Salvar lista atualizada
+          localStorage.setItem(storageKey, JSON.stringify(guestsList));
+        } catch (storageError) {
+          console.error("Erro ao salvar no localStorage:", storageError);
+        }
+      }
+      
+      // Atualizar UI para sucesso
+      setRegistrationSuccess(true);
+      setGuestCount(prevCount => prevCount + 1);
+      
+      toast({
+        title: result.message || "Registro confirmado!",
+        description: "Você foi adicionado à guest list com sucesso.",
+      });
+      
+      // Limpar formulário
+      form.reset();
     } catch (err) {
-      console.error("Cliente - Erro geral no registro:", err)
+      console.error("Erro no registro:", err);
       toast({
         title: "Erro no registro",
         description: err instanceof Error 
           ? err.message 
           : "Não foi possível completar seu registro. Tente novamente.",
         variant: "destructive"
-      })
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
   
   // Função para compartilhar via WhatsApp
   const shareViaWhatsApp = () => {
-    const message = `Venha comigo para o evento ${event?.title} em ${event?.location} no dia ${formatDate(event?.date || '')}!`;
+    if (!event) return;
+    const message = `Venha comigo para o evento ${event.title} em ${event.location} no dia ${formatDate(event.date)}!`;
     const url = window.location.href;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message + '\n\n' + url)}`;
     window.open(whatsappUrl, '_blank');
   };
   
-  // Estado de carregamento
+  // Estado de carregamento - simplificado para melhorar desempenho
   if (loading) {
     return (
       <div className="container max-w-4xl mx-auto px-4 py-8">
@@ -340,7 +287,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
           <div className="h-4 bg-gray-300 w-2/3 rounded mb-6"></div>
         </div>
       </div>
-    )
+    );
   }
   
   // Estado de erro
@@ -359,18 +306,20 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header do evento com imagem */}
+      {/* Header do evento com imagem otimizada */}
       <div className="relative w-full h-[30vh] md:h-[40vh] bg-gray-900">
         {event.flyer_url ? (
           <Image
             src={event.flyer_url}
             alt={event.title}
             fill
+            sizes="100vw"
+            priority
             style={{ objectFit: 'cover' }}
             className="opacity-70"
           />
@@ -381,7 +330,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
           <div className="container max-w-4xl mx-auto px-4 pb-8">
             <Badge className="mb-2 bg-blue-600">Guest List</Badge>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{event.title}</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">{event.title}</h1>
             <div className="flex items-center text-white opacity-80">
               <Users className="h-4 w-4 mr-1" />
               <span>{guestCount} {guestCount === 1 ? 'pessoa' : 'pessoas'} confirmadas</span>
@@ -391,17 +340,17 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
       </div>
       
       {/* Conteúdo do evento */}
-      <div className="container max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="container max-w-4xl mx-auto px-4 py-6 md:py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           {/* Coluna principal */}
           <div className="md:col-span-2 space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle>Detalhes da Guest List</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 text-gray-700">
-                  <CalendarIcon className="h-5 w-5 text-gray-500" />
+                  <CalendarIcon className="h-5 w-5 text-gray-500 flex-shrink-0" />
                   <div>
                     <p className="font-medium">{formatDate(event.date)}</p>
                     <p className="text-sm text-gray-500">
@@ -412,7 +361,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                 </div>
                 
                 <div className="flex items-center gap-3 text-gray-700">
-                  <MapPin className="h-5 w-5 text-gray-500" />
+                  <MapPin className="h-5 w-5 text-gray-500 flex-shrink-0" />
                   <div>
                     <p className="font-medium">{event.location}</p>
                   </div>
@@ -433,8 +382,8 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
           
           {/* Coluna lateral - Formulário de registro ou confirmação */}
           <div className="md:col-span-1">
-            <Card className="sticky top-4">
-              <CardHeader className="bg-blue-50 border-b">
+            <Card className="md:sticky md:top-4">
+              <CardHeader className="bg-blue-50 border-b pb-4">
                 <CardTitle className="text-blue-700">
                   {registrationSuccess 
                     ? 'Confirmação da Guest List!' 
@@ -466,10 +415,10 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                         <div className="flex justify-center bg-white p-3 rounded-md mx-auto" style={{ width: '200px', height: '200px' }}>
                           <img 
                             src={qrCodeUrl} 
-                            alt="QR Code de acesso" 
+                            alt="QR Code de acesso"
                             style={{ width: '180px', height: '180px', objectFit: 'contain' }}
+                            loading="eager"
                             onError={(e) => {
-                              console.error('Erro ao carregar QR code:', e);
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OSI+UVIgQ29kZTxicj5pbmRpc3BvbsOtdmVsPC90ZXh0Pjwvc3ZnPg==';
                             }}
                           />
@@ -479,22 +428,6 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                             href={qrCodeUrl} 
                             download="meu-qrcode-evento.png"
                             className="text-sm text-blue-600 inline-block hover:underline"
-                            onClick={(e) => {
-                              // Verificar se a URL é válida antes de baixar
-                              if (qrCodeUrl.startsWith('data:image')) {
-                                // É uma URL de dados válida, permitir o download
-                                console.log('Iniciando download do QR code');
-                              } else {
-                                // URL inválida, evitar o download
-                                e.preventDefault();
-                                console.error('QR code inválido para download');
-                                toast({
-                                  title: "Erro no QR code",
-                                  description: "Não foi possível baixar o QR code.",
-                                  variant: "destructive"
-                                });
-                              }
-                            }}
                           >
                             Salvar QR Code
                           </a>
@@ -547,13 +480,14 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                                       variant="outline" 
                                       className="absolute inset-y-0 left-0 h-full pl-2 pr-10 flex items-center justify-start rounded-r-none border-r-0"
                                       style={{ width: '90px', paddingRight: '8px' }}
+                                      type="button"
                                     >
                                       <span>{selectedCountry.flag}</span>
                                       <span className="ml-1 text-xs">{selectedCountry.prefix}</span>
                                       <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start" className="max-h-60 overflow-y-auto">
+                                  <DropdownMenuContent align="start" className="max-h-48 overflow-y-auto">
                                     {countries.map((country) => (
                                       <DropdownMenuItem
                                         key={country.code}
@@ -571,6 +505,8 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                                   className="pl-24" 
                                   placeholder="912345678" 
                                   {...field} 
+                                  type="tel"
+                                  inputMode="tel"
                                 />
                               </div>
                             </FormControl>

@@ -42,7 +42,7 @@ export default function RegisterPage() {
       first_name: '',
       last_name: '',
       email: '',
-      role: 'organizador',
+      role: 'promotor',
       password: '',
       confirm: ''
     }

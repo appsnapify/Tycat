@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   first_name TEXT NOT NULL,
   last_name TEXT,
-  role TEXT NOT NULL CHECK (role IN ('organizador', 'promotor')),
+  role TEXT NOT NULL CHECK (role IN ('organizador', 'promotor', 'team-leader')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -252,4 +252,26 @@ SELECT
   au.created_at
 FROM auth.users au
 LEFT JOIN profiles p ON au.id = p.id
-WHERE p.id IS NULL; 
+WHERE p.id IS NULL;
+
+-- Criar políticas para team_members (se existirem)
+
+-- Remover políticas potencialmente problemáticas
+DROP POLICY IF EXISTS "Membros visíveis para membros da mesma equipe" ON team_members;
+
+-- Políticas simplificadas para team_members
+CREATE POLICY "Todos podem visualizar membros de equipe" 
+ON team_members FOR SELECT 
+USING (true);
+
+CREATE POLICY "Usuário pode visualizar suas próprias associações" 
+ON team_members FOR SELECT 
+USING (user_id = auth.uid());
+
+CREATE POLICY "Criadores de equipe podem gerenciar membros" 
+ON team_members FOR ALL 
+USING (
+  team_id IN (
+    SELECT id FROM teams WHERE created_by = auth.uid()
+  )
+); 
