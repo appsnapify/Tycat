@@ -39,14 +39,29 @@ const GuestListFormSchema = z.object({
   title: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   description: z.string().min(10, 'A descrição deve ter pelo menos 10 caracteres'),
   startDate: z.date({
-    required_error: 'A data de início é obrigatória',
+    required_error: 'A data de início do evento é obrigatória',
   }),
   endDate: z.date({
-    required_error: 'A data de término é obrigatória',
+    required_error: 'A data de término do evento é obrigatória',
+  }),
+  guestListOpenDate: z.date({
+    required_error: 'A data de abertura da lista é obrigatória',
+  }),
+  guestListCloseDate: z.date({
+    required_error: 'A data de fechamento da lista é obrigatória',
   }),
   location: z.string().min(3, 'O local deve ter pelo menos 3 caracteres'),
   flyer: z.instanceof(FileList).optional(),
-})
+}).refine(data => data.guestListOpenDate < data.guestListCloseDate, {
+  message: "A data de abertura da lista deve ser anterior à data de fechamento",
+  path: ["guestListCloseDate"], // Mostra o erro no campo de data de fechamento
+}).refine(data => data.startDate <= data.endDate, {
+  message: "A data de início do evento deve ser anterior ou igual à data de término",
+  path: ["endDate"],
+}).refine(data => data.guestListCloseDate <= data.startDate, {
+  message: "A lista deve fechar antes ou no momento em que o evento começa",
+  path: ["guestListCloseDate"],
+});
 
 type GuestListFormValues = z.infer<typeof GuestListFormSchema>
 
@@ -135,6 +150,16 @@ export default function GuestListPage() {
             // Adicionar 3 horas à data de início
             endDate.setHours(endDate.getHours() + 3)
             form.setValue('endDate', endDate)
+          }
+          
+          // Converter data de abertura da lista
+          if (event.guest_list_open_datetime) {
+            form.setValue('guestListOpenDate', new Date(event.guest_list_open_datetime));
+          }
+
+          // Converter data de fechamento da lista
+          if (event.guest_list_close_datetime) {
+            form.setValue('guestListCloseDate', new Date(event.guest_list_close_datetime));
           }
           
           form.setValue('location', event.location || '')
@@ -304,6 +329,8 @@ export default function GuestListPage() {
         organization_id: currentOrganization.id,
         type: 'guest-list',
         is_active: true,
+        guest_list_open_datetime: data.guestListOpenDate.toISOString(),
+        guest_list_close_datetime: data.guestListCloseDate.toISOString(),
         guest_list_settings: {
           max_guests: 100, // Valor padrão
           requires_approval: false // Valor padrão
@@ -428,7 +455,7 @@ export default function GuestListPage() {
                   name="startDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Data de Início</FormLabel>
+                      <FormLabel>Data de Início <span className="text-xs text-muted-foreground">(Evento)</span></FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -440,9 +467,9 @@ export default function GuestListPage() {
                               )}
                             >
                               {field.value ? (
-                                format(field.value, 'dd/MM/yyyy')
+                                format(field.value, 'dd/MM/yyyy HH:mm')
                               ) : (
-                                <span>Selecione uma data</span>
+                                <span>Selecione data e hora</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -458,6 +485,20 @@ export default function GuestListPage() {
                             }
                             initialFocus
                           />
+                          <div className="p-3 border-t border-border">
+                            <p className="text-xs text-muted-foreground">Selecione a hora no campo abaixo (implementação pendente)</p>
+                            <Input 
+                              type="time" 
+                              value={field.value ? format(field.value, 'HH:mm') : ''}
+                              onChange={(e) => {
+                                const time = e.target.value;
+                                const [hours, minutes] = time.split(':');
+                                const newDate = field.value ? new Date(field.value) : new Date();
+                                newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                field.onChange(newDate);
+                              }}
+                            />
+                          </div>
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
@@ -470,7 +511,7 @@ export default function GuestListPage() {
                   name="endDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Data de Término</FormLabel>
+                      <FormLabel>Data de Término <span className="text-xs text-muted-foreground">(Evento)</span></FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -482,9 +523,9 @@ export default function GuestListPage() {
                               )}
                             >
                               {field.value ? (
-                                format(field.value, 'dd/MM/yyyy')
+                                format(field.value, 'dd/MM/yyyy HH:mm')
                               ) : (
-                                <span>Selecione uma data</span>
+                                <span>Selecione data e hora</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -500,6 +541,29 @@ export default function GuestListPage() {
                             }
                             initialFocus
                           />
+                          <div className="p-3 border-t border-border">
+                            <Input 
+                              type="time" 
+                              value={field.value ? format(field.value, 'HH:mm') : ''}
+                              onChange={(e) => {
+                                const time = e.target.value;
+                                const [hours, minutes] = time.split(':');
+                                const newDate = field.value ? new Date(field.value) : new Date();
+                                newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                
+                                // Validação extra: hora de fechamento no mesmo dia da abertura
+                                const openDate = form.getValues('guestListOpenDate');
+                                if(openDate && 
+                                   newDate.toDateString() === openDate.toDateString() &&
+                                   newDate.getTime() < openDate.getTime()) {
+                                    // Resetar se for inválido? Ou mostrar erro? Por agora, apenas aplicamos.
+                                    // Idealmente, a validação Zod pegaria isso, mas pode ser bom ter feedback imediato.
+                                }
+                                
+                                field.onChange(newDate);
+                              }}
+                            />
+                          </div>
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
@@ -517,6 +581,130 @@ export default function GuestListPage() {
                     <FormControl>
                       <Input placeholder="Ex: Club Premium" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Datas da Guest List */}
+            <h2 className="text-lg font-semibold pt-4">Período de Registro na Lista</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="guestListOpenDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Abertura da Lista</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy HH:mm')
+                            ) : (
+                              <span>Selecione data e hora</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                        <div className="p-3 border-t border-border">
+                          <p className="text-xs text-muted-foreground">Selecione a hora no campo abaixo (implementação pendente)</p>
+                          <Input 
+                            type="time" 
+                            value={field.value ? format(field.value, 'HH:mm') : ''}
+                            onChange={(e) => {
+                              const time = e.target.value;
+                              const [hours, minutes] = time.split(':');
+                              const newDate = field.value ? new Date(field.value) : new Date();
+                              newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                              field.onChange(newDate);
+                            }}
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="guestListCloseDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Fechamento da Lista</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy HH:mm')
+                            ) : (
+                              <span>Selecione data e hora</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => 
+                            (form.getValues('guestListOpenDate') && date < form.getValues('guestListOpenDate')) ||
+                            (form.getValues('startDate') && date > form.getValues('startDate'))
+                          }
+                          initialFocus
+                        />
+                        <div className="p-3 border-t border-border">
+                          <Input 
+                            type="time" 
+                            value={field.value ? format(field.value, 'HH:mm') : ''}
+                            onChange={(e) => {
+                              const time = e.target.value;
+                              const [hours, minutes] = time.split(':');
+                              const newDate = field.value ? new Date(field.value) : new Date();
+                              newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                              
+                              // Validação extra: hora de fechamento no mesmo dia da abertura
+                              const openDate = form.getValues('guestListOpenDate');
+                              if(openDate && 
+                                 newDate.toDateString() === openDate.toDateString() &&
+                                 newDate.getTime() < openDate.getTime()) {
+                                  // Resetar se for inválido? Ou mostrar erro? Por agora, apenas aplicamos.
+                                  // Idealmente, a validação Zod pegaria isso, mas pode ser bom ter feedback imediato.
+                              }
+                              
+                              field.onChange(newDate);
+                            }}
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

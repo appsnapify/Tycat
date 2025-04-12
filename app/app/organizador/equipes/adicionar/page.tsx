@@ -190,7 +190,7 @@ export default function AdicionarEquipePage() {
       <Card>
         <CardHeader className="text-center">
           <Building className="h-12 w-12 mx-auto text-primary mb-4" />
-          <CardTitle>Adicionar Equipe</CardTitle>
+          <CardTitle>Criar Equipe</CardTitle>
           <CardDescription>
             Vincule uma equipe à sua organização
           </CardDescription>

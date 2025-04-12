@@ -12,16 +12,13 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  signUp: (email: string, password: string, metadata: {
-    first_name: string
-    last_name: string
-    role: 'organizador' | 'promotor'
-    organization?: string
-  }) => Promise<User | null>
+  signUp: (email: string, password: string, metadata: { [key: string]: any }) => Promise<User | null>
   signIn: (email: string, password: string) => Promise<User | null>
   signOut: () => Promise<void>
   isTeamLeader: boolean
   updateUserRole: (newRole: string) => void
+  selectedOrganization: any | null
+  setSelectedOrganization: (org: any | null) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -31,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isTeamLeader, setIsTeamLeader] = useState(false)
+  const [selectedOrganization, setSelectedOrganization] = useState<any | null>(null)
 
   // Adicionar função para normalizar terminologia entre front-end e banco de dados
   // Isso permite manter compatibilidade com o esquema existente sem refatoração completa
@@ -365,6 +363,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Adicionar função para atualizar organização selecionada
+  const updateSelectedOrganization = (org: any | null) => {
+    setSelectedOrganization(org)
+    if (org) {
+      localStorage.setItem('selectedOrganization', JSON.stringify(org))
+    } else {
+      localStorage.removeItem('selectedOrganization')
+    }
+  }
+
+  // Carregar organização selecionada do localStorage
+  useEffect(() => {
+    const savedOrg = localStorage.getItem('selectedOrganization')
+    if (savedOrg) {
+      setSelectedOrganization(JSON.parse(savedOrg))
+    }
+  }, [])
+
   useEffect(() => {
     const supabase = createClient()
 
@@ -405,119 +421,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
-  const signUp = async (email: string, password: string, metadata: {
-    first_name: string
-    last_name: string
-    role: 'organizador' | 'promotor'
-    organization?: string
-  }) => {
+  const signUp = async (email: string, password: string, metadata: { [key: string]: any }) => {
     try {
-      const { user } = await auth.signUp(email, password, metadata)
-      if (!user) {
-        throw new Error('Erro ao criar conta')
-      }
-      toast.success('Conta criada com sucesso! Por favor, faça login.')
-      router.push('/login')
+      console.log('[signUp] Iniciando processo de registro para:', email, 'com metadados:', metadata)
+      
+      // Limpar estado anterior
+      setUser(null)
+      setIsTeamLeader(false)
+      
+      // Chamar função de registro passando o objeto metadata completo
+      const user = await auth.signUp(email, password, metadata) 
+      
+      // Atualizar estado local
+      setUser(user)
+      
+      console.log('[signUp] Registro bem sucedido para:', email)
       return user
+      
     } catch (error: any) {
-      console.error('Erro ao criar conta:', error)
-      if (error?.message?.includes('email')) {
-        throw new Error('Email inválido ou já está em uso')
-      }
-      throw error
+      console.error('[signUp] Erro durante registro:', error)
+      setUser(null)
+      setIsTeamLeader(false)
+      throw error // Propagar o erro original sem modificá-lo
     }
   }
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Mostrar toast de loading
-      const toastId = toast.loading('Fazendo login...')
+      console.log('[signIn] Iniciando processo de login para:', email)
       
-      // Chamar a função de login
-      const { user } = await auth.signIn(email, password)
+      // Limpar estado anterior
+      setUser(null)
+      setIsTeamLeader(false)
       
-      // Verificar se o login foi bem-sucedido
-      if (!user) {
-        toast.dismiss(toastId)
-        throw new Error('Credenciais inválidas')
-      }
+      // Criar cliente Supabase
+      const supabase = createClient()
       
-      // Atualizar o toast para sucesso
-      toast.dismiss(toastId)
-      toast.success('Login realizado com sucesso!')
+      // Tentar fazer login
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
       
-      // Determinar para onde redirecionar com base no papel do usuário
-      const userRole = normalizeRole(user.user_metadata.role)
-      console.log('Papel do usuário detectado:', userRole)
-      
-      let redirectPath = '/app/promotor/dashboard' // Caminho padrão para promotor
-      
-      if (userRole === 'organizador') {
-        console.log('Usuário é organizador, redirecionando para dashboard de organizador')
-        redirectPath = '/app/organizador/dashboard'
-      } else if (userRole === 'promotor') {
-        console.log('Usuário é promotor, verificando se também é líder de equipe')
-        // Verificar se é líder de equipe
-        const isLeader = await checkIfTeamLeader(user.id)
-        
-        // Se for líder de equipe, ir para o dashboard de chefe
-        if (isLeader) {
-          console.log('Usuário é líder de equipe, redirecionando para dashboard de chefe')
-          redirectPath = '/app/chefe-equipe/dashboard'
-        } else {
-          console.log('Usuário é apenas promotor, redirecionando para dashboard de promotor')
-          redirectPath = '/app/promotor/dashboard' // Garantir que vá para o dashboard de promotor
-        }
-      } else if (userRole === 'chefe-equipe') {
-        console.log('Usuário é chefe de equipe, redirecionando para dashboard de chefe')
-        redirectPath = '/app/chefe-equipe/dashboard'
-      } else {
-        console.warn('Papel de usuário desconhecido:', userRole)
-      }
-      
-      console.log(`Login bem-sucedido, redirecionando para ${redirectPath}`)
-      
-      // Armazenar o papel atual no localStorage para referência rápida
-      try {
-        const authData = {
-          role: userRole,
-          userId: user.id
-        }
-        localStorage.setItem('auth', JSON.stringify(authData))
-      } catch (e) {
-        console.error('Erro ao armazenar papel no localStorage:', e)
-      }
-      
-      // Dar tempo para a sessão ser completamente estabelecida antes de redirecionar
-      setTimeout(() => {
-        // Usar window.location para garantir um redirecionamento completo
-        window.location.href = redirectPath
-      }, 2000)
-      
-      return user
-    } catch (error: any) {
-      console.error('Erro durante o processo de login:', error)
-      
-      // Tratar tipos específicos de erro
-      if (error?.message?.includes('Invalid login credentials') || 
-          error?.message?.includes('invalid login credentials') || 
-          error?.message?.includes('Invalid user credentials')) {
-        toast.error('Email ou senha incorretos')
-        throw new Error('Email ou senha incorretos')
-      } else if (error?.message?.includes('rate limit') || 
-                error?.message?.includes('Rate limit')) {
-        toast.error('Muitas tentativas de login. Tente novamente em alguns instantes.')
-        throw new Error('Limite de tentativas excedido. Aguarde alguns minutos.')
-      } else if (error?.message?.includes('Invalid email')) {
-        toast.error('O email informado não é válido')
-        throw new Error('Email inválido')
-      } else if (error?.message?.includes('network')) {
-        toast.error('Erro de conexão. Verifique sua internet.')
-        throw new Error('Erro de conexão')
-      } else {
-        toast.error('Falha no login. Por favor, tente novamente.')
+      if (error) {
+        console.error('[signIn] Erro durante login:', error)
         throw error
       }
+      
+      if (!data?.user) {
+        console.error('[signIn] Nenhum usuário retornado após login')
+        throw new Error('Falha ao obter dados do usuário')
+      }
+      
+      // Atualizar estado local
+      setUser(data.user)
+      
+      // Verificar se é líder de equipe
+      try {
+        await checkIfTeamLeader(data.user.id)
+      } catch (error) {
+        console.warn('[signIn] Erro ao verificar líder de equipe:', error)
+        // Não interrompe o login se houver erro na verificação
+      }
+      
+      // Atualizar localStorage
+      updateAuthLocalStorage(data)
+      
+      console.log('[signIn] Login bem sucedido para:', email)
+      
+      // Determinar para onde redirecionar
+      const userRole = normalizeRole(data.user.user_metadata?.role)
+      let redirectPath = '/app/promotor/dashboard'
+      
+      if (userRole === 'organizador') {
+        redirectPath = '/app/organizador/dashboard'
+      } else if (userRole === 'chefe-equipe') {
+        redirectPath = '/app/chefe-equipe/dashboard'
+      }
+      
+      // Redirecionar após um pequeno delay para garantir que o estado foi atualizado
+      setTimeout(() => {
+        window.location.href = redirectPath
+      }, 500)
+      
+      return data.user
+      
+    } catch (error: any) {
+      console.error('[signIn] Erro fatal durante login:', error)
+      setUser(null)
+      setIsTeamLeader(false)
+      throw error
     }
   }
 
@@ -536,16 +529,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       toast.success('Sessão terminada com sucesso!')
       
-      // Forçar redirecionamento para a página de login
-      setTimeout(() => {
-        window.location.href = '/login'
-      }, 500)
+      // Código de redirecionamento removido, tratado pelo listener onAuthStateChange
     } catch (error) {
       console.error('Erro ao terminar sessão:', error)
       toast.error('Erro ao terminar sessão.')
       
-      // Mesmo com erro, tentar redirecionar
-      router.push('/login')
+      // Código de redirecionamento no catch removido
       throw error
     }
   }
@@ -557,7 +546,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
     isTeamLeader,
-    updateUserRole
+    updateUserRole,
+    selectedOrganization,
+    setSelectedOrganization: updateSelectedOrganization
   }
 
   return (

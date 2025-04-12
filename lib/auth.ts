@@ -1,72 +1,37 @@
 import { createClient } from '@/lib/supabase'
 
-export async function signUp(email: string, password: string, metadata: {
-  first_name: string
-  last_name: string
-  role: 'organizador' | 'promotor'
-}) {
-  const supabase = createClient()
-  
+export async function signUp(email: string, password: string, metadata: { [key: string]: any }) {
   try {
-    console.log('Iniciando processo de registro com os seguintes dados:', {
-      email,
-      role: metadata.role,
-      first_name: metadata.first_name,
-      last_name: metadata.last_name
-    })
+    console.log('Iniciando processo de registro com os seguintes dados:', { email, metadata })
     
-    // Garantir que o campo role seja válido
-    if (metadata.role !== 'organizador' && metadata.role !== 'promotor') {
-      console.error('Papel inválido fornecido:', metadata.role)
-      throw new Error('Papel inválido. Deve ser "organizador" ou "promotor".')
-    }
+    const supabase = createClient()
     
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          first_name: metadata.first_name,
-          last_name: metadata.last_name,
-          role: metadata.role
-        }
+        data: metadata 
       }
     })
-
-    if (authError) {
-      console.error('Erro retornado pelo Supabase durante registro:', authError)
-      if (authError.message.includes('already registered')) {
+    
+    if (error) {
+      console.error('Erro retornado pelo Supabase durante registro:', error)
+      if (error.message.includes('User already registered')) {
         throw new Error('Este email já está registrado. Por favor, use outro email ou faça login.')
       }
-      throw authError
-    }
-
-    if (!authData.user) {
-      console.error('Registro falhou: dados do usuário não retornados')
-      throw new Error('Erro ao criar usuário: dados não retornados')
-    }
-    
-    console.log('Usuário registrado com sucesso:', {
-      id: authData.user.id,
-      email: authData.user.email,
-      role: authData.user.user_metadata?.role || 'não definido'
-    })
-    
-    // Verificar se os metadados foram salvos corretamente
-    if (authData.user.user_metadata?.role !== metadata.role) {
-      console.warn('Aviso: O papel do usuário nos metadados não corresponde ao papel fornecido:', {
-        expectedRole: metadata.role,
-        actualRole: authData.user.user_metadata?.role || 'não definido'
-      })
-    }
-
-    return authData
-  } catch (error) {
-    console.error('Erro no processo de registro:', error)
-    if (error instanceof Error) {
       throw error
     }
-    throw new Error('Erro desconhecido durante o registro')
+    
+    if (!data.user) {
+      throw new Error('Falha ao criar usuário')
+    }
+    
+    console.log('Usuário registrado com sucesso:', data.user)
+    return data.user
+    
+  } catch (error: any) {
+    console.error('Erro no processo de registro:', error)
+    throw error
   }
 }
 

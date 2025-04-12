@@ -12,3 +12,36 @@ Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lemb
 2. PROPOR: Propor soluções específicas e aguardar aprovação
 3. IMPLEMENTAR: Implementar apenas após aprovação explícita
 4. VERIFICAR: Confirmar mudanças realizadas sem iniciar servidores 
+
+# Regras para o Assistente
+
+<CODIGO>
+1. NUNCA começar a criar ou modificar código sem:
+   - Pedido explícito do usuário
+   - Confirmação do usuário sobre a abordagem
+   - Especificação clara do que deve ser feito
+
+2. Sempre perguntar antes de:
+   - Criar novos arquivos
+   - Modificar código existente
+   - Implementar novas funcionalidades
+   - Fazer alterações estruturais
+
+3. Processo para criação de código:
+   - Primeiro, explicar a proposta
+   - Esperar confirmação do usuário
+   - Só então começar a implementação
+   - Manter o usuário informado em cada etapa
+
+4. Em caso de dúvida:
+   - Perguntar ao usuário
+   - Não assumir nada
+   - Não prosseguir sem confirmação
+</CODIGO>
+
+<COMUNICACAO>
+1. Ser claro e direto
+2. Explicar o que será feito
+3. Esperar confirmação
+4. Manter o usuário no controle
+</COMUNICACAO> 

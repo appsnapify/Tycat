@@ -565,76 +565,39 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
   
   // Função para tentar fazer check-in com verificação de status
   const handleCheckinClick = () => {
-    if (isPast) {
-      toast({
-        title: "Operação não permitida",
-        description: "Não é possível fazer check-in em um evento já realizado.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    router.push(`/app/organizador/eventos/checkin?event=${event.id}`);
-  };
+    // Navegar para a página de detalhes do evento
+    console.log(`Navegando para detalhes do evento: ${event.id}`)
+    router.push(`/app/organizador/eventos/${event.id}`)
+  }
   
   // Função para tentar duplicar com verificação
   const handleDuplicateClick = () => {
     onAction('duplicate', event.id);
-  };
+  }
   
   // Função para copiar o link do evento para a área de transferência
   const handleCopyLink = () => {
-    // Obter o nome da organização atual
-    const orgName = currentOrganization?.name?.toLowerCase()
-      .replace(/[^\w\s]/g, '') // Remover caracteres especiais
-      .replace(/\s+/g, '-') || ''; // Substituir espaços por hífens
-    
-    // Gerar um slug baseado no título e local do evento
-    let slug = '';
-    if (event.location) {
-      // Limpar e formatar o local do evento
-      const localFormatado = event.location.toLowerCase()
-        .replace(/[^\w\s]/g, '') // Remover caracteres especiais
-        .replace(/\s+/g, '-'); // Substituir espaços por hífens
-      
-      // Limpar e formatar o título
-      const tituloFormatado = event.title.toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, '-');
-      
-      slug = `${localFormatado}-${tituloFormatado}`;
-    } else {
-      // Se não tiver local, usar apenas o título
-      slug = event.title.toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, '-');
-    }
-    
-    // Gerar URL para compartilhar, baseado no tipo
-    const publicUrl = event.type === 'guest-list' 
-      ? `/g/${event.id}?org=${orgName}&slug=${slug}` // URL para guest list com slug e organização
-      : `/e/${event.id}?org=${orgName}&slug=${slug}`; // URL para eventos normais com slug e organização
-    
-    // URL completa incluindo domínio
-    const fullUrl = `${window.location.origin}${publicUrl}`;
-    
-    // Copiar para área de transferência
-    navigator.clipboard.writeText(fullUrl)
+    // Lógica para gerar o link público do evento
+    // Assumindo que a URL base é conhecida e o ID do evento é suficiente
+    // Substitua 'https://seusite.com/evento/' pela sua URL real
+    const publicEventUrl = `${window.location.origin}/evento/${event.id}`;
+    navigator.clipboard.writeText(publicEventUrl)
       .then(() => {
         toast({
-          title: "Link copiado!",
-          description: "Link do evento copiado para a área de transferência",
+          title: "Link Copiado!",
+          description: "O link público do evento foi copiado para a área de transferência.",
         });
+        console.log("Link copiado:", publicEventUrl);
       })
       .catch(err => {
-        console.error('Erro ao copiar link:', err);
+        console.error("Falha ao copiar link: ", err);
         toast({
-          title: "Erro ao copiar link",
-          description: "Não foi possível copiar o link do evento",
-          variant: "destructive"
+          title: "Erro ao Copiar",
+          description: "Não foi possível copiar o link.",
+          variant: "destructive",
         });
       });
-  };
+  }
   
   // Função para atualizar contagem de convidados
   const refreshGuestCount = async () => {
@@ -803,12 +766,12 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           onClick={handleCheckinClick}
           disabled={isPast}
         >
-          <ScanIcon className="w-4 h-4 mr-1" />
-          Check-in
+          <ExternalLink className="w-4 h-4 mr-1" />
+          Detalhes
         </Button>
         
         <Button 
-          variant={isPast ? "ghost" : "outline"}
+          variant="outline"
           size="sm" 
           className="flex-1"
           onClick={handleEditClick}
@@ -820,9 +783,9 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
         
         {event.type === 'guest-list' && (
           <Button 
-            variant="ghost" 
+            variant="outline"
             size="sm" 
-            className="flex-1 mt-2"
+            className="flex-1"
             onClick={handleDuplicateClick}
           >
             <Copy className="w-4 h-4 mr-1" />

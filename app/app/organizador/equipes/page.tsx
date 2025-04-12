@@ -7,16 +7,12 @@ import {
   PlusCircle, 
   Search, 
   Users, 
-  Copy, 
-  Check, 
-  CreditCard, 
   Settings,
   AlertCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -26,34 +22,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { v4 as uuidv4 } from 'uuid'
+import { Label } from '@/components/ui/label'
+import { associateTeamAction } from '@/app/actions/organizerActions'
 
 interface Team {
   id: string
   name: string
-  description: string | null
-  logo_url: string | null
   team_code: string
   member_count: number
-  commission_type: string
-  commission_settings: any
-  created_at: string
-  total_pending: number | null
-  total_paid: number | null
 }
 
 interface Organization {
@@ -72,16 +51,12 @@ export default function OrganizadorEquipesPage() {
   const [filteredTeams, setFilteredTeams] = useState<Team[]>([])
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [tabValue, setTabValue] = useState('all')
-  const [copied, setCopied] = useState(false)
-  const [showAddTeamDialog, setShowAddTeamDialog] = useState(false)
-  const [teamCodeInput, setTeamCodeInput] = useState('')
-  const [commissionType, setCommissionType] = useState('percentage')
-  const [commissionRate, setCommissionRate] = useState('10')
-  const [teamSplit, setTeamSplit] = useState('30')
-  const [promoterSplit, setPromoterSplit] = useState('70')
-  const [validationError, setValidationError] = useState('')
-  const [organizationCode, setOrganizationCode] = useState('')
+  const [showCreateTeamDialog, setShowCreateTeamDialog] = useState(false)
+  const [showCallTeamDialog, setShowCallTeamDialog] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [creatingTeam, setCreatingTeam] = useState(false)
+  const [associationCode, setAssociationCode] = useState('')
+  const [associatingTeam, setAssociatingTeam] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -91,301 +66,171 @@ export default function OrganizadorEquipesPage() {
 
   useEffect(() => {
     filterTeams()
-  }, [teams, searchQuery, tabValue])
+  }, [teams, searchQuery])
 
   const loadOrganizationAndTeams = async () => {
-    setLoading(true)
+    console.log('Iniciando carregamento de equipes via RPC...');
+    setLoading(true);
+    
     try {
-      // Carregar organização atual
       const { data: orgData, error: orgError } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user?.id)
         .eq('role', 'owner')
-        .single()
+        .single();
 
-      if (orgError) {
-        console.error('Erro ao carregar organização:', orgError)
-        toast.error('Não foi possível carregar a organização.')
-        setLoading(false)
-        return
+      if (orgError || !orgData?.organization_id) {
+        console.error('Erro ao carregar ID da organização:', orgError);
+        requestAnimationFrame(() => {
+          toast.error('Não foi possível carregar os dados da organização.');
+        });
+        setLoading(false);
+        return;
       }
       
-      if (!orgData || !orgData.organization_id) {
-        toast.error('Organização não encontrada.')
-        setLoading(false)
-        return
+      const organizationId = orgData.organization_id;
+      console.log('ID da organização a ser usado na RPC:', organizationId);
+      
+      setOrganization({ id: organizationId, name: '', slug: '' });
+
+      const { data: teamsWithCounts, error: rpcError } = await supabase
+        .rpc('get_organization_teams_with_counts', { 
+          org_id: organizationId 
+        });
+      
+      console.log('Resposta COMPLETA da RPC:', { data: teamsWithCounts, error: rpcError });
+
+      if (rpcError) {
+        console.error('Erro DETALHADO ao chamar RPC:', JSON.stringify(rpcError, null, 2)); 
+        requestAnimationFrame(() => {
+          const errorMessage = rpcError.message || 'Erro ao carregar equipes via RPC.';
+          toast.error(errorMessage);
+        });
+        setLoading(false);
+        return;
       }
-      
-      const organizationId = orgData.organization_id
-      
-      // Buscar detalhes da organização
-      const { data: orgDetailsData, error: orgDetailsError } = await supabase
-        .from('organizations')
-        .select('id, name, slug')
-        .eq('id', organizationId)
-        .single()
-        
-      if (orgDetailsError) {
-        console.error('Erro ao carregar detalhes da organização:', orgDetailsError)
-        setLoading(false)
-        return
+
+      console.log('Equipes com contagem recebidas da RPC (sem erro detectado):', teamsWithCounts);
+
+      if (teamsWithCounts && teamsWithCounts.length > 0) {
+        setTeams(teamsWithCounts);
+        setFilteredTeams(teamsWithCounts);
+      } else {
+        console.log('Nenhuma equipe encontrada pela RPC para esta organização');
+        setTeams([]);
+        setFilteredTeams([]);
       }
-      
-      // Montar objeto da organização
-      const org = {
-        id: orgDetailsData.id,
-        name: orgDetailsData.name,
-        slug: orgDetailsData.slug || 'org'
-      }
-      
-      // Usar setTimeout para evitar erro de atualização durante renderização
-      setTimeout(() => {
-        setOrganization(org)
-        
-        // Gerar código de organização
-        const code = `ORG-${org.slug.substring(0, 5).toUpperCase()}`
-        setOrganizationCode(code)
-      }, 0)
-      
-      // Buscar equipes vinculadas usando a função RPC
-      try {
-        const { data: teamsData, error: teamsError } = await supabase
-          .rpc('get_organization_teams_with_details', { org_id: organizationId })
-        
-        if (teamsError) {
-          console.error('Erro ao carregar equipes:', teamsError)
-          toast.error('Não foi possível carregar as equipes. Tente novamente mais tarde.')
-          setLoading(false)
-          return
-        }
-        
-        // Usar setTimeout para evitar erro de atualização durante renderização
-        setTimeout(() => {
-          if (teamsData && teamsData.length > 0) {
-            // Formatar dados das equipes para garantir compatibilidade
-            const formattedTeams = teamsData.map(team => ({
-              id: team.id || '',
-              name: team.name || 'Equipa sem nome',
-              description: team.description || null,
-              logo_url: team.logo_url || null,
-              team_code: team.code || 'CÓDIGO',
-              member_count: team.member_count || 0,
-              commission_type: team.commission_type || 'percentage',
-              commission_settings: {
-                rate: team.commission_rate || 10,
-                fixed_amount: team.fixed_amount || 0,
-                tiers: team.tiers || null,
-                team_promoter_split: team.team_promoter_split || 30
-              },
-              created_at: team.created_at || new Date().toISOString(),
-              total_pending: team.total_pending || null,
-              total_paid: team.total_paid || null
-            }));
-            
-            setTeams(formattedTeams)
-            setFilteredTeams(formattedTeams)
-          } else {
-            setTeams([])
-            setFilteredTeams([])
-          }
-          setLoading(false)
-        }, 0)
-      } catch (e) {
-        console.error('Erro ao processar equipes:', e)
-        toast.error('Erro ao processar dados das equipes.')
-        setLoading(false)
-      }
+
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
-      toast.error('Não foi possível carregar as equipes.')
-      setLoading(false)
+      console.error('Erro geral ao carregar equipes:', error);
+      requestAnimationFrame(() => {
+        toast.error('Ocorreu um erro inesperado ao carregar as equipes.');
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   const filterTeams = () => {
-    let result = [...teams]
+    if (!teams.length) {
+      setFilteredTeams([])
+      return
+    }
     
-    // Filtrar por busca
+    let filtered = [...teams]
+    
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(team => 
-        team.name.toLowerCase().includes(query) || 
-        team.team_code.toLowerCase().includes(query)
+      filtered = filtered.filter(team => 
+        team.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
     
-    // Filtrar por tab
-    if (tabValue === 'pending') {
-      result = result.filter(team => (team.total_pending || 0) > 0)
-    }
-    
-    setFilteredTeams(result)
+    setFilteredTeams(filtered)
   }
 
-  const copyOrganizationCode = () => {
-    navigator.clipboard.writeText(organizationCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success('Código copiado para a área de transferência')
-  }
-
-  const validateTeamCode = (code: string) => {
-    if (!code.trim()) {
-      setValidationError('O código da equipe é obrigatório')
-      return false
-    }
-    
-    if (!code.trim().startsWith('TEAM-')) {
-      setValidationError('Código inválido. O formato correto é TEAM-XXXXX')
-      return false
-    }
-    
-    setValidationError('')
-    return true
-  }
-
-  const handleAddTeam = async () => {
-    if (!validateTeamCode(teamCodeInput)) {
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) {
+      setTimeout(() => {
+        toast.error('Por favor, digite um nome para a equipe')
+      }, 0)
       return
     }
     
     if (!organization) {
-      toast.error('Nenhuma organização selecionada')
+      setTimeout(() => {
+        toast.error('Organização não encontrada')
+      }, 0)
       return
     }
 
-    setLoading(true)
+    setCreatingTeam(true)
+    
     try {
-      // Verificar se o código da equipe existe
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('id, name')
-        .eq('team_code', teamCodeInput.trim())
-        .single()
-
-      if (teamError) {
-        setValidationError('Equipe não encontrada. Verifique o código.')
-        setLoading(false)
-        return
+      const response = await fetch('/api/teams/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newTeamName.trim(),
+          organizationId: organization.id
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Erro ao criar equipe');
       }
       
-      // Verificar se a equipe já está vinculada
-      const { data: existingLink, error: linkError } = await supabase
-        .from('organization_teams')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('team_id', teamData.id)
-        .single()
-
-      if (existingLink) {
-        setValidationError('Esta equipe já está vinculada à sua organização')
-        setLoading(false)
-        return
-      }
+      setNewTeamName('');
+      setShowCreateTeamDialog(false);
+      setCreatingTeam(false);
       
-      // Converter valores para números
-      const rateValue = parseFloat(commissionRate)
-      const teamSplitValue = parseFloat(teamSplit)
-      const promoterSplitValue = parseFloat(promoterSplit)
-      
-      // Validar valores
-      if (teamSplitValue + promoterSplitValue !== 100) {
-        setValidationError('A soma dos percentuais deve ser 100%')
-        setLoading(false)
-        return
-      }
-      
-      // Criar configurações de comissão baseadas no tipo
-      let commissionSettings = {}
-      
-      if (commissionType === 'percentage') {
-        commissionSettings = {
-          rate: rateValue,
-          team_split: teamSplitValue,
-          promoter_split: promoterSplitValue
-        }
-      } else if (commissionType === 'fixed') {
-        commissionSettings = {
-          fixed_amount: rateValue,
-          team_split: teamSplitValue,
-          promoter_split: promoterSplitValue
-        }
-      } else if (commissionType === 'tiered') {
-        commissionSettings = {
-          rate: rateValue,
-          team_split: teamSplitValue,
-          promoter_split: promoterSplitValue,
-          tiers: [
-            { threshold: 0, rate: rateValue },
-            { threshold: 10, rate: rateValue + 2 },
-            { threshold: 20, rate: rateValue + 5 }
-          ]
-        }
-      }
-      
-      // Vincular equipe à organização
-      const { error: insertError } = await supabase
-        .from('organization_teams')
-        .insert({
-          organization_id: organization.id,
-          team_id: teamData.id,
-          commission_type: commissionType,
-          commission_settings: commissionSettings,
-          is_active: true
-        })
-
-      if (insertError) throw insertError
-      
-      toast.success(`Equipe ${teamData.name} adicionada com sucesso!`)
-      setShowAddTeamDialog(false)
-      
-      // Recarregar equipes
-      loadOrganizationAndTeams()
+      requestAnimationFrame(() => {
+        toast.success('Equipe criada com sucesso!');
+        
+        loadOrganizationAndTeams();
+      });
       
     } catch (error) {
-      console.error('Erro ao adicionar equipe:', error)
-      toast.error('Não foi possível adicionar a equipe')
-    } finally {
-      setLoading(false)
+      console.error('Erro ao criar equipe:', error);
+      setCreatingTeam(false);
+      
+      requestAnimationFrame(() => {
+        toast.error(error instanceof Error ? error.message : 'Não foi possível criar a equipe');
+      });
     }
-  }
-
-  const handlePayCommission = (teamId: string, teamName: string) => {
-    // Redirecionar para página de pagamento de comissão
-    router.push(`/app/organizador/comissoes/pagar?team=${teamId}&name=${encodeURIComponent(teamName)}`)
   }
 
   const handleTeamSettings = (teamId: string) => {
-    // Redirecionar para página de configurações da equipe
     router.push(`/app/organizador/equipes/${teamId}/configuracoes`)
   }
 
-  const formatCurrency = (value: number | null) => {
-    if (value === null) return '€0,00'
-    return new Intl.NumberFormat('pt-PT', { 
-      style: 'currency', 
-      currency: 'EUR' 
-    }).format(value)
-  }
-
-  const commissionTypeDisplay = (type: string) => {
-    switch (type) {
-      case 'percentage': return 'Percentual'
-      case 'fixed': return 'Valor Fixo'
-      case 'tiered': return 'Patamares'
-      default: return type
+  const handleAssociateTeamByCode = async () => {
+    if (!associationCode.trim() || !organization?.id) {
+      toast.error("Código da equipa ou organização inválida.");
+      return;
     }
-  }
+    setAssociatingTeam(true);
 
-  const getCommissionRateDisplay = (team: Team) => {
-    if (team.commission_type === 'percentage') {
-      return `${team.commission_settings.rate}%`
-    } else if (team.commission_type === 'fixed') {
-      return formatCurrency(team.commission_settings.fixed_amount)
+    const formData = new FormData();
+    formData.append('teamCode', associationCode.trim());
+    formData.append('organizationId', organization.id);
+
+    const result = await associateTeamAction(formData);
+
+    if (result.success) {
+       toast.success(result.message + ` (Nome: ${result.teamName || 'desconhecido'})`);
+       setAssociationCode('');
+       setShowCallTeamDialog(false);
+       loadOrganizationAndTeams();
     } else {
-      return `${team.commission_settings.rate}%+`
+       toast.error(result.message);
     }
+
+    setAssociatingTeam(false);
   }
 
   if (loading && teams.length === 0) {
@@ -412,127 +257,84 @@ export default function OrganizadorEquipesPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="border rounded-lg p-2 flex items-center gap-2 bg-card">
-            <span className="text-sm font-medium">Código da Organização:</span>
-            <Badge variant="secondary" className="font-mono">{organizationCode}</Badge>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={copyOrganizationCode}
-              title="Copiar código"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-          
-          <Dialog open={showAddTeamDialog} onOpenChange={setShowAddTeamDialog}>
+          <Dialog open={showCreateTeamDialog} onOpenChange={setShowCreateTeamDialog}>
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Adicionar Equipe
+                Criar Equipa
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Adicionar Equipe</DialogTitle>
+                <DialogTitle>Criar Nova Equipe</DialogTitle>
                 <DialogDescription>
-                  Insira o código da equipe que deseja adicionar à sua organização.
+                  Digite um nome para sua nova equipe. Um código único será gerado automaticamente.
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-3">
-                <div className="space-y-2">
-                  <label htmlFor="team-code" className="text-sm font-medium">
-                    Código da Equipe
+              <div className="py-4">
+                <label htmlFor="team-name" className="text-sm font-medium block mb-2">
+                  Nome da Equipe
                   </label>
                   <Input
-                    id="team-code"
-                    placeholder="TEAM-XXXXX"
-                    value={teamCodeInput}
-                    onChange={(e) => setTeamCodeInput(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    O código é fornecido pelo líder da equipe.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Tipo de Comissão</label>
-                  <Select 
-                    value={commissionType} 
-                    onValueChange={setCommissionType}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o tipo de comissão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentual</SelectItem>
-                      <SelectItem value="fixed">Valor Fixo</SelectItem>
-                      <SelectItem value="tiered">Patamares</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    {commissionType === 'percentage' && 'Taxa (%)'}
-                    {commissionType === 'fixed' && 'Valor (€)'}
-                    {commissionType === 'tiered' && 'Taxa Base (%)'}
-                  </label>
-                  <Input
-                    type="number"
-                    value={commissionRate}
-                    onChange={(e) => setCommissionRate(e.target.value)}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      % para Equipe
-                    </label>
-                    <Input
-                      type="number"
-                      value={teamSplit}
-                      onChange={(e) => {
-                        setTeamSplit(e.target.value)
-                        // Calcular automaticamente o outro valor
-                        const newValue = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0))
-                        setPromoterSplit((100 - newValue).toString())
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      % para Promotor
-                    </label>
-                    <Input
-                      type="number"
-                      value={promoterSplit}
-                      onChange={(e) => {
-                        setPromoterSplit(e.target.value)
-                        // Calcular automaticamente o outro valor
-                        const newValue = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0))
-                        setTeamSplit((100 - newValue).toString())
-                      }}
-                    />
-                  </div>
-                </div>
-                
-                {validationError && (
-                  <div className="bg-destructive/10 p-3 rounded-md flex items-start">
-                    <AlertCircle className="h-5 w-5 text-destructive mr-2 mt-0.5" />
-                    <span className="text-sm text-destructive">{validationError}</span>
-                  </div>
-                )}
+                  id="team-name"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="Digite o nome da equipe"
+                  className="mb-2"
+                />
               </div>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAddTeamDialog(false)}>
+                <Button variant="outline" onClick={() => setShowCreateTeamDialog(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleAddTeam} disabled={loading}>
-                  {loading ? "Adicionando..." : "Adicionar Equipe"}
+                <Button onClick={handleCreateTeam} disabled={creatingTeam}>
+                  {creatingTeam ? "Criando..." : "Criar Equipe"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={showCallTeamDialog} onOpenChange={setShowCallTeamDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Users className="mr-2 h-4 w-4" />
+                Chamar equipa
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Associar Equipa Existente</DialogTitle>
+                <DialogDescription>
+                  Insira o código da equipa que deseja associar a esta organização ({organization?.name || '...'}). A equipa não pode pertencer a outra organização.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-4 space-y-2">
+                 <Label htmlFor="team-code-associate">Código da Equipa</Label>
+                 <Input
+                   id="team-code-associate"
+                   value={associationCode}
+                   onChange={(e) => setAssociationCode(e.target.value.toUpperCase())}
+                   placeholder="Ex: TEAM-XXXX"
+                   disabled={associatingTeam}
+                 />
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setShowCallTeamDialog(false); setAssociationCode(''); }} 
+                  disabled={associatingTeam}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => handleAssociateTeamByCode()} 
+                  disabled={!associationCode.trim() || associatingTeam}
+                >
+                  {associatingTeam ? "Associando..." : "Associar Equipa"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -551,13 +353,6 @@ export default function OrganizadorEquipesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
-          <Tabs defaultValue="all" className="w-full" onValueChange={setTabValue}>
-            <TabsList>
-              <TabsTrigger value="all">Todas as Equipes</TabsTrigger>
-              <TabsTrigger value="pending">Comissões Pendentes</TabsTrigger>
-            </TabsList>
-          </Tabs>
         </div>
       </div>
       
@@ -575,11 +370,11 @@ export default function OrganizadorEquipesPage() {
             <>
               <h3 className="text-xl font-medium mb-2">Nenhuma equipe vinculada</h3>
               <p className="text-muted-foreground text-center mb-6">
-                Adicione equipes usando o código fornecido pelo líder.
+                Você ainda não tem equipes vinculadas à sua organização.
               </p>
-              <Button onClick={() => setShowAddTeamDialog(true)}>
+              <Button onClick={() => setShowCreateTeamDialog(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Adicionar Primeira Equipe
+                Criar Primeira Equipe
               </Button>
             </>
           )}
@@ -587,63 +382,31 @@ export default function OrganizadorEquipesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <Card key={team.id}>
-              <CardHeader className="pb-3">
-                <CardTitle>{team.name}</CardTitle>
-                <CardDescription className="flex items-center">
+            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-primary">
+              <CardHeader className="pb-3 text-center">
+                <CardTitle className="text-primary">{team.name}</CardTitle>
+                <CardDescription className="flex items-center justify-center">
                   <Users className="h-4 w-4 mr-1" />
                   {team.member_count} membro{team.member_count !== 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-3 text-center">
                   <div>
                     <span className="text-sm text-muted-foreground">Código:</span>
-                    <span className="font-mono ml-2">{team.team_code}</span>
-                  </div>
-                  
-                  <div className="flex justify-between">
-                    <div>
-                      <span className="text-sm text-muted-foreground">Comissão:</span>
-                      <span className="ml-2">{commissionTypeDisplay(team.commission_type)}</span>
-                    </div>
-                    <Badge variant="outline">
-                      {getCommissionRateDisplay(team)}
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <div className="bg-muted rounded-md p-3 text-center">
-                      <h4 className="text-xs text-muted-foreground">Pendente</h4>
-                      <p className="font-medium">
-                        {formatCurrency(team.total_pending || 0)}
-                      </p>
-                    </div>
-                    <div className="bg-muted rounded-md p-3 text-center">
-                      <h4 className="text-xs text-muted-foreground">Total Pago</h4>
-                      <p className="font-medium">
-                        {formatCurrency(team.total_paid || 0)}
-                      </p>
-                    </div>
+                    <span className="font-mono ml-2 font-semibold">{team.team_code}</span>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t pt-4">
+              <CardFooter className="flex justify-center border-t pt-4">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => handleTeamSettings(team.id)}
+                  className="w-2/3"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Editar
-                </Button>
-                <Button 
-                  size="sm"
-                  disabled={(team.total_pending || 0) <= 0}
-                  onClick={() => handlePayCommission(team.id, team.name)}
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Pagar
                 </Button>
               </CardFooter>
             </Card>

@@ -90,17 +90,35 @@ export default function NewOrganizationPage() {
       const data = await response.json()
       console.log('Organização criada com sucesso:', data)
       
-      toast.success('Organização criada com sucesso!')
-      router.push('/app/organizador/organizacoes')
+      // Usar requestAnimationFrame para garantir execução após renderização
+      requestAnimationFrame(() => {
+        toast.success('Organização criada com sucesso!');
+        
+        // Adicionar um pequeno delay antes de redirecionar
+        setTimeout(() => {
+           // Verificar para onde redirecionar (Dashboard parece mais lógico após criar)
+           router.push('/app/organizador/dashboard'); 
+        }, 500); // Pequeno delay para o toast ser visível
+      });
+
     } catch (error) {
       console.error('Erro ao criar organização:', error)
-      if (error instanceof Error) {
-        toast.error(`Erro ao criar organização: ${error.message}`)
-      } else {
-        toast.error('Erro desconhecido ao criar organização')
-      }
+      // Usar requestAnimationFrame para o toast de erro também
+      requestAnimationFrame(() => {
+        if (error instanceof Error) {
+          toast.error(`Erro ao criar organização: ${error.message}`)
+        } else {
+          toast.error('Erro desconhecido ao criar organização')
+        }
+      });
     } finally {
-      setIsLoading(false)
+      // Definir isLoading como false apenas se houve erro, 
+      // senão o redirect cuida da mudança de UI.
+      if (!(error instanceof Error)) { 
+        // Não definir como false no sucesso para manter o botão desativado até o redirect
+      } else {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -155,13 +173,14 @@ export default function NewOrganizationPage() {
           </div>
 
           <div>
-            <Label htmlFor="contacts">Contactos</Label>
+            <Label htmlFor="contacts">Telemóvel</Label>
             <Input
               id="contacts"
+              type="tel"
               required
               value={formData.contacts}
               onChange={(e) => setFormData({ ...formData, contacts: e.target.value })}
-              placeholder="Telefone, telemóvel, etc."
+              placeholder="912345678"
             />
           </div>
 

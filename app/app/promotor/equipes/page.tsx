@@ -36,6 +36,7 @@ interface Team {
   team_code: string
   role: string
   is_simulated?: boolean
+  isPartial?: boolean
 }
 
 export default function EquipesPage() {
@@ -53,12 +54,16 @@ export default function EquipesPage() {
   useEffect(() => {
     if (isTeamLeader) {
       console.log("Usuário já é chefe de equipe, redirecionando para o dashboard de chefe...");
-      toast.info("Você já é chefe de equipe. Redirecionando para o dashboard de chefe.");
       
-      // Usar setTimeout para evitar erro durante renderização
-      setTimeout(() => {
-        router.push('/app/chefe-equipe/dashboard');
-      }, 100);
+      // Usar Promise.resolve().then() para garantir execução após renderização
+      Promise.resolve().then(() => {
+        toast.info("Você já é chefe de equipe. Redirecionando para o dashboard de chefe.");
+        
+        // O redirecionamento pode ficar aqui ou dentro de outro setTimeout
+        setTimeout(() => {
+          router.push('/app/chefe-equipe/dashboard');
+        }, 150); // Aumentar ligeiramente o delay se necessário
+      });
     }
   }, [isTeamLeader, router]);
   
@@ -94,18 +99,6 @@ export default function EquipesPage() {
         console.log("Membros de equipes encontrados:", memberData);
       }
       
-      // Buscar todas as equipes disponíveis (debug)
-      const { data: allTeamsData, error: allTeamsError } = await supabase
-        .from('teams')
-        .select('*')
-        .limit(20);
-        
-      if (allTeamsError) {
-        console.error('Erro ao carregar todas as equipes:', allTeamsError);
-      } else {
-        console.log("Todas as equipes disponíveis (debug):", allTeamsData);
-      }
-      
       // Se encontrou membros, buscar as equipes correspondentes
       if (memberData && memberData.length > 0) {
         const teamIds = memberData.map(member => member.team_id);
@@ -118,16 +111,25 @@ export default function EquipesPage() {
           
         if (teamsError) {
           console.error('Erro ao carregar equipes por IDs:', teamsError);
+          // *** NOVO: Se der erro a buscar teams, criar placeholder ***
+          const placeholderTeams = memberData.map(member => ({
+            id: member.team_id,
+            name: `Equipa (ID: ${member.team_id.substring(0, 6)}...)`,
+            description: "Detalhes não disponíveis (sem organização associada?).",
+            logo_url: null,
+            team_code: 'INDISP.',
+            role: member.role || 'member',
+            isPartial: true // Flag para indicar dados parciais
+          }));
+          setTeams(placeholderTeams);
+
         } else {
           console.log("Equipes encontradas por IDs:", teamsData);
           
-          // Processar dados usando setTimeout para evitar erro de atualização durante renderização
           if (teamsData && teamsData.length > 0) {
-            setTimeout(() => {
-              const formattedTeams = teamsData.map(team => {
-                // Encontrar o papel do usuário nesta equipe
+             // Processar dados como antes
+             const formattedTeams = teamsData.map(team => {
                 const membership = memberData.find(m => m.team_id === team.id);
-                
                 return {
                   id: team.id,
                   name: team.name || 'Equipe sem nome',
@@ -135,16 +137,29 @@ export default function EquipesPage() {
                   logo_url: team.logo_url,
                   team_code: team.team_code || 'CÓDIGO',
                   role: membership?.role || 'member'
+                  // isPartial: false implicitamente
                 };
               });
-              
               console.log("Equipes formatadas:", formattedTeams);
               setTeams(formattedTeams);
-            }, 0);
+          } else {
+             // *** NOVO: Se não encontrou teams mesmo tendo memberData, criar placeholder ***
+             console.warn("Associação encontrada mas detalhes da equipa não encontrados/acessíveis.")
+             const placeholderTeams = memberData.map(member => ({
+               id: member.team_id,
+               name: `Equipa (ID: ${member.team_id.substring(0, 6)}...)`,
+               description: "Detalhes não disponíveis (sem organização associada?).",
+               logo_url: null,
+               team_code: 'INDISP.',
+               role: member.role || 'member',
+               isPartial: true // Flag para indicar dados parciais
+             }));
+             setTeams(placeholderTeams);
           }
         }
       } else {
         console.log("Nenhuma associação de equipe encontrada para o usuário");
+        setTeams([]); // Garantir que teams fica vazio
       }
     } catch (error) {
       console.error('Erro ao carregar equipes:', error);

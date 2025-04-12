@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import Image from 'next/image'
+// import Image from 'next/image' // REMOVIDO
 import { useAuth } from '@/hooks/use-auth'
 import { LogOut } from 'lucide-react'
 

@@ -1,158 +1,138 @@
 import { Metadata } from 'next'
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // Remover, usar server client
 import { CalendarIcon, MapPinIcon, ArrowLeftIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Suspense } from 'react';
 import DiagnosticWrapper from './DiagnosticWrapper';
+import EventDetailsClient from './EventDetailsClient';
+import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers'; // Importar cookies
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'; // Importar server client
 
 interface PageProps {
-  params: Promise<{ id: string }>
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+  params: { id: string };
 }
 
+// Simplificar generateMetadata para evitar buscas complexas aqui
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const resolvedParams = await params;
-  return {
-    title: `Evento ${resolvedParams.id} - Detalhes`,
-  }
+  const eventId = params.id;
+  if (!eventId) return { title: 'Evento não encontrado' };
+  return { title: `Evento ${eventId} - Detalhes` };
 }
 
-async function fetchEvent(id: string) {
-  const { data, error } = await supabase
+// Funções de busca (recebendo supabase)
+async function fetchEvent(id: string, supabaseClient: any) {
+    const { data, error } = await supabaseClient
     .from('events')
     .select('*')
     .eq('id', id)
     .single();
-  
+
   if (error) {
-    throw new Error(`Erro ao carregar evento: ${error.message}`);
+    console.error("Erro Supabase fetchEvent:", error);
+    // Verificar se é erro de RLS ou não encontrado
+    if (error.code === 'PGRST116') { // code for 'relation "events" does not exist or permission denied'
+        throw new Error("Evento não encontrado ou sem permissão."); 
+    } else {
+        throw new Error(`Erro ao carregar evento: ${error.message}`);
+    }
   }
-  
+  if (!data) {
+    throw new Error("Evento não encontrado (no data).");
+  }
   return data;
 }
+async function fetchOrganizationTeams(organizationId: string, supabaseClient: any) {
+  const { data, error } = await supabaseClient
+    .from('teams')
+    .select('id, name')
+    .eq('organization_id', organizationId);
 
+  if (error) {
+    console.error("Erro ao buscar equipas da organização:", error);
+    return []; // Retorna array vazio em caso de erro, não lançar erro aqui
+  }
+  return data || [];
+}
+async function fetchCurrentAssociations(eventId: string, supabaseClient: any) {
+   const { data, error } = await supabaseClient
+    .from('event_teams')
+    .select('team_id')
+    .eq('event_id', eventId);
+    
+   if (error) {
+     console.error("Erro ao buscar associações atuais:", error);
+     return new Set<string>(); // Retorna set vazio em caso de erro
+   }
+   return new Set(data?.map(a => a.team_id) || []);
+}
+
+
+// Componente da Página Principal
 export default async function EventoDetalhesPage({ params }: PageProps) {
-  // Resolver o params no início para usar em todo o componente
-  const resolvedParams = await params;
-  
-  // Carrega os dados do evento no servidor
-  let event;
-  let errorMessage = null;
-  
+
+  // Acessar params aqui DENTRO da função async é seguro
+  const eventId = params.id;
+  if (!eventId) {
+    notFound();
+  }
+
+  // Criar cliente Supabase aqui DENTRO, APÓS validar eventId
+  let supabase;
   try {
-    event = await fetchEvent(resolvedParams.id);
-  } catch (err: any) {
-    errorMessage = err.message || 'Erro ao carregar evento';
-    console.error('Erro ao carregar evento:', err);
+      const cookieStore = cookies();
+      supabase = createServerComponentClient({ cookies: () => cookieStore });
+  } catch (error) {
+      console.error("Erro ao criar Supabase server client:", error);
+      return <div className="p-6 text-red-500">Erro interno ao inicializar a ligação de dados.</div>;
   }
 
-  if (errorMessage) {
-    return (
-      <div className="p-4 bg-red-50 text-red-800 rounded-md">
-        <h2 className="text-lg font-semibold mb-2">Erro</h2>
-        <p>{errorMessage}</p>
-        <div className="mt-4">
-          <a href="/app/organizador/eventos" className="inline-flex items-center">
-            <Button variant="outline">
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-          </a>
-        </div>
-      </div>
-    );
+  // Buscar dados
+  let eventData, organizationTeams, initialAssociatedIds;
+  try {
+    // Primeiro buscar o evento para obter organization_id
+    eventData = await fetchEvent(eventId, supabase);
+
+    // Agora buscar associações e equipas em paralelo
+    [initialAssociatedIds, organizationTeams] = await Promise.all([
+        fetchCurrentAssociations(eventId, supabase),
+        fetchOrganizationTeams(eventData.organization_id, supabase)
+    ]);
+
+  } catch (error: any) {
+    console.error("Erro ao buscar dados da página de detalhes do evento:", error);
+    // Usar notFound para erros específicos de não encontrar
+    if (error.message.includes("não encontrado") || error.message.includes("sem permissão")) {
+        notFound();
+    }
+    // Renderizar um componente de erro ou retornar uma mensagem para outros erros
+    return <div className="p-6 text-red-500">Erro ao carregar dados do evento: {error.message}</div>;
   }
 
-  if (!event) {
-    return (
-      <div className="p-4 bg-amber-50 text-amber-800 rounded-md">
-        <h2 className="text-lg font-semibold mb-2">Evento não encontrado</h2>
-        <p>O evento solicitado não foi encontrado.</p>
-        <div className="mt-4">
-          <a href="/app/organizador/eventos" className="inline-flex items-center">
-            <Button variant="outline">
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-  };
-
+  // Renderiza o Client Component (como antes)
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="mb-2">
-            <a href="/app/organizador/eventos" className="inline-flex items-center">
-              <Button variant="outline" size="sm">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Voltar
-              </Button>
-            </a>
-          </div>
-          <h1 className="text-2xl font-bold">{event.title}</h1>
-          <p className="text-gray-500">{event.type === 'guest-list' ? 'Guest List' : 'Evento'}</p>
-        </div>
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="mb-4">
+        <a href="/app/organizador/eventos">
+          <Button variant="outline" size="sm">
+            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+            Voltar para Eventos
+          </Button>
+        </a>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalhes do Evento</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-sm text-gray-500">Descrição</h3>
-              <p>{event.description || 'Sem descrição'}</p>
-            </div>
-            <div className="flex items-center">
-              <CalendarIcon className="w-4 h-4 mr-2 text-gray-500" />
-              <span>{formatDate(event.date)}</span>
-            </div>
-            {event.location && (
-              <div className="flex items-center">
-                <MapPinIcon className="w-4 h-4 mr-2 text-gray-500" />
-                <span>{event.location}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        {event.type === 'guest-list' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest List</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500 mb-4">
-                Verifique abaixo os dados de convidados registrados para este evento.
-              </p>
-              
-              <div className="flex space-x-2">
-                <a href={`/app/organizador/eventos/checkin?event=${resolvedParams.id}`}>
-                  <Button variant="outline">Check-in</Button>
-                </a>
-                <a href={`/g/${resolvedParams.id}`}>
-                  <Button variant="default">Ver página pública</Button>
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      <EventDetailsClient
+         key={eventData.id}
+         event={eventData}
+         teams={organizationTeams} // Passar a lista de equipas
+         initialAssociatedIds={initialAssociatedIds} // Passar o Set de IDs associados
+      />
 
-      {/* Ferramenta de diagnóstico de dados - agora usando o wrapper */}
-      {event.type === 'guest-list' && (
-        <DiagnosticWrapper eventId={resolvedParams.id} />
+      {/* Ferramenta de diagnóstico (como antes) */}
+      {eventData.type === 'guest-list' && (
+         <Suspense fallback={<div>Carregando diagnóstico...</div>}>
+           <DiagnosticWrapper eventId={eventId} />
+         </Suspense>
       )}
     </div>
   );

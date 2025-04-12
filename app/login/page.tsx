@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,27 +46,25 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError(null) // Limpar erros anteriores
+    setError(null)
     setDebugInfo(null)
 
     try {
       await signIn(formData.email, formData.password)
+      // Se chegou aqui, o login foi bem sucedido
+      setIsLoading(false)
     } catch (error: any) {
       console.error('Erro ao fazer login:', error)
+      setIsLoading(false) // Garantir que o loading seja resetado em caso de erro
       
       if (error?.message?.includes('Invalid login credentials') || 
           error?.message?.includes('Email ou senha incorretos')) {
         setError('Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.')
-        toast.error('Email ou senha incorretos')
       } else if (error?.message?.includes('rate limit')) {
         setError('Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.')
-        toast.error('Limite de tentativas excedido')
       } else {
         setError(`Ocorreu um erro ao fazer login: ${error.message}`)
-        toast.error('Erro ao iniciar sessão')
       }
-    } finally {
-      setIsLoading(false)
     }
   }
 

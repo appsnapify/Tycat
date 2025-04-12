@@ -493,4 +493,40 @@ $$;
 
 -- Conceder permissão para usuários autenticados e o service role executar a função
 GRANT EXECUTE ON FUNCTION create_promoter_team_v2 TO authenticated;
-GRANT EXECUTE ON FUNCTION create_promoter_team_v2 TO service_role; 
+GRANT EXECUTE ON FUNCTION create_promoter_team_v2 TO service_role;
+
+-- Primeiro removemos a função existente
+DROP FUNCTION IF EXISTS get_team_details(uuid);
+
+-- Agora criamos a nova versão
+CREATE OR REPLACE FUNCTION get_team_details(team_id_param uuid)
+RETURNS TABLE (
+    id uuid,
+    name text,
+    description text,
+    team_code text,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    member_count bigint,
+    is_leader boolean
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        t.id,
+        t.name,
+        t.description,
+        t.team_code,
+        t.created_at,
+        t.updated_at,
+        (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as member_count,
+        (SELECT EXISTS (
+            SELECT 1 FROM team_members 
+            WHERE team_id = t.id 
+            AND user_id = auth.uid()
+            AND is_leader = true
+        )) as is_leader
+    FROM teams t
+    WHERE t.id = team_id_param;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER; 

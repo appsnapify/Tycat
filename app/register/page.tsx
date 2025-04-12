@@ -49,22 +49,52 @@ export default function RegisterPage() {
   })
 
   const handleSubmit = async (data: FormData) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    let registrationError: Error | null = null;
+
     try {
-      setIsLoading(true)
-      await signUp(data.email, data.password, {
+      const newUser = await signUp(data.email, data.password, {
         first_name: data.first_name,
         last_name: data.last_name,
         role: data.role
-      })
-    } catch (error) {
-      console.error('Error during registration:', error)
-      if (error instanceof Error) {
-        toast.error(error.message)
+      });
+
+      if (newUser) {
+        // Sucesso: Mostrar mensagem e redirecionar
+        toast.success("Conta criada com sucesso! Redirecionando...");
+
+        // Determinar o dashboard correto OU a página de escolha de equipe
+        const redirectPath = data.role === 'organizador' 
+          ? '/app/organizador/dashboard' 
+          : '/app/promotor/equipes';
+        
+        // Adicionar um pequeno delay antes de redirecionar para dar tempo ao toast
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1500); // Delay de 1.5 segundos
+
       } else {
-        toast.error('Erro ao criar conta. Por favor, tente novamente.')
+        // Caso inesperado onde signUp não retorna usuário ou erro
+        throw new Error('Falha ao obter dados do usuário após registro.');
       }
+
+    } catch (error) {
+      console.error('Error during registration:', error);
+      // Armazena o erro para mostrar *depois* de sair do loading
+      if (error instanceof Error) {
+        registrationError = error;
+      } else {
+        registrationError = new Error('Erro desconhecido ao criar conta.');
+      }
+      // Exibe o toast de erro imediatamente no catch
+      toast.error(registrationError.message);
     } finally {
-      setIsLoading(false)
+      // Definir isLoading como false apenas se não estivermos redirecionando
+      // O redirecionamento cuidará da mudança de página
+      // setIsLoading(false); 
+      // Comentado para evitar que o botão volte ao estado normal antes do redirect
     }
   }
 

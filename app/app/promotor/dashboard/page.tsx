@@ -11,10 +11,8 @@ import {
   ArrowRight,
   Users,
   Ticket,
-  CreditCard,
   Building,
   CalendarDays,
-  ShoppingBag,
   Calendar,
   QrCode,
   UserPlus,
@@ -23,7 +21,8 @@ import {
   ChevronRight,
   ClipboardList,
   BadgePercent,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -35,27 +34,52 @@ import { MetricCard } from '@/components/dashboard/metric-card'
 import { ActivityFeed, ActivityItem } from '@/components/dashboard/activity-feed'
 import { TeamCodeDisplay } from '@/components/dashboard/team-code-display'
 
+// *** NOVA Interface para Equipas do Promotor ***
+interface PromoterTeam {
+  id: string;
+  name: string;
+  description?: string | null;
+  logo_url?: string | null;
+  role?: string; // Papel do promotor nesta equipa
+  isPartial?: boolean; // Indica se os dados são completos ou placeholder
+  member_count?: number; // Opcional: Contagem de membros
+}
+
+// *** NOVA Interface para Organização ***
+interface Organization {
+  id: string;
+  name: string;
+  // Adicionar outros campos necessários
+}
+
+// *** NOVA Interface para Evento ***
+interface EventSummary {
+  id: string;
+  name: string;
+  date: string;
+  location?: string | null;
+  organizations?: { name: string } | null; // Organização associada
+}
+
 export default function PromotorDashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
   const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(true)
-  const [teamData, setTeamData] = useState<any>(null)
-  const [teamCode, setTeamCode] = useState<string | null>(null)
-  const [teamMembers, setTeamMembers] = useState(0)
-  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
-  const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [promoterTeams, setPromoterTeams] = useState<PromoterTeam[]>([]) // Usado se >1 equipa ou sem org
+  const [organizationData, setOrganizationData] = useState<Organization | null>(null) // Usado se 1 equipa com org
+  const [organizationEvents, setOrganizationEvents] = useState<EventSummary[]>([]) // Eventos da org para a equipa
+  
+  // Manter Stats (exceto comissões)
   const [userStats, setUserStats] = useState({
     totalSales: 0,
-    totalCommission: 0,
     eventsJoined: 0,
     tasksDone: 0
   })
   
   useEffect(() => {
     console.log("PromotorDashboardPage - Montado")
-    
     if (user) {
       loadDashboardData()
     } else {
@@ -73,240 +97,139 @@ export default function PromotorDashboardPage() {
   
   const loadDashboardData = async () => {
     setLoading(true)
+    setPromoterTeams([]) // Reset states
+    setOrganizationData(null)
+    setOrganizationEvents([])
+    setUserStats({ totalSales: 0, eventsJoined: 0, tasksDone: 0 }) // Reset stats
     try {
-      console.log("Carregando dados do dashboard do promotor")
-      
-      // Obter ID da equipe dos metadados do usuário
-      const teamId = user?.user_metadata?.team_id
-      const teamCode = user?.user_metadata?.team_code
-      
-      setTeamCode(teamCode)
-      
-      // Se não houver ID da equipe, mostrar estados vazios
-      if (!teamId) {
-        console.log("ID da equipa não encontrado nos metadados")
-        setLoading(false)
-        return
+      console.log("PromotorDashboard: Carregando dados (Direct Query Mode)...") // Mudança no log
+      const userId = user?.id;
+      if (!userId) {
+          console.error("Utilizador não autenticado.");
+          toast.error("Utilizador não autenticado.");
+          setLoading(false);
+          return;
       }
-      
-      // Buscar dados da equipe
-      try {
-        const { data: teamData, error: teamError } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', teamId)
-          .single()
-        
-        if (teamError) {
-          console.error("Erro ao buscar dados da equipa:", teamError)
-        } else if (teamData) {
-          setTeamData(teamData)
-        }
-        
-        // Contar membros da equipe
-        const { count, error: countError } = await supabase
-          .from('team_members')
-          .select('id', { count: 'exact', head: true })
-          .eq('team_id', teamId)
-        
-        if (!countError) {
-          setTeamMembers(count || 1)
-        }
-      } catch (err) {
-        console.error("Erro ao buscar dados da equipa:", err)
+
+      // 1. Buscar a primeira associação em team_members
+      const { data: memberData, error: memberError } = await supabase
+        .from('team_members')
+        .select('team_id, role')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError && memberError.code !== 'PGRST116') {
+        console.error('PromotorDashboard: Erro ao carregar associação de equipa:', memberError);
+        toast.error("Erro ao verificar sua equipa.");
       }
-      
-      // Buscar eventos próximos
-      try {
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select(`
-            id,
-            name,
-            date,
-            location,
-            status,
-            organizations (
-              name
-            )
-          `)
-          .eq('team_id', teamId)
-          .eq('status', 'upcoming')
-          .order('date', { ascending: true })
-          .limit(3)
-        
-        if (eventsError) {
-          console.error("Erro ao buscar eventos:", eventsError)
-          setUpcomingEvents([])
-        } else if (eventsData && eventsData.length > 0) {
-          setUpcomingEvents(eventsData)
-        } else {
-          setUpcomingEvents([])
-        }
-        
-        // Contar eventos que o promotor participou
-        try {
-          const userId = user?.id
-          const { count: joinedCount, error: joinedError } = await supabase
-            .from('event_participants')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-          
-          if (!joinedError) {
-            setUserStats(prev => ({
-              ...prev,
-              eventsJoined: joinedCount || 0
-            }))
-          } else {
-            setUserStats(prev => ({
-              ...prev,
-              eventsJoined: 0
-            }))
+
+      // 2. Se encontrou uma associação, buscar detalhes da equipa e ID da organização
+      let teamId: string | null = null;
+      let teamDetailsForDisplay: PromoterTeam | null = null;
+      let orgIdToLoad: string | null = null;
+
+      if (memberData) {
+          teamId = memberData.team_id;
+          const userRoleInTeam = memberData.role || 'promotor';
+          console.log(`PromotorDashboard: Encontrado na equipa ${teamId} com papel ${userRoleInTeam}`);
+
+          // Query à tabela teams (RLS 'Permitir leitura aos membros da equipa' deve permitir)
+          const { data: teamData, error: teamError } = await supabase
+            .from('teams')
+            .select('id, name, description, logo_url, organization_id')
+            .eq('id', teamId)
+            .single();
+
+          if (teamError) {
+              console.error(`PromotorDashboard: Erro ao buscar detalhes da equipa ${teamId} (RLS?):`, teamError);
+              toast.error("Erro ao carregar detalhes da sua equipa.");
+              teamDetailsForDisplay = { id: teamId, name: `Equipa (${teamId.substring(0,6)}...)`, role: userRoleInTeam, isPartial: true };
+          } else if (teamData) {
+              orgIdToLoad = teamData.organization_id; // Guardar ID da organização
+              teamDetailsForDisplay = {
+                  id: teamData.id,
+                  name: teamData.name || `Equipa s/ Nome (${teamId.substring(0,6)}...)`,
+                  description: teamData.description,
+                  logo_url: teamData.logo_url,
+                  role: userRoleInTeam,
+                  isPartial: false
+              };
+              console.log(`PromotorDashboard: Equipa ${teamData.name} pertence à organização ID: ${orgIdToLoad}`);
           }
-        } catch (err) {
-          console.error("Erro ao contar eventos participados:", err)
-          setUserStats(prev => ({
-            ...prev,
-            eventsJoined: 0
-          }))
-        }
-      } catch (err) {
-        console.error("Erro ao buscar eventos:", err)
-        setUpcomingEvents([])
+      } else {
+          console.log("PromotorDashboard: Nenhuma associação de equipa encontrada.");
+          // A UI deve mostrar estado vazio ou mensagem, não necessariamente erro
       }
-      
-      // Buscar vendas e comissões
-      try {
-        const userId = user?.id
-        
-        const { data: salesData, error: salesError } = await supabase
-          .from('sales')
-          .select('quantity, amount')
-          .eq('user_id', userId)
-        
-        if (!salesError && salesData && salesData.length > 0) {
-          const totalSales = salesData.reduce((sum, sale) => sum + (parseInt(sale.quantity) || 0), 0)
-          setUserStats(prev => ({
-            ...prev,
-            totalSales
-          }))
-        } else {
-          setUserStats(prev => ({
-            ...prev,
-            totalSales: 0
-          }))
-        }
-        
-        // Buscar comissões
-        const { data: commissionsData, error: commissionsError } = await supabase
-          .from('commissions')
-          .select('amount')
-          .eq('user_id', userId)
-          .eq('status', 'paid')
-        
-        if (!commissionsError && commissionsData && commissionsData.length > 0) {
-          const totalCommission = commissionsData.reduce((sum, comm) => sum + (parseFloat(comm.amount) || 0), 0)
-          setUserStats(prev => ({
-            ...prev,
-            totalCommission
-          }))
-        } else {
-          setUserStats(prev => ({
-            ...prev,
-            totalCommission: 0
-          }))
-        }
-      } catch (err) {
-        console.error("Erro ao buscar vendas e comissões:", err)
-        setUserStats(prev => ({
-          ...prev,
-          totalSales: 0,
-          totalCommission: 0
-        }))
-      }
-      
-      // Contar tarefas concluídas
-      try {
-        const userId = user?.id
-        const { count: tasksCount, error: tasksError } = await supabase
-          .from('tasks')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('status', 'completed')
-        
-        if (!tasksError) {
-          setUserStats(prev => ({
-            ...prev,
-            tasksDone: tasksCount || 0
-          }))
-        } else {
-          setUserStats(prev => ({
-            ...prev,
-            tasksDone: 0
-          }))
-        }
-      } catch (err) {
-        console.error("Erro ao contar tarefas:", err)
-        setUserStats(prev => ({
-          ...prev,
-          tasksDone: 0
-        }))
-      }
-      
-      // Buscar atividades
-      try {
-        // Verificar se a tabela 'activities' existe antes de tentar consultar
-        const { error: tableCheckError } = await supabase
-          .from('activities')
-          .select('id')
-          .limit(1)
-          
-        // Se houver erro ao verificar a tabela, provavelmente ela não existe
-        if (tableCheckError) {
-          console.warn("A tabela 'activities' pode não existir:", tableCheckError)
-          setActivities([])
-        } else {
-          const userId = user?.id
-          const { data: activitiesData, error: activitiesError } = await supabase
-            .from('activities')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(5)
-          
-          if (!activitiesError && activitiesData && activitiesData.length > 0) {
-            // Converter para o formato de ActivityItem
-            const formattedActivities: ActivityItem[] = activitiesData.map(activity => ({
-              id: activity.id,
-              type: activity.type || 'unknown',
-              timestamp: activity.created_at,
-              data: activity.data || {}
-            }))
-            setActivities(formattedActivities)
+
+      // 3. Se temos um ID de organização, FAZER QUERY SEPARADA (RLS 'Allow read for team members...' deve permitir)
+      if (orgIdToLoad) {
+          console.log(`PromotorDashboard: Buscando organização ${orgIdToLoad} separadamente...`);
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .select('id, name, logotipo') // Apenas o necessário
+            .eq('id', orgIdToLoad)
+            .single(); // Espera-se uma organização
+
+          if (orgError) {
+              console.error(`PromotorDashboard: Erro ao buscar organização ${orgIdToLoad} (RLS?):`, orgError);
+              toast.warning("Não foi possível carregar os detalhes da organização associada.");
+          } else if (orgData) {
+              console.log("PromotorDashboard: Detalhes da organização carregados:", orgData);
+              setOrganizationData(orgData as Organization); // Define o estado!
           } else {
-            setActivities([])
+              console.warn(`PromotorDashboard: Organização ${orgIdToLoad} não encontrada (Dados inconsistentes?).`);
           }
-        }
-      } catch (err) {
-        console.error("Erro ao buscar atividades:", err)
-        setActivities([])
+      } else {
+          if (teamId) {
+              console.log(`PromotorDashboard: Equipa ${teamId} não está associada a uma organização.`);
+          }
       }
-      
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-      toast.error("Erro ao carregar dados do dashboard")
-      
-      // Em caso de erro, definir estados vazios
-      setUpcomingEvents([])
-      setActivities([])
-      setUserStats({
-        totalSales: 0,
-        totalCommission: 0,
-        eventsJoined: 0,
-        tasksDone: 0
-      })
+
+      // 4. Guardar detalhes da equipa no estado (se encontrados)
+      if (teamDetailsForDisplay) {
+          setPromoterTeams([teamDetailsForDisplay]);
+      }
+
+
+      // 5. Carregar outras métricas (AGORA USANDO QUERIES DIRETAS E RLS SIMPLES)
+      console.log("PromotorDashboard: Carregando métricas adicionais (Direct Query)...");
+      // Vendas (Requer RLS `auth.uid() = user_id` em 'sales')
+      try {
+           const { data: salesData, error: salesError } = await supabase.from('sales').select('quantity').eq('user_id', userId);
+           if (salesError && salesError.code !== '42P01') { // Ignorar 'relation does not exist'
+               console.warn("PromotorDashboard: Erro vendas (RLS?):", salesError);
+           } else if (salesData) {
+               const totalSales = salesData.reduce((sum, sale) => sum + (sale.quantity || 0), 0);
+               setUserStats(prev => ({ ...prev, totalSales }));
+           }
+      } catch (err) { console.error("PromotorDashboard: Erro crítico vendas:", err); }
+
+      // Eventos Participados (Requer RLS `auth.uid() = user_id` em 'event_participants' OU nome correto da tabela)
+      // ASSUMINDO NOME CORRETO DA TABELA DE CHECK-INS / PARTICIPANTES
+      const participantsTable = 'guests'; // <-- **AJUSTAR SE O NOME FOR DIFERENTE**
+       try {
+           const { count: joinedCount, error: joinedError } = await supabase
+               .from(participantsTable)
+               .select('*', { count: 'exact', head: true })
+               .eq('promoter_id', userId); // <-- **AJUSTAR SE A COLUNA FOR DIFERENTE** (ex: checked_in_by, user_id?)
+
+           if (joinedError && joinedError.code !== '42P01') { // Ignorar 'relation does not exist'
+               console.warn(`PromotorDashboard: Erro eventos participados na tabela ${participantsTable} (RLS ou Coluna?):`, joinedError);
+           } else if (joinedCount !== null) {
+               setUserStats(prev => ({ ...prev, eventsJoined: joinedCount }));
+           }
+       } catch (err) { console.error("PromotorDashboard: Erro crítico eventos participados:", err); }
+
+       // Outras métricas (tasksDone, etc.) podem ser adicionadas aqui
+
+
+    } catch (error: any) {
+      console.error("PromotorDashboard: Erro GERAL ao carregar dashboard:", error)
+      toast.error(error.message || "Ocorreu um erro inesperado.")
     } finally {
       setLoading(false)
+      console.log("PromotorDashboard: Carregamento finalizado (Direct Query Mode).")
     }
   }
   
@@ -376,306 +299,122 @@ export default function PromotorDashboardPage() {
   }
   
   return (
-    <div className="container">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div>
+    <>
+      {/* Cabeçalho e Métricas - Sempre visíveis (exceto em loading) */}
+      <div className="mb-6"> 
           <h1 className="text-2xl font-bold mb-1">Dashboard de Promotor</h1>
           <p className="text-muted-foreground">
             Bem-vindo ao seu painel de promotor
           </p>
-        </div>
-        <div className="mt-4 sm:mt-0">
-          {teamCode ? (
-            <Badge variant="outline" className="text-sm">
-              Código da Equipa: {teamCode}
-            </Badge>
-          ) : (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => router.push('/app/promotor/equipes/entrar')}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Entrar numa Equipa
-            </Button>
-          )}
-        </div>
       </div>
       
-      {/* Métricas */}
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <MetricCard 
-          title="Bilhetes Vendidos"
-          value={userStats.totalSales}
-          description="Total de vendas"
-          icon={<Ticket className="h-4 w-4" />}
-        />
-        
-        <MetricCard 
-          title="Comissões Ganhas"
-          value={formatCurrency(userStats.totalCommission)}
-          description="Valor recebido"
-          icon={<BadgePercent className="h-4 w-4" />}
-        />
-        
-        <MetricCard 
-          title="Eventos"
-          value={userStats.eventsJoined}
-          description="Eventos participados"
-          icon={<Calendar className="h-4 w-4" />}
-        />
-        
-        <MetricCard 
-          title="Tarefas Concluídas"
-          value={userStats.tasksDone}
-          description="Tarefas completadas"
-          icon={<CheckCircle className="h-4 w-4" />}
-        />
-      </div>
-      
-      {/* Conteúdo Principal */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        {/* Status da Equipe */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>A Minha Equipa</CardTitle>
-              <CardDescription>
-                {teamData?.name || 'Equipa'} • {teamMembers} {teamMembers === 1 ? 'membro' : 'membros'}
-              </CardDescription>
-            </div>
-            {teamCode && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => router.push('/app/promotor/equipe')}
-              >
-                Ver Detalhes
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            {teamCode ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-muted rounded-md">
-                  <h3 className="font-medium mb-2">Meu progresso na equipa</h3>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span>Vendas</span>
-                        <span className="text-muted-foreground">{userStats.totalSales}/100</span>
-                      </div>
-                      <Progress value={Math.min(userStats.totalSales, 100)} className="h-2" />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span>Eventos</span>
-                        <span className="text-muted-foreground">{userStats.eventsJoined}/10</span>
-                      </div>
-                      <Progress value={Math.min(userStats.eventsJoined * 10, 100)} className="h-2" />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span>Tarefas</span>
-                        <span className="text-muted-foreground">{userStats.tasksDone}/20</span>
-                      </div>
-                      <Progress value={Math.min(userStats.tasksDone * 5, 100)} className="h-2" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
+      {/* --- Conteúdo Principal Condicional --- */}
+
+      {/* CENÁRIO 4: Nenhuma Equipa */}
+      { promoterTeams.length === 0 && !organizationData && (
               <EmptyState
                 icon={Users}
-                title="Sem equipa"
-                description="Ainda não pertence a nenhuma equipa"
-                actionLabel="Entrar numa Equipa"
-                onAction={() => router.push('/app/promotor/equipes/entrar')}
-              />
-            )}
+            title="Nenhuma equipa associada"
+            description="Você ainda não está associado a nenhuma equipa."
+            actionLabel="Procurar Equipas"
+            onAction={() => router.push('/app/promotor/equipes')} 
+          />
+      )}
+
+      {/* CENÁRIO 1: Uma Equipa COM Organização */}
+      { promoterTeams.length === 1 && organizationData && (
+          <div className="grid gap-8 lg:grid-cols-3">
+            {/* Coluna Esquerda: Card da Organização */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card>
+                 <CardHeader>
+                   <CardTitle>Organização Associada</CardTitle>
+                 </CardHeader>
+                 <CardContent>
+                   <p className="text-lg font-medium">{organizationData.name}</p>
           </CardContent>
-          {teamCode && (
-            <CardFooter className="border-t px-6 py-4">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => router.push('/app/promotor/equipe')}
-              >
-                <Users className="mr-2 h-4 w-4" />
-                Ver Detalhes da Equipa
-              </Button>
-            </CardFooter>
-          )}
         </Card>
-        
-        {/* Próximos Eventos */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Próximos Eventos</CardTitle>
-              <CardDescription>
-                Eventos agendados para a sua equipa
-              </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => router.push('/app/promotor/eventos')}
-            >
-              Ver Todos
-            </Button>
+
+            {/* Coluna Direita: Próximos Eventos Permitidos */}
+            <div className="lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Próximos Eventos da Organização</h2>
+              {organizationEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {organizationEvents.map(event => (
+                    <Card key={event.id}>
+                      <CardHeader>
+                        <CardTitle className="text-md">{event.name}</CardTitle>
+                        <CardDescription>
+                           {formatDate(event.date)} {event.location ? `| ${event.location}` : ''}
+                        </CardDescription>
           </CardHeader>
-          <CardContent>
-            {upcomingEvents.length > 0 ? (
-              <div className="space-y-4">
-                {upcomingEvents.map((event) => (
-                  <div key={event.id} className="flex flex-col space-y-2">
-                    <div className="font-medium">{event.name}</div>
-                    <div className="flex justify-between text-sm">
-                      <div className="flex items-center">
-                        <CalendarDays className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{formatDate(event.date)}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Building className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{event.organizations?.name || 'Organização'}</span>
-                      </div>
-                    </div>
-                    <Separator />
-                  </div>
+                    </Card>
                 ))}
               </div>
             ) : (
               <EmptyState
-                icon={Calendar}
-                title="Sem eventos"
-                description="Sem eventos próximos"
-                actionLabel="Explorar Eventos"
-                onAction={() => router.push('/app/promotor/eventos')}
-              />
-            )}
-          </CardContent>
-          <CardFooter className="border-t px-6 py-4">
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => router.push('/app/promotor/eventos')}
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              Ver Calendário de Eventos
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        {/* Atividade Recente */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Minhas Atividades</CardTitle>
-            <CardDescription>
-              Suas ações recentes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityFeed 
-              activities={activities}
-              emptyMessage="Sem atividades recentes para mostrar"
-            />
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Acesso Rápido */}
-      <div className="grid gap-6 md:grid-cols-3 mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>QR Venda Rápida</CardTitle>
-            <CardDescription>
-              Acesse o código QR para vendas rápidas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="bg-muted p-4 rounded-md w-40 h-40 flex items-center justify-center">
-              <QrCode className="h-24 w-24 text-muted-foreground/60" />
+                    icon={CalendarDays}
+                    title="Sem eventos futuros"
+                    description="Não há eventos futuros agendados ou permitidos para a sua equipa nesta organização."
+                  />
+              )}
             </div>
+          </div>
+      )}
+
+       {/* CENÁRIO 2: Uma Equipa SEM Organização - Mensagem Ajustada */}
+      { promoterTeams.length === 1 && !organizationData && (
+         <Card className="border-dashed bg-muted/50">
+           <CardContent className="flex flex-col items-center justify-center py-10">
+             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+             <h3 className="text-lg font-medium mb-2">Equipa Sem Organização</h3>
+             <p className="text-muted-foreground text-center mb-6 max-w-md">
+               A equipa <span className="font-medium">{promoterTeams[0]?.name}</span> ainda não tem nenhuma organização activa. 
+               Contacte o líder da sua equipa ou o suporte.
+             </p>
           </CardContent>
-          <CardFooter className="border-t px-6 py-4">
+         </Card>
+      )}
+
+      {/* CENÁRIO 3: Múltiplas Equipas */}
+      { promoterTeams.length > 1 && (
+          <div>
+            {/* Mostrar a lista de equipas para seleção */}
+            <h2 className="text-xl font-semibold mb-4">Selecione a Equipa</h2>
+            <p className="text-muted-foreground mb-4">Você pertence a múltiplas equipas. Selecione uma para ver detalhes ou eventos.</p>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {promoterTeams.map((team) => (
+                <Card key={team.id} className="overflow-hidden">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{team.name}</CardTitle>
+                    {team.description && (
+                      <CardDescription>{team.description}</CardDescription>
+                    )}
+                    {team.isPartial && (
+                      <Badge variant="outline" className="w-fit mt-2">Detalhes Limitados</Badge>
+                    )}
+                  </CardHeader>
+                  <CardFooter className="border-t p-4">
             <Button 
+              variant="outline" 
               className="w-full"
-              onClick={() => router.push('/app/promotor/vender')}
-            >
-              Vender Bilhetes
+                      onClick={() => {
+                        console.log("Selecionou equipa:", team.id); 
+                        // TO DO: Implementar lógica de seleção/contexto da equipa
+                        toast.info(`Seleção da equipa ${team.id.substring(0,6)}... ainda não implementada.`);
+                      }}
+                    >
+                      <ChevronRight className="mr-2 h-4 w-4" />
+                      Selecionar Equipa
             </Button>
           </CardFooter>
         </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Suas Vendas</CardTitle>
-            <CardDescription>
-              Acompanhe seu desempenho de vendas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Button 
-              variant="outline" 
-              className="justify-between"
-              onClick={() => router.push('/app/promotor/vendas')}
-            >
-              <div className="flex items-center">
-                <ShoppingBag className="mr-2 h-4 w-4" />
-                Histórico de Vendas
+              ))}
+            </div>
               </div>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              className="justify-between"
-              onClick={() => router.push('/app/promotor/comissoes')}
-            >
-              <div className="flex items-center">
-                <CreditCard className="mr-2 h-4 w-4" />
-                Minhas Comissões
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Tarefas</CardTitle>
-            <CardDescription>
-              Suas tarefas e pendências
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <Button 
-              variant="outline" 
-              className="justify-between"
-              onClick={() => router.push('/app/promotor/tarefas')}
-            >
-              <div className="flex items-center">
-                <ClipboardList className="mr-2 h-4 w-4" />
-                Minhas Tarefas
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              className="justify-between"
-              onClick={() => router.push('/app/promotor/perfil')}
-            >
-              <div className="flex items-center">
-                <Users className="mr-2 h-4 w-4" />
-                Meu Perfil
-              </div>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      )}
+
+    </>
   )
 } 

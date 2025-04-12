@@ -33,6 +33,7 @@ export default function AppLayout({
   return (
     <SidebarProvider>
       <OrganizationProvider>
+        <Toaster />
         <div className="flex min-h-screen flex-col">
           <main className="flex-1">
             <AppLayoutContent>
@@ -40,7 +41,6 @@ export default function AppLayout({
             </AppLayoutContent>
           </main>
         </div>
-        <Toaster />
       </OrganizationProvider>
     </SidebarProvider>
   )

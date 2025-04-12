@@ -1,5 +1,0 @@
-[33m5e58c22[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Fix: Corrigida tipagem de params no componente de Guest List para compatibilidade com Next.js 15
-[33m38bf8fa[m Fix: Corrigida tipagem de params para compatibilidade com Next.js 15
-[33m458e563[m Fix: Corrigido erro de ssr:false em componente servidor movendo-o para componente cliente
-[33m4513d52[m Fix: Correção na estrutura de código para evitar conflitos entre componentes cliente e servidor. Implementação de diagnóstico de dados de convidados com carregamento otimizado. Resolução do problema com generateMetadata.
-[33m8c67097[m Corrige erro de 'use client' com generateMetadata na página de detalhes do evento

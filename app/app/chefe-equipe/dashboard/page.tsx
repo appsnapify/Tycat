@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { LogOut, Loader2 } from 'lucide-react'
+import { LogOut, Loader2, Building } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -52,6 +52,7 @@ function getTeamDetailsFromMetadata(userData: any): TeamType | null {
 
 // Função para carregar dados da equipe
 async function loadTeamData(userData: any) {
+  console.log("[loadTeamData] Iniciando...");
   // Verificar se o usuário está autenticado
   if (!userData || !userData.user) {
     console.log('Usuário não autenticado')
@@ -71,121 +72,71 @@ async function loadTeamData(userData: any) {
   }
 
   try {
-    // Criar cliente Supabase
-    const supabase = createClientComponentClient()
+    const supabase = createClientComponentClient();
+    console.log("[loadTeamData] Cliente Supabase criado.");
 
-    // Tentar carregar dados da equipe
-    let teamResponse: any = { data: null, error: null }
+    let teamResponse: any = { data: null, error: null };
     try {
-      console.log(`Tentando carregar equipe com ID: ${teamId}`)
+      console.log(`[loadTeamData] Tentando carregar equipe via RPC: get_team_details para teamId=${teamId}`);
+      teamResponse = await supabase.rpc('get_team_details', { team_id_param: teamId });
+      console.log('[loadTeamData] Resultado RPC get_team_details:', { data: !!teamResponse.data, error: teamResponse.error });
       
-      // Verificando se a função RPC existe
-      try {
-        // Primeiro tente usar a função RPC que é mais robusta
-        teamResponse = await supabase.rpc('get_team_details', { team_id_param: teamId })
-        console.log('Resultado da chamada RPC:', teamResponse)
-        
-        if (teamResponse.error) {
-          console.log(`Erro ao carregar equipe via RPC: ${teamResponse.error.message}`)
-          throw new Error(`Erro ao carregar equipe via RPC: ${teamResponse.error.message}`)
-        }
-      } catch (rpcError) {
-        console.log('Erro na chamada RPC, tentando método direto:', rpcError)
-        
-        // Tentar carregar diretamente da tabela
-        teamResponse = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', teamId)
-          .single()
-        
-        console.log('Resultado da busca direta na tabela teams:', teamResponse)
-      }
-      
-      // Se ainda temos erro ou nenhum dado
-      if (teamResponse.error || !teamResponse.data) {
-        console.log('Também falhou ao carregar equipe diretamente:', teamResponse.error)
-        
-        // Usar dados dos metadados como fallback
-        const metadataTeam = getTeamDetailsFromMetadata(userData)
-        console.log('Usando dados de equipe dos metadados:', metadataTeam)
-        
-        if (!metadataTeam) {
-          console.log('Não foi possível obter dados da equipe dos metadados')
-          return { teamData: null, members: [] }
-        }
-        
-        return { 
-          teamData: metadataTeam, 
-          members: await loadTeamMembersAlternative(teamId, userId)
-        }
-      }
-      
-      console.log('Dados da equipe carregados:', teamResponse.data)
-    } catch (error) {
-      console.error('Erro ao tentar carregar equipe:', error)
-      
-      // Fallback para metadados
-      const metadataTeam = getTeamDetailsFromMetadata(userData)
-      
-      if (!metadataTeam) {
-        console.error('Não foi possível obter dados da equipe')
-        return { teamData: null, members: [] }
-      }
-      
-      return {
-        teamData: metadataTeam,
-        members: await loadTeamMembersAlternative(teamId, userId)
-      }
+      if (teamResponse.error) throw new Error(`Erro RPC get_team_details: ${teamResponse.error.message}`);
+
+    } catch (rpcError: any) {
+      console.log('[loadTeamData] Falha na RPC get_team_details, tentando select direto:', rpcError.message);
+      console.log(`[loadTeamData] Tentando carregar equipe via SELECT direto para teamId=${teamId}`);
+      teamResponse = await supabase.from('teams').select('*').eq('id', teamId).single();
+      console.log('[loadTeamData] Resultado SELECT direto teams:', { data: !!teamResponse.data, error: teamResponse.error });
     }
+    
+    if (teamResponse.error || !teamResponse.data) {
+      console.log('[loadTeamData] Falha ao carregar dados da equipe via RPC e SELECT. Usando metadados.');
+      const metadataTeam = getTeamDetailsFromMetadata(userData);
+      if (!metadataTeam) throw new Error("Não foi possível obter dados da equipe de nenhuma fonte.");
+      console.log("[loadTeamData] Obtendo membros (alternativo) para equipa dos metadados...");
+      const members = await loadTeamMembersAlternative(teamId, userId);
+      return { teamData: metadataTeam, members };
+    }
+      
+    const teamData = teamResponse.data;
+    console.log('[loadTeamData] Dados da equipe carregados com sucesso:', teamData?.id);
 
     // Obter membros da equipe
-    let members = []
+    let members = [];
     try {
-      console.log(`Tentando carregar membros da equipe: ${teamId}`)
-      
-      // Verificar se a função RPC existe
-      try {
-        // Primeiro tente usar a função RPC
-        const membersResponse = await supabase.rpc('get_team_members', { team_id_param: teamId })
-        console.log('Resultado da chamada RPC para membros:', membersResponse)
-        
-        if (membersResponse.error) {
-          throw new Error(`Erro ao carregar membros via RPC: ${membersResponse.error.message}`)
-        }
-        
-        members = membersResponse.data || []
-      } catch (membersRpcError) {
-        console.log('Erro na chamada RPC para membros, tentando método direto:', membersRpcError)
-        members = await loadTeamMembersAlternative(teamId, userId)
-      }
-      
-      console.log(`${members.length} membros carregados`)
-    } catch (error) {
-      console.error('Erro ao carregar membros:', error)
-      members = await loadTeamMembersAlternative(teamId, userId)
-    }
+      console.log(`[loadTeamData] Tentando carregar membros via RPC: get_team_members para teamId=${teamId}`);
+      const membersResponse = await supabase.rpc('get_team_members', { team_id_param: teamId });
+      console.log('[loadTeamData] Resultado RPC get_team_members:', { dataLength: membersResponse.data?.length, error: membersResponse.error });
+      if (membersResponse.error) throw new Error(`Erro RPC get_team_members: ${membersResponse.error.message}`);
+      members = membersResponse.data || [];
 
-    return {
-      teamData: teamResponse.data,
-      members: members
+    } catch (membersRpcError: any) {
+      console.log('[loadTeamData] Falha na RPC get_team_members, tentando alternativo:', membersRpcError.message);
+      console.log("[loadTeamData] Obtendo membros (alternativo) após falha RPC...");
+      members = await loadTeamMembersAlternative(teamId, userId);
     }
-  } catch (error) {
-    console.error('Erro ao carregar dados da equipe:', error)
-    
-    // Usar dados dos metadados como último recurso
-    const metadataTeam = getTeamDetailsFromMetadata(userData)
-    console.log('Usando dados de equipe dos metadados como último recurso:', metadataTeam)
-    
-    return { 
-      teamData: metadataTeam, 
-      members: await loadTeamMembersAlternative(teamId, userId) 
+      
+    console.log(`[loadTeamData] Total de membros carregados: ${members.length}`);
+    return { teamData, members };
+
+  } catch (error: any) {
+    console.error('[loadTeamData] Erro CATCH GERAL:', error.message);
+    // Tentar fallback final para metadados
+    const metadataTeam = getTeamDetailsFromMetadata(userData);
+    if (!metadataTeam) {
+      console.error("[loadTeamData] Falha no fallback final para metadados.");
+      throw error; // Relançar erro se nem metadados funcionarem
     }
+    console.log("[loadTeamData] Usando metadados no CATCH GERAL. Obtendo membros (alternativo)...");
+    const members = await loadTeamMembersAlternative(teamId, userId);
+    return { teamData: metadataTeam, members };
   }
 }
 
 // Função alternativa para carregar membros da equipe contornando problemas de RLS
 async function loadTeamMembersAlternative(teamId: string, userId: string) {
+  console.log(`[loadTeamMembersAlternative] Iniciando para teamId=${teamId}`);
   if (!teamId || !userId) {
     console.log('ID de equipe ou usuário inválido para carregamento alternativo de membros')
     return []
@@ -197,6 +148,7 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
     
     // Tentar carregar diretamente da tabela
     try {
+      console.log(`[loadTeamMembersAlternative] Tentando SELECT direto em team_members (com profiles)...`);
       const response = await supabase
         .from('team_members')
         .select(`
@@ -209,7 +161,7 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
         `)
         .eq('team_id', teamId)
       
-      console.log('Resultado da busca direta de team_members:', response)
+      console.log('[loadTeamMembersAlternative] Resultado SELECT direto (com profiles):', { dataLength: response.data?.length, error: response.error });
       
       if (response.error) {
         throw new Error(`Erro ao carregar membros: ${response.error.message}`)
@@ -268,134 +220,96 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
 }
 
 export default function TeamLeaderDashboard() {
-  const { user, status, checkIfTeamLeader } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
   const supabase = createClientComponentClient()
   const { toast } = useToast()
   
-  const [team, setTeam] = useState<TeamType | null>(null)
-  const [members, setMembers] = useState<TeamMemberType[]>([])
   const [loading, setLoading] = useState(true)
-  const [copySuccess, setCopySuccess] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [associatedOrganizations, setAssociatedOrganizations] = useState<Organization[]>([])
   
-  // Função para carregar dados do dashboard
+  // Função para carregar dados APENAS das organizações
   async function loadDashboardData() {
-    console.log('Iniciando carregamento do dashboard')
+    console.log('Iniciando carregamento do dashboard (organizações)')
     setLoading(true)
     setLoadError(null)
     
-    // Adicionar um timeout de segurança para evitar loading infinito
     const safetyTimeout = setTimeout(() => {
-      console.log('Timeout de segurança acionado')
       if (loading) {
-        console.log('Dashboard ainda em carregamento após timeout, forçando conclusão')
-        
-        // Usar dados básicos dos metadados se disponíveis
-        if (user?.user_metadata?.team_id && user?.user_metadata?.team_name) {
-          const metadataTeam = getTeamDetailsFromMetadata({ user })
-          console.log('Usando dados básicos dos metadados:', metadataTeam)
-          
-          if (metadataTeam) {
-            setTeam(metadataTeam)
-            // Definir membro padrão (próprio usuário)
-            setMembers([{
-              id: 'self',
-              user_id: user.id,
-              team_id: metadataTeam.id,
-              role: 'chefe-equipe',
-              joined_at: new Date().toISOString(),
-              profile: {
-                id: user.id,
-                email: user.email || 'Sem dados',
-                full_name: user.user_metadata?.full_name || 'Líder da Equipe',
-                avatar_url: null
-              }
-            }])
-          }
-        }
-        
-        // Forçar saída do estado de carregamento
+        setLoadError("Timeout ao carregar dados.")
         setLoading(false)
       }
-    }, 5000) // Reduzido para 5 segundos para mais rapidez
+    }, 8000) // Aumentar ligeiramente o timeout
     
     try {
-      // Verificar se o usuário está autenticado
-      if (!user) {
-        console.error('Usuário não autenticado')
-        router.push('/login')
-        clearTimeout(safetyTimeout)
-        return
-      }
-      
-      console.log('Carregando dashboard para usuário:', user.id)
-      console.log('Metadados do usuário:', user.user_metadata)
-      
-      // Carregar dados usando a função robusta
-      console.log('Chamando loadTeamData')
-      const { teamData, members: teamMembers } = await loadTeamData({ user })
-      console.log('Resposta de loadTeamData:', { teamDataReceived: !!teamData, membersCount: teamMembers?.length })
-      
-      if (!teamData) {
-        console.error('Nenhum dado de equipe encontrado')
-        setLoadError('Não foi possível carregar os dados da equipe. Verifique se você tem as permissões necessárias.')
+      if (!user || !user.user_metadata?.team_id) {
+        console.error('Usuário não autenticado ou sem team_id nos metadados')
+        setLoadError('Informações da equipe não encontradas. Contacte o suporte.')
         setLoading(false)
         clearTimeout(safetyTimeout)
         return
       }
       
-      console.log('Dados da equipe carregados:', teamData)
-      console.log('Membros carregados:', teamMembers)
+      const teamId = user.user_metadata.team_id
+      console.log('Carregando dashboard para usuário:', user.id, ' Equipe ID:', teamId)
       
-      setTeam(teamData)
-      setMembers(teamMembers)
-    } catch (error) {
+      // ---> BUSCAR ORGANIZAÇÕES ASSOCIADAS <--- 
+      console.log(`Buscando organizações para a equipe: ${teamId}`);
+      const { data: orgLinks, error: linkError } = await supabase
+        .from('organization_teams')
+        .select('organization_id')
+        .eq('team_id', teamId); 
+        
+      if (linkError) {
+        throw new Error(`Erro ao buscar links de organização: ${linkError.message}`);
+      }
+      
+      if (orgLinks && orgLinks.length > 0) {
+        const orgIds = orgLinks.map(link => link.organization_id);
+        console.log(`Encontrados IDs de organização associados: ${orgIds.join(', ')}`);
+        const { data: organizationsData, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, name, logotipo, address, location')
+          .in('id', orgIds);
+          
+        if (orgsError) {
+          throw new Error(`Erro ao buscar detalhes das organizações: ${orgsError.message}`);
+        }
+        console.log('Organizações associadas carregadas:', organizationsData);
+        setAssociatedOrganizations(organizationsData || []);
+      } else {
+        console.log('Nenhuma organização encontrada associada a esta equipe.');
+        setAssociatedOrganizations([]);
+      }
+      // ---> FIM BUSCA ORGANIZAÇÕES <--- 
+      
+    } catch (error: any) {
       console.error('Erro ao carregar dashboard:', error)
-      setLoadError('Ocorreu um erro ao carregar o dashboard. Por favor, tente novamente.')
+      setLoadError(error.message || 'Ocorreu um erro ao carregar o dashboard.')
     } finally {
-      console.log('Finalizando carregamento do dashboard')
+      console.log('Finalizando carregamento do dashboard (organizações)')
       setLoading(false)
       clearTimeout(safetyTimeout)
     }
   }
   
-  // Copiar código da equipe
-  const copyTeamCode = () => {
-    if (team?.team_code) {
-      navigator.clipboard.writeText(team.team_code)
-        .then(() => {
-          setCopySuccess(true)
-          toast.success('Código da equipe copiado!')
-          setTimeout(() => setCopySuccess(false), 2000)
-        })
-        .catch(err => {
-          console.error('Falha ao copiar:', err)
-          toast.error('Não foi possível copiar o código')
-        })
-    }
-  }
-  
   useEffect(() => {
-    console.log('Status da autenticação mudou:', status)
-    
-    if (status === 'authenticated') {
-      loadDashboardData()
-    } else if (status === 'unauthenticated') {
-      console.log('Usuário não autenticado, redirecionando para login')
-      router.push('/login')
+    console.log('Auth state changed:', { isLoading, hasUser: !!user });
+    if (isLoading) {
+      console.log("Auth ainda está carregando...");
+      return;
     }
-    
-    // Efeito específico para lidar com redirecionamento após logout
-    return () => {
-      if (status === 'unauthenticated') {
-        console.log('Componente desmontado com status não autenticado, forçando redirecionamento')
-        router.push('/login')
-      }
+    if (!isLoading && user) {
+      console.log("Autenticado, carregando dados do dashboard...");
+      loadDashboardData();
     }
-  }, [status, router])
+    if (!isLoading && !user) {
+      console.log('Usuário não autenticado após carregamento, redirecionando para login');
+      router.push('/login');
+    }
+  }, [isLoading, user, router]);
   
-  // Renderização do estado de carregamento
   if (loading) {
     return (
       <div className="container py-10 flex flex-col items-center justify-center min-h-[70vh]">
@@ -405,42 +319,16 @@ export default function TeamLeaderDashboard() {
     )
   }
   
-  // Renderização de erro
   if (loadError) {
     return (
       <div className="container py-10">
         <Card>
           <CardHeader>
             <CardTitle>Erro ao carregar dashboard</CardTitle>
-            <CardDescription>
-              {loadError}
-            </CardDescription>
+            <CardDescription>{loadError}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => loadDashboardData()}>
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-  
-  // Renderização quando não há equipe
-  if (!team) {
-    return (
-      <div className="container py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Nenhuma equipe encontrada</CardTitle>
-            <CardDescription>
-              Você precisa criar uma equipe para acessar o dashboard de chefe de equipe.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push('/app/promotor/equipes/criar')}>
-              Criar Equipe
-            </Button>
+            <Button onClick={() => loadDashboardData()}>Tentar novamente</Button>
           </CardContent>
         </Card>
       </div>
@@ -448,87 +336,55 @@ export default function TeamLeaderDashboard() {
   }
   
   return (
-    <div className="container py-10 space-y-6">
-      <div className="flex flex-col md:flex-row gap-4 md:gap-8 md:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{team.name}</h1>
-          <p className="text-muted-foreground mt-1">{team.description}</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/app/promotor/equipes/gerenciar')}
-          >
-            Gerenciar Equipe
-          </Button>
-        </div>
-      </div>
+    <div className="container py-8 space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight mb-6">Dashboard Chefe de Equipe</h1>
       
-      <Separator />
-      
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Código da Equipe</CardTitle>
-            <CardDescription>
-              Compartilhe este código com outros promotores para que eles entrem na sua equipe.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex space-x-2">
-              <Input
-                readOnly
-                value={team.team_code || 'Código não disponível'}
-                className="font-mono text-center"
-              />
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={copyTeamCode}
-                className={copySuccess ? 'bg-green-100' : ''}
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">Organizações Associadas</h2>
+        {associatedOrganizations.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {associatedOrganizations.map((org) => (
+              <Card
+                key={org.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col min-h-[150px]"
+                onClick={() => alert(`Clicou na organização: ${org.name} (ID: ${org.id}) - Implementar Modal!`)}
               >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Membros</CardTitle>
-            <CardDescription>
-              {members.length === 1 
-                ? '1 membro na equipe'
-                : `${members.length} membros na equipe`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Users className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">{members.length}</p>
-                <p className="text-sm text-muted-foreground">Total de membros</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <CardHeader className="p-5 flex flex-row items-center space-x-4">
+                  {org.logotipo ? (
+                    <img src={org.logotipo} alt={org.name || 'Logo'} className="h-12 w-12 rounded-lg object-cover border" />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center text-muted-foreground border">
+                      {(org.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <CardTitle className="text-xl font-semibold">{org.name || 'Organização Sem Nome'}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 pt-0 text-sm text-muted-foreground flex-grow">
+                   {org.address && (
+                     <p className="line-clamp-2">{org.address}</p>
+                   )}
+                   {!org.address && org.location && (
+                     <p className="line-clamp-2">{org.location}</p>
+                   )}
+                   {!org.address && !org.location && (
+                      <p><i>Localização não disponível</i></p>
+                   )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-dashed border-gray-300">
+            <CardContent className="p-6 text-center flex flex-col items-center justify-center min-h-[150px]">
+              <Building className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="font-medium mb-1">Sem Organizações Associadas</h3>
+              <p className="text-sm text-muted-foreground">
+                Sua equipe ainda não está associada a nenhuma organização.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Membros da Equipe</CardTitle>
-          <CardDescription>
-            Lista de todos os promotores que fazem parte da sua equipe.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TeamMembersList 
-            initialMembers={members} 
-            teamId={team.id}
-            fallbackUserId={user?.id} 
-          />
-        </CardContent>
-      </Card>
     </div>
   )
 } 

@@ -93,12 +93,70 @@ export interface Database {
           created_at?: string
         }
       }
+      teams: {
+        Row: {
+          id: string
+          created_at: string
+          name: string
+          description: string | null
+          team_code: string
+          created_by: string
+          member_count: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          name: string
+          description?: string | null
+          team_code: string
+          created_by: string
+          member_count?: number
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          name?: string
+          description?: string | null
+          team_code?: string
+          created_by?: string
+          member_count?: number
+        }
+      }
+      team_members: {
+        Row: {
+          id: string
+          created_at: string
+          team_id: string
+          user_id: string
+          role: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          team_id: string
+          user_id: string
+          role: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          team_id?: string
+          user_id?: string
+          role?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_promoter_team_v2: {
+        Args: {
+          p_team_name: string
+          p_team_description: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
