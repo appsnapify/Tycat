@@ -39,23 +39,9 @@ const formSchema = z.object({
 // Definir o tipo dos valores do formulário
 type CreateTeamFormValues = z.infer<typeof formSchema>;
 
-// Função de normalização para garantir consistência de papéis
-const normalizeRole = (role: string | null | undefined): string => {
-  if (!role) return 'desconhecido';
-  
-  const roleMap: Record<string, string> = {
-    'promoter': 'promotor',
-    'promotor': 'promotor',
-    'team-leader': 'chefe-equipe',
-    'chefe-equipe': 'chefe-equipe'
-  };
-  
-  return roleMap[role.toLowerCase()] || role.toLowerCase();
-};
-
 export default function CriarEquipePage() {
   const router = useRouter()
-  const { user, updateUserRole, checkIfUserIsTeamLeader } = useAuth()
+  const { user, updateUserRole, isTeamLeader } = useAuth()
   const supabase = createClientComponentClient()
   const { toast } = useToast()
   
@@ -63,7 +49,7 @@ export default function CriarEquipePage() {
   const [diagnosisLoading, setDiagnosisLoading] = useState(false)
   const [teamName, setTeamName] = useState('')
   const [teamDescription, setTeamDescription] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [dbStatus, setDbStatus] = useState({
     uuidExtension: false,
     teamsTable: false,
@@ -124,38 +110,28 @@ export default function CriarEquipePage() {
   }, [user, supabase]);
   
   // Verificar se o usuário já é líder de equipe
-  const checkIfAlreadyTeamLeader = async () => {
-    if (!user) return false;
-    
-    try {
-      console.log("Verificando se o usuário já é líder de equipe");
-      const isTeamLeader = await checkIfUserIsTeamLeader();
-      if (isTeamLeader) {
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Você já é líder de uma equipe",
-        });
-        router.push("/app/chefe-equipe/dashboard");
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error("Erro ao verificar status de líder:", error);
-      return false;
+  const checkIfAlreadyTeamLeader = () => {
+    console.log("Verificando se o usuário já é líder de equipe (usando estado isTeamLeader):");
+    if (isTeamLeader) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Você já é líder de uma equipe",
+      });
+      router.push("/app/chefe-equipe/dashboard");
+      return true;
     }
+    return false;
   };
   
   // Função para criar equipe
   const onSubmit = async (formData: CreateTeamFormValues) => {
     try {
       setLoading(true);
-      setError('');
+      setError(null);
       
       // Verificar se o usuário já é líder de equipe
-      const isAlreadyLeader = await checkIfAlreadyTeamLeader();
-      if (isAlreadyLeader) return;
+      if (checkIfAlreadyTeamLeader()) return;
       
       // Verificar se o usuário está autenticado
       if (!user || !user.id) {
@@ -173,29 +149,28 @@ export default function CriarEquipePage() {
       console.log("Metadados atuais do usuário:", user.user_metadata);
       
       // Chamar a função RPC para criar a equipe
-      const { data, error } = await supabase.rpc("create_promoter_team_v2", {
-        user_id: user.id,
-        team_name: formData.name,
-        team_description: formData.description || null,
+      const { data, error: rpcError } = await supabase.rpc("create_promoter_team_v2", {
+        p_team_name: formData.name,
+        p_team_description: formData.description || null,
       });
       
-      if (error) {
-        console.error("Erro ao criar equipe:", error);
+      if (rpcError) {
+        console.error("Erro ao criar equipe RPC:", rpcError);
         
-        if (error.message?.includes('já é')) {
+        if (rpcError.message?.includes('já é')) {
           toast({
             variant: "destructive",
             title: "Você já é líder de uma equipe",
             description: "Um usuário só pode liderar uma equipe por vez.",
           });
           router.push("/app/chefe-equipe/dashboard");
-        } else if (error.message?.includes('permissão')) {
+        } else if (rpcError.message?.includes('permissão')) {
           toast({
             variant: "destructive",
             title: "Permissão negada",
             description: "Você não tem permissão para criar uma equipe",
           });
-        } else if (error.code === '42501') {
+        } else if (rpcError.code === '42501') {
           toast({
             variant: "destructive",
             title: "Erro de permissão",
@@ -205,11 +180,11 @@ export default function CriarEquipePage() {
           toast({
             variant: "destructive",
             title: "Erro ao criar equipe",
-            description: error.message || "Ocorreu um erro ao criar a equipe",
+            description: rpcError.message || "Ocorreu um erro ao criar a equipe",
           });
         }
         
-        setError(error.message || "Ocorreu um erro ao criar a equipe");
+        setError(rpcError.message || "Ocorreu um erro ao criar a equipe");
         setLoading(false);
         return;
       }
@@ -320,8 +295,8 @@ export default function CriarEquipePage() {
       
       // Mostrar notificação de sucesso
       toast({
-        title: "Equipe criada com sucesso!",
-        description: `Sua equipe "${formData.name}" foi criada`,
+        title: "Sucesso!",
+        description: "Equipe criada com sucesso. Você agora é um Chefe de Equipe!",
       });
       
       // Pequeno atraso para garantir que a sessão seja atualizada
@@ -330,14 +305,14 @@ export default function CriarEquipePage() {
         console.log("Redirecionando para o dashboard de chefe de equipe");
         router.push("/app/chefe-equipe/dashboard");
       }, 1500);
-    } catch (error: any) {
-      console.error("Erro ao criar equipe:", error);
+    } catch (err: any) {
+      console.error("Erro GERAL ao criar equipe:", err);
       toast({
         variant: "destructive",
         title: "Erro",
-        description: error.message || "Ocorreu um erro ao criar a equipe",
+        description: err.message || "Ocorreu um erro inesperado ao criar a equipe",
       });
-      setError(error.message || "Ocorreu um erro ao criar a equipe");
+      setError(err.message || "Ocorreu um erro inesperado ao criar a equipe");
     } finally {
       setLoading(false);
     }
@@ -387,9 +362,8 @@ export default function CriarEquipePage() {
       setTimeout(() => {
         router.push('/app/chefe-equipe/dashboard');
       }, 100);
-    } catch (error) {
-      console.error('Erro ao criar equipe simulada:', error);
-      setError('Erro ao criar equipe simulada. Tente novamente.');
+    } catch (simError: any) {
+      toast.error('Erro ao criar equipe simulada: ' + simError.message);
     } finally {
       setLoading(false);
     }
@@ -570,7 +544,7 @@ export default function CriarEquipePage() {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Criando simulação...
+                      Criar Equipe Simulada
                     </>
                   ) : (
                     'Criar Equipe Simulada'

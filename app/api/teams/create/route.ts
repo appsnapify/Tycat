@@ -122,7 +122,6 @@ export async function POST(request: Request) {
         // created_at e updated_at usarão default now()
         // commission_rate e fixed_amount são nullable
         // team_promoter_split usa default 30.0
-        commission_type: 'percentage' // Este é NOT NULL
       })
       
     // Logar resultado da inserção em ORGANIZATION_TEAMS

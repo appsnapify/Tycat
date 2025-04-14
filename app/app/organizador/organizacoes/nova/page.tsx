@@ -49,6 +49,7 @@ export default function NewOrganizationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    let submissionError: Error | null = null;
 
     try {
       if (!user) {
@@ -101,23 +102,24 @@ export default function NewOrganizationPage() {
         }, 500); // Pequeno delay para o toast ser visível
       });
 
-    } catch (error) {
-      console.error('Erro ao criar organização:', error)
+    } catch (err) {
+      submissionError = err instanceof Error ? err : new Error(String(err));
+      console.error('Erro ao criar organização:', submissionError)
       // Usar requestAnimationFrame para o toast de erro também
       requestAnimationFrame(() => {
-        if (error instanceof Error) {
-          toast.error(`Erro ao criar organização: ${error.message}`)
-        } else {
-          toast.error('Erro desconhecido ao criar organização')
-        }
+        toast.error(`Erro ao criar organização: ${submissionError?.message || 'Erro desconhecido'}`)
       });
     } finally {
-      // Definir isLoading como false apenas se houve erro, 
+      // Definir isLoading como false apenas se houve erro,
       // senão o redirect cuida da mudança de UI.
-      if (!(error instanceof Error)) { 
-        // Não definir como false no sucesso para manter o botão desativado até o redirect
-      } else {
+      if (submissionError) {
         setIsLoading(false);
+      } else {
+        // No caso de sucesso, o redirect acontece, não precisamos necessariamente
+        // de reativar o botão imediatamente, mas podemos fazê-lo se quisermos.
+        // Se o redirect falhar por algum motivo, o botão ficaria desativado.
+        // Para maior segurança, podemos reativar se não houver erro:
+        // setIsLoading(false); 
       }
     }
   }

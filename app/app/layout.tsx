@@ -4,7 +4,7 @@ import '@/app/globals.css'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Toaster } from 'sonner'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { SidebarProvider } from '@/contexts/sidebar-context'
 import { OrganizationProvider } from '@/app/contexts/organization-context'
@@ -22,6 +22,7 @@ import { ContentArea } from '@/components/content-area'
 import { AppHeader } from '@/components/app-header'
 import { MobileMenu } from '@/components/mobile-menu'
 import { AppSidebar } from '@/components/app-sidebar'
+import { LayoutDashboard, Building, Users } from 'lucide-react'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -47,91 +48,22 @@ export default function AppLayout({
 }
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading: isLoadingAuth } = useAuth()
   const router = useRouter()
-  const [checkingAuth, setCheckingAuth] = useState(true)
-  const [sessionChecks, setSessionChecks] = useState(0)
-  const [error, setError] = useState<Error | null>(null)
-  const MAX_SESSION_CHECKS = 3
   
   console.log("DEBUG - AppLayoutContent iniciando:", { 
     userAutenticado: !!user, 
-    isLoading,
-    checkingAuth,
-    sessionChecks
+    isLoadingAuth
   });
   
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Se ainda está carregando, esperar
-        if (isLoading) {
-          console.log("DEBUG - AppLayoutContent: isLoading é true, aguardando");
-          return
-        }
-        
-        // Se já temos um usuário, permitir acesso
-        if (user) {
-          console.log('Layout: Usuário autenticado detectado', user.user_metadata)
-          setCheckingAuth(false)
-          return
-        }
-        
-        // Se não há usuário e já tentamos verificar múltiplas vezes
-        if (sessionChecks >= MAX_SESSION_CHECKS) {
-          console.log('Layout: Limite de verificações excedido, redirecionando para login')
-          // Em vez de usar window.location.href que pode causar problemas de navegação,
-          // usar o router do Next.js
-          router.push('/login')
-          return
-        }
-        
-        // Se não há usuário, verificar a sessão manualmente
-        console.log(`Layout: Verificando sessão manualmente (tentativa ${sessionChecks + 1})`)
-        const supabase = createClientComponentClient()
-        const { data } = await supabase.auth.getSession()
-        
-        if (data.session) {
-          console.log('Layout: Sessão encontrada manualmente')
-          // Temos uma sessão, mas o hook não detectou - aguardar mais
-          setSessionChecks(prev => prev + 1)
-          setTimeout(() => setCheckingAuth(true), 500) // Verificar novamente em 500ms
-        } else {
-          console.log('Layout: Nenhuma sessão encontrada, redirecionando para login')
-          router.push('/login')
-        }
-      } catch (error) {
-        console.error('Layout: Erro ao verificar sessão manualmente:', error)
-        setError(error instanceof Error ? error : new Error('Erro desconhecido'))
-        // Em caso de erro na verificação, redirecionar para login após um pequeno atraso
-        setTimeout(() => {
-          router.push('/login')
-        }, 1000)
-      }
+    if (!isLoadingAuth && !user) {
+      console.log('AppLayoutContent: Auth carregado, sem utilizador. Redirecionando para /login.')
+      router.push('/login')
     }
-    
-    if (checkingAuth) {
-      checkAuth()
-    }
-  }, [user, isLoading, checkingAuth, sessionChecks, router])
+  }, [isLoadingAuth, user, router])
 
-  // Se ocorreu um erro, exibir mensagem
-  if (error) {
-    return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center p-4">
-        <h2 className="text-lg font-semibold text-red-600 mb-2">Erro ao verificar sessão</h2>
-        <p className="text-sm text-gray-600 mb-4">{error.message}</p>
-        <button 
-          onClick={() => router.push('/login')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Voltar para o login
-        </button>
-      </div>
-    )
-  }
-
-  if (isLoading || (checkingAuth && sessionChecks < MAX_SESSION_CHECKS)) {
+  if (isLoadingAuth) {
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -140,10 +72,50 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }
   
   if (!user) {
-    console.log("DEBUG - AppLayoutContent: Não há usuário após verificações");
-    return null
+    console.log("DEBUG - AppLayoutContent: Não há utilizador após carregamento do Auth (redirecionamento pendente).");
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      </div>
+    )
   }
   
-  console.log("DEBUG - AppLayoutContent: Renderizando children");
+  console.log("DEBUG - AppLayoutContent: Auth carregado, utilizador encontrado. Renderizando children");
   return children
-} 
+}
+
+const getNavLinks = (role: string) => {
+  switch (role) {
+    case 'organizador':
+      return [
+        { href: '/app/organizador/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/app/organizador/organizations', label: 'Organizações', icon: Building },
+        // ... outros links organizador
+      ];
+    case 'chefe-equipe':
+      return [
+        { href: '/app/chefe-equipe/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/app/chefe-equipe/equipe', label: 'A Minha Equipa', icon: Users },
+        // ... outros links chefe
+      ];
+    case 'promotor':
+      return [
+        { href: '/app/promotor/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        // { href: '/app/promotor/equipes', label: 'Equipas', icon: Users }, // <-- LINHA REMOVIDA
+        // ... outros links promotor
+      ];
+    default:
+      return [];
+  }
+};
+
+// Dentro do componente que renderiza os links (ex: SidebarNav):
+// const navLinks = getNavLinks(userRole);
+// ... (código que mapeia navLinks para elementos de link) ...
+
+// --- Instrução Específica para o Modelo de Edição --- 
+// Localize a definição dos links de navegação para a role 'promotor'.
+// Remova ou comente a linha/objeto que representa o link para '/app/promotor/equipes' com o label 'Equipas'.
+// Certifique-se de que apenas o link para promotores é afetado.
+
+// ... código existente ... 

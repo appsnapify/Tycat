@@ -68,8 +68,6 @@ export default function PromotorLayout({
   // Links da barra lateral para o Promotor
   const sidebarLinks = [
     { href: '/app/promotor/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    // Link para a página de equipas (onde pode juntar/criar)
-    { href: '/app/promotor/equipes', label: 'Equipas', icon: Users }, 
     // Futuramente: Link para ver eventos? 
     // { href: '/app/promotor/eventos', label: 'Meus Eventos', icon: CalendarDays }, 
   ]

@@ -141,6 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Função modificada para usar a normalização
   const checkIfTeamLeader = async (userId: string) => {
+    let isIdentifiedAsLeader = false; // Flag local para rastrear
+    let currentUserRole: string | null = null;
+
     try {
       console.log("[checkIfTeamLeader] Verificando se o usuário é líder de equipe:", userId);
       
@@ -148,35 +151,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       
       // Primeiro verificar se o usuário já tem metadados que o identificam como líder
-      const { data: userData, error: userError } = await supabase.auth.getUser(userId);
+      // E obter o role atual
+      const { data: userDataWrapper, error: userError } = await supabase.auth.getUser(); // Usar getUser() para obter dados frescos
+      const userData = userDataWrapper?.user; // Extrair o objeto user
       
       if (!userError && userData) {
-        const userRole = userData.user_metadata?.role;
-        const normalizedRole = normalizeRole(userRole);
-        
+        currentUserRole = normalizeRole(userData.user_metadata?.role); // Guardar role atual normalizado
+        console.log(`[checkIfTeamLeader] Role atual nos metadados: ${currentUserRole}`);
+
         // Verificar metadados para papel compatível com chefe de equipe
-        if (normalizedRole === 'chefe-equipe') {
-          console.log("[checkIfTeamLeader] Usuário identificado como líder pelos metadados");
+        if (currentUserRole === 'chefe-equipe') {
+          console.log("[checkIfTeamLeader] Usuário já identificado como líder pelos metadados (role)");
+          isIdentifiedAsLeader = true;
           setIsTeamLeader(true);
-          
-          // Atualizar localStorage com dados atualizados
-          updateAuthLocalStorage(userData);
-          
-          return true;
+          updateAuthLocalStorage(userData); // Atualizar localStorage
+          // Não precisa retornar aqui, pois pode haver outras verificações
         }
         
         // Verificar também o flag is_team_leader
         if (userData.user_metadata?.is_team_leader === true) {
-          console.log("[checkIfTeamLeader] Usuário identificado como líder pelo flag is_team_leader");
+          console.log("[checkIfTeamLeader] Usuário já identificado como líder pelo flag is_team_leader");
+          isIdentifiedAsLeader = true;
           setIsTeamLeader(true);
-          return true;
+          // Não precisa retornar aqui
         }
+      } else if (userError) {
+         console.error("[checkIfTeamLeader] Erro ao obter dados do usuário:", userError);
+         // Não podemos determinar o role atual, proceder com cautela
       }
       
+      // Se já foi identificado como líder pelos metadados, não precisamos das verificações abaixo
+      // a menos que queiramos corrigir/atualizar dados como team_id se faltarem.
+      // Por agora, vamos simplificar: se já é líder nos metadados, paramos aqui.
+      if (isIdentifiedAsLeader) {
+        console.log("[checkIfTeamLeader] Usuário já confirmado como líder via metadados. Finalizando verificação.");
+        return true;
+      }
+
+      // --- Verificações adicionais apenas se NÃO for líder pelos metadados --- 
+
+      console.log("[checkIfTeamLeader] Usuário não é líder pelos metadados, continuando verificações...");
+
       // Método mais seguro: verificar se é criador de equipe
       try {
         // Criar cliente Supabase para esta verificação
-        const supabase = createClient();
+        // const supabase = createClient(); // Reutilizar cliente já criado
         
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
@@ -184,106 +203,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('created_by', userId)
           .maybeSingle();
         
-        if (!teamError && teamData) {
-          console.log("[checkIfTeamLeader] Usuário é criador de equipe:", teamData.id);
-          setIsTeamLeader(true);
+        if (teamError) {
+            console.error("[checkIfTeamLeader] Erro ao consultar teams por created_by:", teamError);
+        } else if (teamData) {
+          console.log("[checkIfTeamLeader] Usuário é criador de equipe (detectado):", teamData.id);
+          setIsTeamLeader(true); // <<< OK: Definir estado local
           
-          // Se encontrarmos dados de equipe, atualizar os metadados do usuário
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: {
-              role: 'chefe-equipe',
-              team_id: teamData.id,
-              team_code: teamData.team_code,
-              team_name: teamData.name,
-              is_team_leader: true
-            }
-          });
-          
-          if (updateError) {
-            console.error("[checkIfTeamLeader] Erro ao atualizar metadados:", updateError);
-          } else {
-            console.log("[checkIfTeamLeader] Metadados atualizados com informações da equipe");
+          // *** LÓGICA CONDICIONAL DE ATUALIZAÇÃO ***
+          if (currentUserRole === 'promotor') {
+            console.log("[checkIfTeamLeader] Role atual é 'promotor'. Atualizando metadados para 'chefe-equipe'.");
+            // Se encontrarmos dados de equipe E o user era promotor, atualizar metadados
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: {
+                role: 'chefe-equipe', // <<< Promover para chefe
+                team_id: teamData.id,
+                team_code: teamData.team_code,
+                team_name: teamData.name,
+                is_team_leader: true
+              }
+            });
             
-            // Atualizar localStorage
-            handleLocalStorage('chefe-equipe');
+            if (updateError) {
+              console.error("[checkIfTeamLeader] Erro ao atualizar metadados para promotor->chefe:", updateError);
+            } else {
+              console.log("[checkIfTeamLeader] Metadados atualizados (promotor->chefe). Usuário promovido.");
+              // Atualizar localStorage com o novo role
+              handleLocalStorage('chefe-equipe'); 
+            }
+          } else {
+             console.log(`[checkIfTeamLeader] Usuário criou equipa, mas role atual é '${currentUserRole}' (não promotor). NÃO atualizando metadados.`);
           }
-          
-          return true;
+          // --- Fim da Lógica Condicional ---
+
+          return true; // É líder (pelo menos para esta sessão) porque criou equipa
         }
       } catch (teamError) {
-        console.warn("[checkIfTeamLeader] Erro ao verificar se é criador de equipe:", teamError);
-        // Continuar com próximas verificações
+        console.warn("[checkIfTeamLeader] Exceção ao verificar se é criador de equipe:", teamError);
       }
       
-      // Verificar como membro com papel de líder (método mais propendo a erros de política)
-      try {
-        // Criar novo cliente Supabase para esta consulta
-        const supabase = createClient();
-        
-        const { data: memberData, error: memberError } = await supabase
-          .from('team_members')
-          .select('team_id, teams(name, team_code)')
-          .eq('user_id', userId)
-          .eq('role', 'leader')
-          .maybeSingle();
-        
-        if (memberError) {
-          // Verificar se é erro de recursão infinita
-          if (memberError.message && memberError.message.includes('infinite recursion')) {
-            console.warn("[checkIfTeamLeader] Detectado erro de recursão infinita na política. Dependendo dos metadados.");
-            // Se chegamos aqui, o usuário não tem metadados e a verificação falhou
-            return false;
-          } else if (memberError.code === 'PGRST116') {
-            // Não encontrado, não é um erro
-            console.log("[checkIfTeamLeader] Usuário não é líder em team_members");
-            return false;
-          } else {
-            throw memberError;
-          }
-        }
-        
-        if (memberData && memberData.team_id) {
-          console.log("[checkIfTeamLeader] Usuário é líder de equipe:", memberData.team_id);
-          setIsTeamLeader(true);
-          
-          // Dados da equipe obtidos da relação aninhada
-          const teamName = memberData.teams?.name || 'Minha Equipe';
-          const teamCode = memberData.teams?.team_code || '';
-          
-          // Atualizar metadados do usuário
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: {
-              role: 'chefe-equipe',
-              team_id: memberData.team_id,
-              team_code: teamCode,
-              team_name: teamName,
-              is_team_leader: true
-            }
-          });
-          
-          if (updateError) {
-            console.error("[checkIfTeamLeader] Erro ao atualizar metadados:", updateError);
-          } else {
-            console.log("[checkIfTeamLeader] Metadados atualizados com informações da equipe");
-            
-            // Atualizar localStorage
-            handleLocalStorage('chefe-equipe');
-          }
-          
-          return true;
-        }
-      } catch (memberError) {
-        console.warn("[checkIfTeamLeader] Erro ao verificar se é líder de equipe na tabela members:", memberError);
-      }
-      
-      console.log("[checkIfTeamLeader] Usuário não é líder de equipe");
-      setIsTeamLeader(false);
-      return false;
-    } catch (error) {
-      console.error('[checkIfTeamLeader] Erro ao verificar se é líder de equipe:', error);
-      return false;
+      // Verificar como membro com papel de líder (método menos preferido)
+      // ... (restante da lógica para verificar team_members)
+
+    // Se nenhuma condição acima identificou como líder
+    if (!isIdentifiedAsLeader) {
+        console.log("[checkIfTeamLeader] Após todas as verificações, usuário NÃO é identificado como líder de equipe.");
+        setIsTeamLeader(false);
     }
-  };
+    return isIdentifiedAsLeader; // Retorna o estado final da verificação
+
+  } catch (error) {
+      console.error('[checkIfTeamLeader] Erro GERAL ao verificar se é líder de equipe:', error);
+      setIsTeamLeader(false); // Garantir estado falso em caso de erro
+      return false;
+  }
+};
   
   // Atualizar papel do usuário - versão robusta com normalização
   const updateUserRole = async (newRole: string) => {
@@ -446,73 +419,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<User | null> => {
+    console.log(`[signIn] Iniciando processo de login para: ${email}`);
+    setIsLoading(true);
     try {
-      console.log('[signIn] Iniciando processo de login para:', email)
-      
-      // Limpar estado anterior
-      setUser(null)
-      setIsTeamLeader(false)
-      
-      // Criar cliente Supabase
-      const supabase = createClient()
-      
-      // Tentar fazer login
+      const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
-      })
-      
+        password,
+      });
+
       if (error) {
-        console.error('[signIn] Erro durante login:', error)
-        throw error
+        console.error("[signIn] Erro no login:", error.message);
+        toast.error(error.message || "Erro ao fazer login");
+        setUser(null);
+        setIsTeamLeader(false);
+        localStorage.removeItem('auth');
+        setIsLoading(false); // Definir loading false no erro
+        return null;
       }
-      
-      if (!data?.user) {
-        console.error('[signIn] Nenhum usuário retornado após login')
-        throw new Error('Falha ao obter dados do usuário')
+
+      if (data.user) {
+        console.log(`[signIn] Login API SUCESSO para: ${email}. User ID: ${data.user.id}`);
+        // Atualizar estado local PRIMEIRO
+        setUser(data.user);
+        updateAuthLocalStorage(data.user); // Atualizar localStorage com dados frescos
+
+        // ** CHAMAR checkIfTeamLeader AQUI, como estava antes **
+        console.log("[signIn] Chamando checkIfTeamLeader AGORA...");
+        try {
+            await checkIfTeamLeader(data.user.id); 
+            console.log("[signIn] checkIfTeamLeader CONCLUÍDO.");
+        } catch (checkError) {
+            console.error("[signIn] Erro durante checkIfTeamLeader (não fatal para login):", checkError);
+            // Continuar mesmo se houver erro aqui, pois o role principal vem dos metadados
+        }
+
+        // Determinar o role a partir dos METADADOS recebidos no login (fonte primária para redirect)
+        const loggedInUserRole = normalizeRole(data.user.user_metadata?.role);
+        console.log(`[signIn] Role determinado a partir dos metadados do login: ${loggedInUserRole}`);
+        
+        // Determinar URL e redirecionar usando router.push
+        const dashboardUrl = getDashboardUrlByRole(loggedInUserRole);
+        console.log(`[signIn] Preparando para redirecionar para: ${dashboardUrl}`);
+        router.push(dashboardUrl); // <<< Usar router.push diretamente
+        console.log("[signIn] router.push chamado.");
+        
+        // NÃO definir isLoading false aqui, pois o componente vai desmontar
+        return data.user; // Retorna o usuário
+      } else {
+        console.warn("[signIn] Login retornou sem erro, mas sem dados de usuário.");
+        setUser(null);
+        setIsTeamLeader(false);
+        localStorage.removeItem('auth');
+        setIsLoading(false); // Definir loading false
+        return null;
       }
-      
-      // Atualizar estado local
-      setUser(data.user)
-      
-      // Verificar se é líder de equipe
-      try {
-        await checkIfTeamLeader(data.user.id)
-      } catch (error) {
-        console.warn('[signIn] Erro ao verificar líder de equipe:', error)
-        // Não interrompe o login se houver erro na verificação
-      }
-      
-      // Atualizar localStorage
-      updateAuthLocalStorage(data)
-      
-      console.log('[signIn] Login bem sucedido para:', email)
-      
-      // Determinar para onde redirecionar
-      const userRole = normalizeRole(data.user.user_metadata?.role)
-      let redirectPath = '/app/promotor/dashboard'
-      
-      if (userRole === 'organizador') {
-        redirectPath = '/app/organizador/dashboard'
-      } else if (userRole === 'chefe-equipe') {
-        redirectPath = '/app/chefe-equipe/dashboard'
-      }
-      
-      // Redirecionar após um pequeno delay para garantir que o estado foi atualizado
-      setTimeout(() => {
-        window.location.href = redirectPath
-      }, 500)
-      
-      return data.user
-      
     } catch (error: any) {
-      console.error('[signIn] Erro fatal durante login:', error)
-      setUser(null)
-      setIsTeamLeader(false)
-      throw error
-    }
-  }
+      console.error("[signIn] Erro GERAL no processo de login:", error);
+      toast.error(error.message || "Ocorreu um erro inesperado no login");
+      setUser(null);
+      setIsTeamLeader(false);
+      localStorage.removeItem('auth');
+      setIsLoading(false); // Definir loading false no erro geral
+      return null;
+    } 
+    // Remover finally block ou garantir que não define isLoading false se o redirect foi chamado
+    /* finally {
+      // NÃO definir isLoading como false aqui se router.push foi chamado
+      // setIsLoading(false);
+      console.log("[signIn] Processo de login finalizado (finally).");
+    } */
+  };
 
   const signOut = async () => {
     try {

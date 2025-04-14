@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { LogOut, Loader2, Building } from 'lucide-react'
+import { LogOut, Loader2, Building, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -19,6 +19,7 @@ import { Copy, Users } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 // Função para normalizar papéis
 function normalizeRole(role: string | null | undefined): string {
@@ -90,7 +91,7 @@ async function loadTeamData(userData: any) {
       console.log('[loadTeamData] Resultado SELECT direto teams:', { data: !!teamResponse.data, error: teamResponse.error });
     }
     
-    if (teamResponse.error || !teamResponse.data) {
+      if (teamResponse.error || !teamResponse.data) {
       console.log('[loadTeamData] Falha ao carregar dados da equipe via RPC e SELECT. Usando metadados.');
       const metadataTeam = getTeamDetailsFromMetadata(userData);
       if (!metadataTeam) throw new Error("Não foi possível obter dados da equipe de nenhuma fonte.");
@@ -219,172 +220,168 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
   }
 }
 
+// (Se houver interfaces definidas para dados do dashboard, ajustá-las ou criar novas)
+interface DashboardData {
+  team_name?: string;
+  organization_name?: string;
+  organization_logo_url?: string;
+  // Adicionar outros campos conforme necessário
+}
+
+// Interface para os dados retornados pela nova RPC
+interface LeaderDashboardData {
+  team_id: string;
+  team_name?: string;
+  organization_id?: string;
+  organization_name?: string;
+  organization_logo_url?: string;
+  // Adicione outros campos que a RPC retorna, se houver
+}
+
 export default function TeamLeaderDashboard() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading: isLoadingAuth } = useAuth()
   const router = useRouter()
   const supabase = createClientComponentClient()
   const { toast } = useToast()
   
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [associatedOrganizations, setAssociatedOrganizations] = useState<Organization[]>([])
-  
-  // Função para carregar dados APENAS das organizações
-  async function loadDashboardData() {
-    console.log('Iniciando carregamento do dashboard (organizações)')
-    setLoading(true)
-    setLoadError(null)
-    
-    const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        setLoadError("Timeout ao carregar dados.")
-        setLoading(false)
-      }
-    }, 8000) // Aumentar ligeiramente o timeout
-    
-    try {
-      if (!user || !user.user_metadata?.team_id) {
-        console.error('Usuário não autenticado ou sem team_id nos metadados')
-        setLoadError('Informações da equipe não encontradas. Contacte o suporte.')
-        setLoading(false)
-        clearTimeout(safetyTimeout)
-        return
-      }
-      
-      const teamId = user.user_metadata.team_id
-      console.log('Carregando dashboard para usuário:', user.id, ' Equipe ID:', teamId)
-      
-      // ---> BUSCAR ORGANIZAÇÕES ASSOCIADAS <--- 
-      console.log(`Buscando organizações para a equipe: ${teamId}`);
-      const { data: orgLinks, error: linkError } = await supabase
-        .from('organization_teams')
-        .select('organization_id')
-        .eq('team_id', teamId); 
-        
-      if (linkError) {
-        throw new Error(`Erro ao buscar links de organização: ${linkError.message}`);
-      }
-      
-      if (orgLinks && orgLinks.length > 0) {
-        const orgIds = orgLinks.map(link => link.organization_id);
-        console.log(`Encontrados IDs de organização associados: ${orgIds.join(', ')}`);
-        const { data: organizationsData, error: orgsError } = await supabase
-          .from('organizations')
-          .select('id, name, logotipo, address, location')
-          .in('id', orgIds);
-          
-        if (orgsError) {
-          throw new Error(`Erro ao buscar detalhes das organizações: ${orgsError.message}`);
-        }
-        console.log('Organizações associadas carregadas:', organizationsData);
-        setAssociatedOrganizations(organizationsData || []);
-      } else {
-        console.log('Nenhuma organização encontrada associada a esta equipe.');
-        setAssociatedOrganizations([]);
-      }
-      // ---> FIM BUSCA ORGANIZAÇÕES <--- 
-      
-    } catch (error: any) {
-      console.error('Erro ao carregar dashboard:', error)
-      setLoadError(error.message || 'Ocorreu um erro ao carregar o dashboard.')
-    } finally {
-      console.log('Finalizando carregamento do dashboard (organizações)')
-      setLoading(false)
-      clearTimeout(safetyTimeout)
-    }
-  }
+  const [error, setError] = useState<string | null>(null)
+  const [dashboardInfo, setDashboardInfo] = useState<LeaderDashboardData | null>(null)
   
   useEffect(() => {
-    console.log('Auth state changed:', { isLoading, hasUser: !!user });
-    if (isLoading) {
-      console.log("Auth ainda está carregando...");
-      return;
-    }
-    if (!isLoading && user) {
-      console.log("Autenticado, carregando dados do dashboard...");
-      loadDashboardData();
-    }
-    if (!isLoading && !user) {
-      console.log('Usuário não autenticado após carregamento, redirecionando para login');
-      router.push('/login');
-    }
-  }, [isLoading, user, router]);
+    const fetchDashboardData = async () => {
+      if (!user || isLoadingAuth) return; // Sai se não houver user ou auth ainda a carregar
+
+      setLoading(true);
+      setError(null);
+      setDashboardInfo(null);
+
+      try {
+        // Obter o team_id dos metadados do utilizador
+        const teamId = user.user_metadata?.team_id; 
+        if (!teamId) {
+          console.error("Dashboard Chefe: ID da equipa não encontrado nos metadados.");
+          setError("Não foi possível identificar a sua equipa principal.");
+          setLoading(false);
+          return;
+        }
+
+        console.log(`Dashboard Chefe: Chamando RPC get_team_leader_dashboard_data para team_id: ${teamId}`);
+
+        // Chamar a RPC correta
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('get_team_leader_dashboard_data', { p_team_id: teamId });
+
+        // Tratamento de erro aprimorado
+        if (rpcError) {
+          console.error("Dashboard Chefe: Erro ao chamar RPC:", rpcError);
+          console.log("Detalhes completos do erro:", JSON.stringify(rpcError));
+          
+          if (rpcError.message && rpcError.message.includes('Permissão negada')) {
+             setError("Acesso negado. Apenas o chefe de equipa pode ver este dashboard.");
+          } else {
+             setError(`Ocorreu um erro ao carregar os dados: ${rpcError.message || 'Erro desconhecido'}`);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Verificar se os dados são válidos
+        if (!rpcData) {
+             console.warn("Dashboard Chefe: RPC retornou dados nulos.");
+             setDashboardInfo({ team_id: teamId }); // Definir ao menos o ID da equipa
+        } else if (rpcData.error) {
+             console.error("Dashboard Chefe: Erro retornado dentro da resposta RPC:", rpcData.error);
+             setError(`Erro ao processar dados: ${rpcData.error}`);
+             setLoading(false);
+             return;
+        } else {
+            console.log("Dashboard Chefe: Dados recebidos da RPC:", rpcData);
+            setDashboardInfo(rpcData as LeaderDashboardData);
+        }
+
+      } catch (err: any) {
+        console.error("Dashboard Chefe: Erro GERAL no carregamento:", err);
+        if (!error) { 
+             setError("Falha ao carregar informações do dashboard.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+    
+  }, [user, isLoadingAuth, supabase]); // Dependências corretas
   
-  if (loading) {
+  if (loading || isLoadingAuth) {
     return (
       <div className="container py-10 flex flex-col items-center justify-center min-h-[70vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-gray-900 mx-auto" />
-        <p className="text-muted-foreground mt-4">Carregando dashboard...</p>
+        <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mx-auto" />
+        <p className="text-muted-foreground mt-4">A carregar dashboard...</p>
       </div>
     )
   }
   
-  if (loadError) {
+  if (error) {
     return (
-      <div className="container py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Erro ao carregar dashboard</CardTitle>
-            <CardDescription>{loadError}</CardDescription>
+       <div className="container py-10">
+        <Card className="border-destructive bg-destructive/10">
+          <CardHeader className="flex flex-row items-center space-x-4">
+             <AlertCircle className="h-8 w-8 text-destructive"/>
+             <div>
+                <CardTitle className="text-destructive">Erro ao Carregar</CardTitle>
+                <CardDescription className="text-destructive/90">{error}</CardDescription>
+             </div>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => loadDashboardData()}>Tentar novamente</Button>
-          </CardContent>
         </Card>
       </div>
     )
   }
   
+  if (!dashboardInfo) {
+     // Este caso pode não ser necessário se tratarmos rpcData nulo como um estado válido
+     return (
+        <div className="container py-10">
+             <p>Não foram encontrados dados para apresentar no dashboard.</p>
+        </div>
+      );
+  }
+  
   return (
     <div className="container py-8 space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight mb-6">Dashboard Chefe de Equipe</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Dashboard Chefe de Equipa</h1>
+      <p className="text-muted-foreground">Bem-vindo, chefe da equipa {dashboardInfo.team_name || `(ID: ${dashboardInfo.team_id})`}!</p>
       
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight mb-4">Organizações Associadas</h2>
-        {associatedOrganizations.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {associatedOrganizations.map((org) => (
-              <Card
-                key={org.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col min-h-[150px]"
-                onClick={() => alert(`Clicou na organização: ${org.name} (ID: ${org.id}) - Implementar Modal!`)}
-              >
-                <CardHeader className="p-5 flex flex-row items-center space-x-4">
-                  {org.logotipo ? (
-                    <img src={org.logotipo} alt={org.name || 'Logo'} className="h-12 w-12 rounded-lg object-cover border" />
-                  ) : (
-                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center text-muted-foreground border">
-                      {(org.name || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <CardTitle className="text-xl font-semibold">{org.name || 'Organização Sem Nome'}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-5 pt-0 text-sm text-muted-foreground flex-grow">
-                   {org.address && (
-                     <p className="line-clamp-2">{org.address}</p>
-                   )}
-                   {!org.address && org.location && (
-                     <p className="line-clamp-2">{org.location}</p>
-                   )}
-                   {!org.address && !org.location && (
-                      <p><i>Localização não disponível</i></p>
-                   )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="border-dashed border-gray-300">
-            <CardContent className="p-6 text-center flex flex-col items-center justify-center min-h-[150px]">
-              <Building className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="font-medium mb-1">Sem Organizações Associadas</h3>
-              <p className="text-sm text-muted-foreground">
-                Sua equipe ainda não está associada a nenhuma organização.
-              </p>
-            </CardContent>
+      <Separator />
+      
+       <h2 className="text-2xl font-semibold tracking-tight">Organização Associada</h2>
+      {dashboardInfo.organization_name ? (
+          <Card className="hover:shadow-lg transition-shadow duration-200">
+            <CardHeader className="flex flex-row items-center space-x-4 p-4">
+              <Avatar className="h-16 w-16 border">
+                <AvatarImage src={dashboardInfo.organization_logo_url || undefined} alt={dashboardInfo.organization_name} />
+                <AvatarFallback className="bg-muted text-muted-foreground">
+                   <Building className="h-8 w-8" />
+                </AvatarFallback> 
+              </Avatar>
+              <div className="flex-1">
+                 <CardTitle className="text-xl font-semibold">{dashboardInfo.organization_name}</CardTitle>
+                 <CardDescription>Organização principal da sua equipa</CardDescription>
+              </div>
+            </CardHeader>
           </Card>
-        )}
-      </div>
+      ) : (
+         <Card className="border-dashed bg-muted/50">
+             <CardContent className="p-6 text-center flex flex-col items-center justify-center min-h-[120px]">
+                 <Building className="h-10 w-10 text-muted-foreground/60 mb-3" />
+                 <h3 className="font-medium mb-1 text-muted-foreground">Sem Organização Associada</h3>
+                 <p className="text-sm text-muted-foreground/80">
+                    A sua equipa não está ligada a nenhuma organização.
+                 </p>
+            </CardContent>
+         </Card>
+      )}
     </div>
   )
 } 

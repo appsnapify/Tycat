@@ -48,9 +48,17 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
 // Middleware de autenticação para controlar acesso a rotas protegidas
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
+  const pathname = request.nextUrl.pathname;
   
-  console.log(`[Middleware] Interceptando requisição para URL: ${request.nextUrl.pathname}`)
-  
+  console.log(`[Middleware] Interceptando requisição para URL: ${pathname}`)
+
+  // Permitir acesso direto a rotas públicas específicas dentro de /app
+  const publicAppRoutes = ['/app/dashboard1']; // Adicione outras rotas se necessário
+  if (publicAppRoutes.includes(pathname)) {
+    console.log(`[Middleware] Rota pública ${pathname} permitida sem autenticação.`);
+    return response; // Permite o acesso
+  }
+
   // Verificar se já existe um redirecionamento
   const requestHeaders = new Headers(request.headers)
   const redirectUrl = requestHeaders.get('x-middleware-rewrite')
@@ -183,6 +191,7 @@ export async function middleware(request: NextRequest) {
 // Configurar quais caminhos este middleware deve ser executado
 export const config = {
   matcher: [
+    // Restaurar matcher original para garantir que o middleware execute em /app/*
     '/app/:path*',
     '/login',
     '/register',

@@ -27,14 +27,14 @@ async function fetchEvent(id: string, supabaseClient: any) {
     .select('*')
     .eq('id', id)
     .single();
-
+  
   if (error) {
     console.error("Erro Supabase fetchEvent:", error);
     // Verificar se é erro de RLS ou não encontrado
     if (error.code === 'PGRST116') { // code for 'relation "events" does not exist or permission denied'
         throw new Error("Evento não encontrado ou sem permissão."); 
     } else {
-        throw new Error(`Erro ao carregar evento: ${error.message}`);
+    throw new Error(`Erro ao carregar evento: ${error.message}`);
     }
   }
   if (!data) {
@@ -114,11 +114,11 @@ export default async function EventoDetalhesPage({ params }: PageProps) {
     <div className="space-y-6 p-4 md:p-6">
       <div className="mb-4">
         <a href="/app/organizador/eventos">
-          <Button variant="outline" size="sm">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm">
+                <ArrowLeftIcon className="w-4 h-4 mr-2" />
             Voltar para Eventos
-          </Button>
-        </a>
+              </Button>
+            </a>
       </div>
 
       <EventDetailsClient

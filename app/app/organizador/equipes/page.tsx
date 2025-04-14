@@ -116,7 +116,7 @@ export default function OrganizadorEquipesPage() {
       if (teamsWithCounts && teamsWithCounts.length > 0) {
         setTeams(teamsWithCounts);
         setFilteredTeams(teamsWithCounts);
-      } else {
+          } else {
         console.log('Nenhuma equipe encontrada pela RPC para esta organização');
         setTeams([]);
         setFilteredTeams([]);
@@ -282,9 +282,9 @@ export default function OrganizadorEquipesPage() {
                   onChange={(e) => setNewTeamName(e.target.value)}
                   placeholder="Digite o nome da equipe"
                   className="mb-2"
-                />
-              </div>
-              
+                  />
+                </div>
+                
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreateTeamDialog(false)}>
                   Cancelar
@@ -313,7 +313,7 @@ export default function OrganizadorEquipesPage() {
               
               <div className="py-4 space-y-2">
                  <Label htmlFor="team-code-associate">Código da Equipa</Label>
-                 <Input
+                    <Input
                    id="team-code-associate"
                    value={associationCode}
                    onChange={(e) => setAssociationCode(e.target.value.toUpperCase())}

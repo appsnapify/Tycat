@@ -55,28 +55,31 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
         }
 
         if (teamData.organization_id !== null) {
-            return { success: false, message: `A equipa \"${teamData.name}\" já pertence a uma organização.` };
+            if (teamData.organization_id === organizationId) {
+                console.warn(`Server Action: Equipa ${teamData.name} já está associada a esta organização (${organizationId}). Garantindo outras ligações...`)
+            } else {
+                return { success: false, message: `A equipa \"${teamData.name}\" já pertence a outra organização.` };
+            }
         }
 
         const teamIdToAssociate = teamData.id;
         const teamNameToAssociate = teamData.name;
         const teamCreatorId = teamData.created_by;
 
-        // 4. Perform Update with User Client (Respecting RLS for the update itself)
-        const { error: updateError } = await supabaseUserClient
+        // 4. Perform Update with Admin Client (Bypass RLS for this step)
+        console.log(`Server Action: Tentando UPDATE teams ID ${teamIdToAssociate} com organization_id ${organizationId} (Admin Client)`);
+        const { error: updateError } = await supabaseAdmin
             .from('teams')
             .update({ organization_id: organizationId })
             .eq('id', teamIdToAssociate);
 
         if (updateError) {
-            console.error("Server Action: Erro ao associar equipa (User):", updateError);
-            if (updateError.code === '42501') {
-                 return { success: false, message: "Permissão negada. Verifique se é administrador da organização." };
-            }
-            return { success: false, message: "Erro ao associar a equipa à organização." };
+            console.error("Server Action: FALHA CRÍTICA ao associar equipa (Admin Client):", updateError);
+            return { success: false, message: "Erro crítico ao atualizar dados da equipa." };
         }
+        console.log(`Server Action: UPDATE em teams bem-sucedido.`);
 
-        // 5. Insert into organization_teams (Admin Client - bypass RLS for this linking action)
+        // 5. Insert into organization_teams (Admin Client)
         const { error: orgTeamInsertError } = await supabaseAdmin
             .from('organization_teams')
             .insert({
@@ -86,12 +89,17 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
              });
 
         if (orgTeamInsertError) {
-             console.error("Server Action: Erro ao inserir em organization_teams (Admin):", orgTeamInsertError);
-             // Message might need update if other errors become possible
-             return { success: false, message: "Erro ao registar a ligação da equipa à organização." };
+            if (orgTeamInsertError.code === '23505') {
+                 console.warn(`Server Action: Ligação equipa-org já existe para ${teamIdToAssociate}-${organizationId}.`);
+            } else {
+                 console.error("Server Action: Erro ao inserir em organization_teams (Admin):", orgTeamInsertError);
+                 return { success: false, message: "Erro ao registar a ligação da equipa à organização." };
+            }
+        } else {
+             console.log(`Server Action: Inserção em organization_teams bem-sucedida.`);
         }
 
-        // 6. Insert into organization_members (Admin Client - Add Team Creator as member)
+        // 6. Insert into organization_members (Admin Client)
         const { error: orgMemberInsertError } = await supabaseAdmin
              .from('organization_members')
              .insert({ organization_id: organizationId, user_id: teamCreatorId, role: 'membro' });
@@ -103,10 +111,12 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
                  console.error("Server Action: Erro ao inserir em organization_members (Admin):", orgMemberInsertError);
                  return { success: false, message: "Erro ao adicionar o chefe de equipa como membro da organização." };
             }
+        } else {
+             console.log(`Server Action: Inserção em organization_members bem-sucedida.`);
         }
 
-        console.log(`Server Action: Equipa ${teamIdToAssociate} associada com sucesso a ${organizationId} e criador ${teamCreatorId} adicionado como membro.`);
-        return { success: true, message: "Equipa associada e chefe de equipa adicionado à organização com sucesso!", teamName: teamNameToAssociate || 'Equipa' };
+        console.log(`Server Action: Processo completo para ${teamIdToAssociate}.`);
+        return { success: true, message: "Equipa associada com sucesso!", teamName: teamNameToAssociate || 'Equipa' };
 
     } catch (error) {
         console.error("Server Action: Erro inesperado:", error);

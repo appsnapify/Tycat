@@ -4,417 +4,489 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/hooks/use-auth'
-
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  ArrowRight,
-  Users,
-  Ticket,
-  Building,
-  CalendarDays,
-  Calendar,
-  QrCode,
-  UserPlus,
-  CheckCircle,
-  Clock,
-  ChevronRight,
-  ClipboardList,
-  BadgePercent,
-  AlertCircle,
-  ExternalLink
-} from 'lucide-react'
+import { Users, CalendarDays, AlertCircle, ChevronRight, Building, CalendarHeart } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
-// Importar componentes do dashboard
-import { MetricCard } from '@/components/dashboard/metric-card'
-import { ActivityFeed, ActivityItem } from '@/components/dashboard/activity-feed'
-import { TeamCodeDisplay } from '@/components/dashboard/team-code-display'
-
-// *** NOVA Interface para Equipas do Promotor ***
+// Interfaces (mantendo as definições anteriores)
 interface PromoterTeam {
   id: string;
   name: string;
   description?: string | null;
   logo_url?: string | null;
-  role?: string; // Papel do promotor nesta equipa
-  isPartial?: boolean; // Indica se os dados são completos ou placeholder
-  member_count?: number; // Opcional: Contagem de membros
+  role?: string;
+  isPartial?: boolean;
 }
 
-// *** NOVA Interface para Organização ***
 interface Organization {
   id: string;
   name: string;
-  // Adicionar outros campos necessários
+  logotipo?: string | null; // Nome correto do campo na tabela organizations
 }
 
-// *** NOVA Interface para Evento ***
 interface EventSummary {
   id: string;
   name: string;
   date: string;
   location?: string | null;
-  organizations?: { name: string } | null; // Organização associada
 }
+
+// Componente EmptyState (mantido)
+const EmptyState = ({
+  icon: Icon = AlertCircle,
+  title = "Sem dados",
+  description = "Não foram encontrados dados para mostrar",
+  actionLabel = "",
+  actionLink = "",
+  onAction,
+  router // Pass router for navigation
+}: {
+  icon?: React.ElementType,
+  title?: string,
+  description?: string,
+  actionLabel?: string,
+  actionLink?: string,
+  onAction?: () => void,
+  router: ReturnType<typeof useRouter> // Ensure router type
+}) => (
+  <div className="text-center py-8">
+    <Icon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+    <p className="text-muted-foreground mb-4">{description}</p>
+    {actionLabel && (
+      <Button
+        variant="outline"
+        onClick={onAction || (actionLink ? () => router.push(actionLink) : undefined)}
+      >
+        {actionLabel}
+      </Button>
+    )}
+  </div>
+)
 
 export default function PromotorDashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
   const supabase = createClientComponentClient()
   
+  // State variables
   const [loading, setLoading] = useState(true)
-  const [promoterTeams, setPromoterTeams] = useState<PromoterTeam[]>([]) // Usado se >1 equipa ou sem org
-  const [organizationData, setOrganizationData] = useState<Organization | null>(null) // Usado se 1 equipa com org
-  const [organizationEvents, setOrganizationEvents] = useState<EventSummary[]>([]) // Eventos da org para a equipa
-  
-  // Manter Stats (exceto comissões)
-  const [userStats, setUserStats] = useState({
-    totalSales: 0,
-    eventsJoined: 0,
-    tasksDone: 0
-  })
-  
+  const [promoterTeams, setPromoterTeams] = useState<PromoterTeam[]>([])
+  const [organizationData, setOrganizationData] = useState<Organization | null>(null)
+  const [organizationEvents, setOrganizationEvents] = useState<EventSummary[]>([]) // Placeholder for future use
+  const [activeEventsCount, setActiveEventsCount] = useState(0) // Contador para eventos ativos
+  const [userStats, setUserStats] = useState({ totalSales: 0, eventsJoined: 0 }) // Simplified stats
+
+  // --- Data Loading Effect ---
   useEffect(() => {
-    console.log("PromotorDashboardPage - Montado")
+    console.log("PromotorDashboard: useEffect triggered.")
     if (user) {
+      console.log("PromotorDashboard: User found, calling loadDashboardData.")
       loadDashboardData()
     } else {
+      // If user is null after initial load, maybe set loading false or handle appropriately
+      // Adding a small delay in case user object is loading async
+      console.log("PromotorDashboard: User not found yet, waiting...")
       const timer = setTimeout(() => {
+         // Re-check user after delay, only set loading false if still no user
+         if (!user) { 
+            console.log("PromotorDashboard: User still not found after delay, setting loading false (may redirect later if needed).")
         setLoading(false)
-      }, 1000)
-      
-      return () => clearTimeout(timer)
+            // Consider redirecting here too if auth state is definitely 'unauthenticated'
+            // However, the primary check is after the RPC call.
     }
-    
-    return () => {
-      console.log("PromotorDashboardPage - Desmontado")
+      }, 1500); // Increased delay slightly
+      return () => clearTimeout(timer);
     }
-  }, [user])
+  }, [user]) // Dependency on user object
   
+  // --- Data Loading Function ---
   const loadDashboardData = async () => {
+    console.log("PromotorDashboard: loadDashboardData started.")
     setLoading(true)
-    setPromoterTeams([]) // Reset states
+    // Reset states at the beginning
+    setPromoterTeams([])
     setOrganizationData(null)
     setOrganizationEvents([])
-    setUserStats({ totalSales: 0, eventsJoined: 0, tasksDone: 0 }) // Reset stats
+    setActiveEventsCount(0)
+    setUserStats({ totalSales: 0, eventsJoined: 0 })
+
+    if (!user?.id) {
+      console.error("PromotorDashboard: loadDashboardData called without user ID. Aborting.")
+      toast.error("Erro de autenticação. Tente recarregar a página.")
+        setLoading(false)
+      // Potentially redirect to login here if desired
+        return
+      }
+      
+    const userId = user.id
+    console.log(`PromotorDashboard: Calling RPC get_promoter_dashboard_data for user: ${userId}`)
+
     try {
-      console.log("PromotorDashboard: Carregando dados (Direct Query Mode)...") // Mudança no log
-      const userId = user?.id;
-      if (!userId) {
-          console.error("Utilizador não autenticado.");
-          toast.error("Utilizador não autenticado.");
-          setLoading(false);
-          return;
+      const { data: dashboardData, error: rpcError } = await supabase.rpc(
+        'get_promoter_dashboard_data',
+        { promoter_user_id: userId }
+      )
+
+      if (rpcError) {
+        console.error("PromotorDashboard: Error calling RPC:", rpcError)
+        toast.error(`Erro ao carregar dados: ${rpcError.message}`)
+        setLoading(false) // Stop loading on error
+        return // Stop processing
       }
 
-      // 1. Buscar a primeira associação em team_members
-      const { data: memberData, error: memberError } = await supabase
-        .from('team_members')
-        .select('team_id, role')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
+      console.log("PromotorDashboard: RPC successful. Data received:", dashboardData)
 
-      if (memberError && memberError.code !== 'PGRST116') {
-        console.error('PromotorDashboard: Erro ao carregar associação de equipa:', memberError);
-        toast.error("Erro ao verificar sua equipa.");
+      if (!dashboardData?.team_association?.team_id) {
+        console.log("PromotorDashboard: No team association found in RPC data. Redirecting...")
+        router.push('/app/promotor/equipes') // Redirect
+        // No need to setLoading(false) here, the component will unmount.
+        return // Stop processing immediately after initiating redirect
       }
 
-      // 2. Se encontrou uma associação, buscar detalhes da equipa e ID da organização
-      let teamId: string | null = null;
-      let teamDetailsForDisplay: PromoterTeam | null = null;
-      let orgIdToLoad: string | null = null;
+      console.log("PromotorDashboard: Team association found. Processing data...")
 
-      if (memberData) {
-          teamId = memberData.team_id;
-          const userRoleInTeam = memberData.role || 'promotor';
-          console.log(`PromotorDashboard: Encontrado na equipa ${teamId} com papel ${userRoleInTeam}`);
+      const teamAssoc = dashboardData.team_association
+      const teamDetails = dashboardData.team_details
+      const orgDetails = dashboardData.organization_details
+      const metrics = dashboardData.metrics
 
-          // Query à tabela teams (RLS 'Permitir leitura aos membros da equipa' deve permitir)
-          const { data: teamData, error: teamError } = await supabase
-            .from('teams')
-            .select('id, name, description, logo_url, organization_id')
-            .eq('id', teamId)
-            .single();
-
-          if (teamError) {
-              console.error(`PromotorDashboard: Erro ao buscar detalhes da equipa ${teamId} (RLS?):`, teamError);
-              toast.error("Erro ao carregar detalhes da sua equipa.");
-              teamDetailsForDisplay = { id: teamId, name: `Equipa (${teamId.substring(0,6)}...)`, role: userRoleInTeam, isPartial: true };
-          } else if (teamData) {
-              orgIdToLoad = teamData.organization_id; // Guardar ID da organização
-              teamDetailsForDisplay = {
-                  id: teamData.id,
-                  name: teamData.name || `Equipa s/ Nome (${teamId.substring(0,6)}...)`,
-                  description: teamData.description,
-                  logo_url: teamData.logo_url,
-                  role: userRoleInTeam,
-                  isPartial: false
-              };
-              console.log(`PromotorDashboard: Equipa ${teamData.name} pertence à organização ID: ${orgIdToLoad}`);
-          }
+      // Usar os dados da equipe que já vêm da RPC
+      if (teamDetails) {
+        const finalTeamData: PromoterTeam = {
+          id: teamAssoc.team_id,
+          name: teamDetails.name || `Equipa (${teamAssoc.team_id.substring(0, 6)}...)`,
+          description: teamDetails.description,
+          logo_url: teamDetails.logo_url,
+          role: teamAssoc.role || 'promotor',
+          isPartial: false
+        };
+        
+        setPromoterTeams([finalTeamData]);
+        console.log("PromotorDashboard: promoterTeams state set (from RPC data):", [finalTeamData]);
       } else {
-          console.log("PromotorDashboard: Nenhuma associação de equipa encontrada.");
-          // A UI deve mostrar estado vazio ou mensagem, não necessariamente erro
+        console.warn("PromotorDashboard: Dados da equipa não encontrados na RPC");
+        const fallbackTeamData: PromoterTeam = {
+          id: teamAssoc.team_id,
+          name: `Equipa (${teamAssoc.team_id.substring(0, 6)}...)`,
+          role: teamAssoc.role || 'promotor',
+          isPartial: true,
+          description: "Detalhes não disponíveis."
+        };
+        setPromoterTeams([fallbackTeamData]);
+        console.log("PromotorDashboard: promoterTeams state set with fallback data");
       }
 
-      // 3. Se temos um ID de organização, FAZER QUERY SEPARADA (RLS 'Allow read for team members...' deve permitir)
-      if (orgIdToLoad) {
-          console.log(`PromotorDashboard: Buscando organização ${orgIdToLoad} separadamente...`);
-          const { data: orgData, error: orgError } = await supabase
-            .from('organizations')
-            .select('id, name, logotipo') // Apenas o necessário
-            .eq('id', orgIdToLoad)
-            .single(); // Espera-se uma organização
+      // Set Organization State
+      if (orgDetails?.id) {
+        const org: Organization = {
+            id: orgDetails.id,
+            name: orgDetails.name || 'Organização s/ Nome',
+            logotipo: orgDetails.logotipo  // Nome correto do campo
+        }
+        setOrganizationData(org)
+        console.log("PromotorDashboard: organizationData state set:", org)
+        
+        // Buscar eventos reais da organização
+        const { data: events, error: eventsError } = await supabase
+          .from('events')
+          .select('id, name, event_date:date, location')
+          .eq('organization_id', orgDetails.id)
+          .gte('event_date', new Date().toISOString().split('T')[0]) // Eventos a partir de hoje
+          .order('event_date', { ascending: true })
+          .limit(5); // Limitando aos próximos 5 eventos
 
-          if (orgError) {
-              console.error(`PromotorDashboard: Erro ao buscar organização ${orgIdToLoad} (RLS?):`, orgError);
-              toast.warning("Não foi possível carregar os detalhes da organização associada.");
-          } else if (orgData) {
-              console.log("PromotorDashboard: Detalhes da organização carregados:", orgData);
-              setOrganizationData(orgData as Organization); // Define o estado!
-          } else {
-              console.warn(`PromotorDashboard: Organização ${orgIdToLoad} não encontrada (Dados inconsistentes?).`);
-          }
+        if (eventsError) {
+          console.error("PromotorDashboard: Error loading events:", eventsError);
+        } else if (events && events.length > 0) {
+          const formattedEvents: EventSummary[] = events.map(event => ({
+            id: event.id,
+            name: event.name,
+            date: event.event_date,
+            location: event.location
+          }));
+          
+          setOrganizationEvents(formattedEvents);
+          setActiveEventsCount(formattedEvents.length);
+          console.log("PromotorDashboard: organizationEvents loaded:", formattedEvents.length);
+        } else {
+          console.log("PromotorDashboard: No events found for organization");
+          setOrganizationEvents([]);
+          setActiveEventsCount(0);
+        }
       } else {
-          if (teamId) {
-              console.log(`PromotorDashboard: Equipa ${teamId} não está associada a uma organização.`);
-          }
+        setOrganizationData(null)
+        console.log("PromotorDashboard: No organization details found in RPC.")
       }
 
-      // 4. Guardar detalhes da equipa no estado (se encontrados)
-      if (teamDetailsForDisplay) {
-          setPromoterTeams([teamDetailsForDisplay]);
+      // Set Metrics State
+      if (metrics) {
+         const stats = {
+             totalSales: metrics.totalSales || 0,
+             eventsJoined: metrics.eventsJoined || 0,
+         }
+         setUserStats(stats)
+         console.log("PromotorDashboard: userStats state set:", stats)
       }
-
-
-      // 5. Carregar outras métricas (AGORA USANDO QUERIES DIRETAS E RLS SIMPLES)
-      console.log("PromotorDashboard: Carregando métricas adicionais (Direct Query)...");
-      // Vendas (Requer RLS `auth.uid() = user_id` em 'sales')
-      try {
-           const { data: salesData, error: salesError } = await supabase.from('sales').select('quantity').eq('user_id', userId);
-           if (salesError && salesError.code !== '42P01') { // Ignorar 'relation does not exist'
-               console.warn("PromotorDashboard: Erro vendas (RLS?):", salesError);
-           } else if (salesData) {
-               const totalSales = salesData.reduce((sum, sale) => sum + (sale.quantity || 0), 0);
-               setUserStats(prev => ({ ...prev, totalSales }));
-           }
-      } catch (err) { console.error("PromotorDashboard: Erro crítico vendas:", err); }
-
-      // Eventos Participados (Requer RLS `auth.uid() = user_id` em 'event_participants' OU nome correto da tabela)
-      // ASSUMINDO NOME CORRETO DA TABELA DE CHECK-INS / PARTICIPANTES
-      const participantsTable = 'guests'; // <-- **AJUSTAR SE O NOME FOR DIFERENTE**
-       try {
-           const { count: joinedCount, error: joinedError } = await supabase
-               .from(participantsTable)
-               .select('*', { count: 'exact', head: true })
-               .eq('promoter_id', userId); // <-- **AJUSTAR SE A COLUNA FOR DIFERENTE** (ex: checked_in_by, user_id?)
-
-           if (joinedError && joinedError.code !== '42P01') { // Ignorar 'relation does not exist'
-               console.warn(`PromotorDashboard: Erro eventos participados na tabela ${participantsTable} (RLS ou Coluna?):`, joinedError);
-           } else if (joinedCount !== null) {
-               setUserStats(prev => ({ ...prev, eventsJoined: joinedCount }));
-           }
-       } catch (err) { console.error("PromotorDashboard: Erro crítico eventos participados:", err); }
-
-       // Outras métricas (tasksDone, etc.) podem ser adicionadas aqui
-
 
     } catch (error: any) {
-      console.error("PromotorDashboard: Erro GERAL ao carregar dashboard:", error)
-      toast.error(error.message || "Ocorreu um erro inesperado.")
+      console.error("PromotorDashboard: General error in loadDashboardData:", error)
+      toast.error(error.message || "Ocorreu um erro inesperado ao carregar o dashboard.")
+      // Ensure loading is set to false even if a non-RPC error occurs
+       setLoading(false)
     } finally {
-      setLoading(false)
-      console.log("PromotorDashboard: Carregamento finalizado (Direct Query Mode).")
+      // Ensure loading is always set to false eventually, unless redirecting
+      // Check if redirect happened before setting loading state
+      // This finally block might run even after a redirect is initiated, but before it completes.
+      // It's generally safe, but checking if the component is still mounted could be more robust if needed.
+      console.log("PromotorDashboard: loadDashboardData finished.")
+      setLoading(false);
     }
   }
-  
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', { 
-      style: 'currency', 
-      currency: 'EUR' 
-    }).format(value)
-  }
-  
-  const formatDate = (dateString: string) => {
+
+  // --- Helper Functions ---
+  const formatDate = (dateString: string | null | undefined): string => {
+     if (!dateString) return 'Data Indisponível';
+    try {
     return new Date(dateString).toLocaleDateString('pt-PT', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     })
+    } catch (e) {
+        console.error("Error formatting date:", e);
+        return 'Data Inválida';
+    }
   }
-  
-  // Componente para estados vazios
-  const EmptyState = ({ 
-    icon: Icon = AlertCircle, 
-    title = "Sem dados", 
-    description = "Não foram encontrados dados para mostrar",
-    actionLabel = "",
-    actionLink = "",
-    onAction
-  }: {
-    icon?: any,
-    title?: string,
-    description?: string,
-    actionLabel?: string,
-    actionLink?: string,
-    onAction?: () => void
-  }) => (
-    <div className="text-center py-8">
-      <Icon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-      <p className="text-muted-foreground mb-4">
-        {description}
-      </p>
-      {actionLabel && (
-        <Button 
-          variant="outline"
-          onClick={onAction || (actionLink ? () => router.push(actionLink) : undefined)}
-        >
-          {actionLabel}
-        </Button>
-      )}
-    </div>
-  )
-  
+
+  // Função para navegar para a página de eventos da organização
+  const navigateToOrgEvents = () => {
+    if (organizationData?.id) {
+      router.push(`/app/promotor/eventos-organizacao/${organizationData.id}`);
+    } else {
+      toast.error("Não foi possível acessar os eventos da organização.");
+    }
+  };
+
+  // --- Render Logic ---
   if (loading) {
+    console.log("PromotorDashboard: Rendering Loading state.")
     return (
       <div className="container py-8">
         <h1 className="text-2xl font-bold mb-4">A carregar Dashboard...</h1>
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="h-12 bg-muted/40"></CardHeader>
-              <CardContent className="p-6">
-                <div className="h-24 bg-muted/40 rounded-md"></div>
-              </CardContent>
-            </Card>
-          ))}
+        {/* Basic loading skeleton */}
+        <div className="space-y-4">
+             <div className="h-10 w-1/2 bg-muted/40 rounded animate-pulse"></div>
+             <div className="h-8 w-1/3 bg-muted/40 rounded animate-pulse"></div>
+             <div className="h-40 bg-muted/40 rounded animate-pulse mt-6"></div>
         </div>
       </div>
     )
   }
   
+  // If not loading and promoterTeams is still empty, it implies a redirect should have happened
+  // or there was an error before data processing. This state shouldn't normally be reached
+  // unless the user isn't logged in and the initial check didn't catch it.
+  if (promoterTeams.length === 0) {
+      console.log("PromotorDashboard: Rendering - No teams loaded and not loading. Likely redirecting or error state.");
+      // Avoid rendering the incorrect "no team associated" message directly here.
+      // Render minimal content or potentially trigger a re-check/redirect if needed.
+      return (
+          <div className="container py-8">
+             <h1 className="text-2xl font-bold mb-1">Dashboard de Promotor</h1>
+             <p className="text-muted-foreground">Verificando associação da equipa...</p>
+             {/* Optionally add a button to manually trigger redirect or retry */}
+             <Button variant="outline" onClick={() => router.push('/app/promotor/equipes')} className="mt-4">
+                 Ir para página de Equipas
+             </Button>
+          </div>
+      );
+  }
+
+  console.log(`PromotorDashboard: Rendering Dashboard content. Teams: ${promoterTeams.length}, Org: ${!!organizationData}`);
+
+  // --- Main Dashboard Render (Assumes promoterTeams.length > 0) ---
   return (
-    <>
-      {/* Cabeçalho e Métricas - Sempre visíveis (exceto em loading) */}
-      <div className="mb-6"> 
-          <h1 className="text-2xl font-bold mb-1">Dashboard de Promotor</h1>
-          <p className="text-muted-foreground">
-            Bem-vindo ao seu painel de promotor
-          </p>
+    <div className="flex flex-col space-y-6">
+      {/* --- Page Header --- */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard de Promotor</h1>
+        {/* Add any header actions here if needed */}
       </div>
       
-      {/* --- Conteúdo Principal Condicional --- */}
-
-      {/* CENÁRIO 4: Nenhuma Equipa */}
-      { promoterTeams.length === 0 && !organizationData && (
-              <EmptyState
-                icon={Users}
-            title="Nenhuma equipa associada"
-            description="Você ainda não está associado a nenhuma equipa."
-            actionLabel="Procurar Equipas"
-            onAction={() => router.push('/app/promotor/equipes')} 
-          />
+      {/* --- Saudação Personalizada --- */}
+      {user && (
+        <h2 className="text-xl text-muted-foreground">
+          Olá, {user.user_metadata?.first_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Promotor'}!
+        </h2>
       )}
+      
+      {/* --- Welcome Message --- */}
+      {/* Texto simplificado */} 
+      <p className="text-muted-foreground">
+        Bem-vindo ao seu painel de promotor
+      </p>
+      
+      {/* --- Loading State --- */}
+      {/* Rest of the component code remains unchanged */}
 
-      {/* CENÁRIO 1: Uma Equipa COM Organização */}
-      { promoterTeams.length === 1 && organizationData && (
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Coluna Esquerda: Card da Organização */}
-            <div className="lg:col-span-1 space-y-6">
-              <Card>
-                 <CardHeader>
-                   <CardTitle>Organização Associada</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                   <p className="text-lg font-medium">{organizationData.name}</p>
-          </CardContent>
-        </Card>
+      {/* Scenario 1: One Team WITH Organization */}
+      {promoterTeams.length === 1 && organizationData && (
+        <div className="grid gap-8 lg:grid-cols-3">
+          {/* Left Column: Org Card */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card 
+              className="hover:shadow-lg transition-all duration-300 hover:border-primary/50 cursor-pointer group"
+              onClick={navigateToOrgEvents}
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="group-hover:text-primary transition-colors">Organização Associada</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Org Logo with animation */}
+                <div className="flex items-center space-x-4">
+                  {organizationData?.logotipo ? (
+                    <Avatar className="h-16 w-16 rounded border group-hover:scale-105 transition-transform duration-300">
+                      <AvatarImage src={organizationData.logotipo} alt={organizationData.name} />
+                      <AvatarFallback>
+                        <Building className="h-7 w-7 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <div className="h-16 w-16 rounded border flex items-center justify-center bg-muted group-hover:bg-muted/80 group-hover:scale-105 transition-all duration-300">
+                      <Building className="h-7 w-7 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div>
+                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                      {organizationData.name}
+                    </CardTitle>
+                    <div className="flex items-center mt-2 space-x-2">
+                      <CalendarHeart className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">
+                        {activeEventsCount} {activeEventsCount === 1 ? 'Evento Ativo' : 'Eventos Ativos'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Call to action button */}
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-4 group-hover:bg-primary/10 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Previne duplo trigger do evento onClick do Card
+                    navigateToOrgEvents();
+                  }}
+                >
+                  <ChevronRight className="mr-2 h-4 w-4" />
+                  Ver Todos os Eventos
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+                    
+          {/* Right Column: Events */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Próximos Eventos da Organização</h2>
+              {organizationEvents.length > 0 && (
+                <Badge variant="outline" className="bg-primary/10 hover:bg-primary/20 transition-colors">
+                  {organizationEvents.length} {organizationEvents.length === 1 ? 'Evento' : 'Eventos'}
+                </Badge>
+              )}
             </div>
-
-            {/* Coluna Direita: Próximos Eventos Permitidos */}
-            <div className="lg:col-span-2">
-              <h2 className="text-xl font-semibold mb-4">Próximos Eventos da Organização</h2>
-              {organizationEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {organizationEvents.map(event => (
-                    <Card key={event.id}>
-                      <CardHeader>
-                        <CardTitle className="text-md">{event.name}</CardTitle>
-                        <CardDescription>
-                           {formatDate(event.date)} {event.location ? `| ${event.location}` : ''}
-                        </CardDescription>
-          </CardHeader>
-                    </Card>
+            
+            {organizationEvents.length > 0 ? (
+              <div className="space-y-4">
+                {organizationEvents.map(event => (
+                  <Card key={event.id} className="hover:shadow-md transition-all duration-200 hover:border-primary/30 cursor-pointer">
+                    <CardHeader>
+                      <CardTitle className="text-md">{event.name}</CardTitle>
+                      <CardDescription>
+                        {formatDate(event.date)} {event.location ? `| ${event.location}` : ''}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="pt-0 pb-3">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-primary hover:text-primary/80 hover:bg-primary/10 p-0"
+                      >
+                        <ChevronRight className="h-4 w-4 mr-1" />
+                        Ver detalhes
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 ))}
               </div>
             ) : (
               <EmptyState
-                    icon={CalendarDays}
-                    title="Sem eventos futuros"
-                    description="Não há eventos futuros agendados ou permitidos para a sua equipa nesta organização."
-                  />
-              )}
-            </div>
+                router={router} // Pass router
+                icon={CalendarDays}
+                title="Sem eventos futuros"
+                description="Não há eventos futuros da organização associados à sua equipa no momento."
+              />
+            )}
           </div>
+        </div>
       )}
 
-       {/* CENÁRIO 2: Uma Equipa SEM Organização - Mensagem Ajustada */}
-      { promoterTeams.length === 1 && !organizationData && (
-         <Card className="border-dashed bg-muted/50">
-           <CardContent className="flex flex-col items-center justify-center py-10">
-             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-             <h3 className="text-lg font-medium mb-2">Equipa Sem Organização</h3>
-             <p className="text-muted-foreground text-center mb-6 max-w-md">
-               A equipa <span className="font-medium">{promoterTeams[0]?.name}</span> ainda não tem nenhuma organização activa. 
-               Contacte o líder da sua equipa ou o suporte.
-             </p>
+      {/* Scenario 2: One Team WITHOUT Organization */}
+      {promoterTeams.length === 1 && !organizationData && (
+        <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-800 hover:shadow-lg transition-all duration-300">
+          <CardHeader className="text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 dark:text-yellow-400" />
+            <CardTitle className="mt-4 text-yellow-800 dark:text-yellow-200">Equipa Sem Organização</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center text-yellow-700 dark:text-yellow-300">
+            <p>
+              A tua equipa ainda não tem organizações associadas.<br />
+              Fala com o teu chefe de Equipa.
+            </p>
           </CardContent>
-         </Card>
+        </Card>
       )}
 
-      {/* CENÁRIO 3: Múltiplas Equipas */}
-      { promoterTeams.length > 1 && (
-          <div>
-            {/* Mostrar a lista de equipas para seleção */}
-            <h2 className="text-xl font-semibold mb-4">Selecione a Equipa</h2>
-            <p className="text-muted-foreground mb-4">Você pertence a múltiplas equipas. Selecione uma para ver detalhes ou eventos.</p>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {promoterTeams.map((team) => (
-                <Card key={team.id} className="overflow-hidden">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{team.name}</CardTitle>
-                    {team.description && (
-                      <CardDescription>{team.description}</CardDescription>
-                    )}
-                    {team.isPartial && (
-                      <Badge variant="outline" className="w-fit mt-2">Detalhes Limitados</Badge>
-                    )}
-                  </CardHeader>
-                  <CardFooter className="border-t p-4">
+      {/* Scenario 3: Multiple Teams */}
+      {promoterTeams.length > 1 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Selecione a Equipa</h2>
+          <p className="text-muted-foreground mb-4">Você pertence a múltiplas equipas. Selecione uma para ver detalhes.</p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {promoterTeams.map((team) => (
+              <Card key={team.id} className="overflow-hidden">
+          <CardHeader>
+                  <CardTitle className="text-lg">{team.name}</CardTitle>
+                  {team.description && (
+                    <CardDescription>{team.description}</CardDescription>
+                  )}
+                  {team.isPartial && (
+                    <Badge variant="outline" className="w-fit mt-2">Detalhes Limitados</Badge>
+                  )}
+          </CardHeader>
+                <CardFooter className="border-t p-4">
             <Button 
-              variant="outline" 
+                    variant="outline"
               className="w-full"
-                      onClick={() => {
-                        console.log("Selecionou equipa:", team.id); 
-                        // TO DO: Implementar lógica de seleção/contexto da equipa
-                        toast.info(`Seleção da equipa ${team.id.substring(0,6)}... ainda não implementada.`);
-                      }}
-                    >
-                      <ChevronRight className="mr-2 h-4 w-4" />
-                      Selecionar Equipa
+                    onClick={() => {
+                      console.log("Selecionou equipa:", team.id);
+                      // TODO: Implement team context switching logic
+                      toast.info(`Seleção da equipa ${team.name} ainda não implementada.`);
+                    }}
+                  >
+                    <ChevronRight className="mr-2 h-4 w-4" />
+                    Ver Dashboard da Equipa
             </Button>
           </CardFooter>
         </Card>
-              ))}
-            </div>
-              </div>
+            ))}
+      </div>
+    </div>
       )}
-
-    </>
+    </div>
   )
 } 
