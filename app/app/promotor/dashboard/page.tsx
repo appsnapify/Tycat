@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Interfaces (mantendo as definições anteriores)
 interface PromoterTeam {
@@ -273,220 +274,216 @@ export default function PromotorDashboardPage() {
 
   // --- Render Logic ---
   if (loading) {
-    console.log("PromotorDashboard: Rendering Loading state.")
+    // Enhanced loading state with multiple skeletons
     return (
-      <div className="container py-8">
-        <h1 className="text-2xl font-bold mb-4">A carregar Dashboard...</h1>
-        {/* Basic loading skeleton */}
-        <div className="space-y-4">
-             <div className="h-10 w-1/2 bg-muted/40 rounded animate-pulse"></div>
-             <div className="h-8 w-1/3 bg-muted/40 rounded animate-pulse"></div>
-             <div className="h-40 bg-muted/40 rounded animate-pulse mt-6"></div>
+      <div className="container mx-auto p-4 md:p-8 animate-pulse">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
         </div>
       </div>
     )
   }
+
+  // Handle case where user might somehow not be logged in despite checks
+  if (!user) {
+    return (
+      <div className="container mx-auto p-4 md:p-8 text-center">
+        <p>Erro: Utilizador não autenticado. Por favor, faça login.</p>
+        {/* Optionally add a login button */}
+      </div>
+    );
+  }
   
-  // If not loading and promoterTeams is still empty, it implies a redirect should have happened
-  // or there was an error before data processing. This state shouldn't normally be reached
-  // unless the user isn't logged in and the initial check didn't catch it.
+  // Handle the case where promoter is not associated with any team after loading
+  // This should ideally be caught by the redirect in loadDashboardData, but as a fallback:
   if (promoterTeams.length === 0) {
-      console.log("PromotorDashboard: Rendering - No teams loaded and not loading. Likely redirecting or error state.");
-      // Avoid rendering the incorrect "no team associated" message directly here.
-      // Render minimal content or potentially trigger a re-check/redirect if needed.
-      return (
-          <div className="container py-8">
-             <h1 className="text-2xl font-bold mb-1">Dashboard de Promotor</h1>
-             <p className="text-muted-foreground">Verificando associação da equipa...</p>
-             {/* Optionally add a button to manually trigger redirect or retry */}
-             <Button variant="outline" onClick={() => router.push('/app/promotor/equipes')} className="mt-4">
-                 Ir para página de Equipas
-             </Button>
-          </div>
-      );
+     return (
+       <div className="container mx-auto p-4 md:p-8">
+         <EmptyState
+            icon={Users}
+            title="Nenhuma Equipa Encontrada"
+            description="Parece que você não está associado a nenhuma equipa ativa."
+            actionLabel="Gerir Equipas"
+            actionLink="/app/promotor/equipes"
+            router={router}
+         />
+       </div>
+     )
   }
 
-  console.log(`PromotorDashboard: Rendering Dashboard content. Teams: ${promoterTeams.length}, Org: ${!!organizationData}`);
+  // Main dashboard content
+  const currentTeam = promoterTeams[0]; // Assuming only one team association is primary for the dashboard view
 
-  // --- Main Dashboard Render (Assumes promoterTeams.length > 0) ---
   return (
-    <div className="flex flex-col space-y-6">
-      {/* --- Page Header --- */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard de Promotor</h1>
-        {/* Add any header actions here if needed */}
+    <div className="container mx-auto p-4 md:p-8 space-y-6">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold">Dashboard do Promotor</h1>
+         {/* Can add action buttons here if needed later */}
       </div>
-      
-      {/* --- Saudação Personalizada --- */}
-      {user && (
-        <h2 className="text-xl text-muted-foreground">
-          Olá, {user.user_metadata?.first_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Promotor'}!
-        </h2>
-      )}
-      
-      {/* --- Welcome Message --- */}
-      {/* Texto simplificado */} 
-      <p className="text-muted-foreground">
-        Bem-vindo ao seu painel de promotor
-      </p>
-      
-      {/* --- Loading State --- */}
-      {/* Rest of the component code remains unchanged */}
 
-      {/* Scenario 1: One Team WITH Organization */}
-      {promoterTeams.length === 1 && organizationData && (
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Left Column: Org Card */}
-          <div className="lg:col-span-1 space-y-6">
-            <Card 
-              className="hover:shadow-lg transition-all duration-300 hover:border-primary/50 cursor-pointer group"
-              onClick={navigateToOrgEvents}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="group-hover:text-primary transition-colors">Organização Associada</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Org Logo with animation */}
-                <div className="flex items-center space-x-4">
-                  {organizationData?.logotipo ? (
-                    <Avatar className="h-16 w-16 rounded border group-hover:scale-105 transition-transform duration-300">
-                      <AvatarImage src={organizationData.logotipo} alt={organizationData.name} />
-                      <AvatarFallback>
-                        <Building className="h-7 w-7 text-muted-foreground" />
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div className="h-16 w-16 rounded border flex items-center justify-center bg-muted group-hover:bg-muted/80 group-hover:scale-105 transition-all duration-300">
-                      <Building className="h-7 w-7 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div>
-                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                      {organizationData.name}
-                    </CardTitle>
-                    <div className="flex items-center mt-2 space-x-2">
-                      <CalendarHeart className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">
-                        {activeEventsCount} {activeEventsCount === 1 ? 'Evento Ativo' : 'Eventos Ativos'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Call to action button */}
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-4 group-hover:bg-primary/10 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Previne duplo trigger do evento onClick do Card
-                    navigateToOrgEvents();
-                  }}
-                >
-                  <ChevronRight className="mr-2 h-4 w-4" />
-                  Ver Todos os Eventos
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-                    
-          {/* Right Column: Events */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Próximos Eventos da Organização</h2>
-              {organizationEvents.length > 0 && (
-                <Badge variant="outline" className="bg-primary/10 hover:bg-primary/20 transition-colors">
-                  {organizationEvents.length} {organizationEvents.length === 1 ? 'Evento' : 'Eventos'}
-                </Badge>
-              )}
-            </div>
-            
-            {organizationEvents.length > 0 ? (
-              <div className="space-y-4">
-                {organizationEvents.map(event => (
-                  <Card key={event.id} className="hover:shadow-md transition-all duration-200 hover:border-primary/30 cursor-pointer">
-                    <CardHeader>
-                      <CardTitle className="text-md">{event.name}</CardTitle>
-                      <CardDescription>
-                        {formatDate(event.date)} {event.location ? `| ${event.location}` : ''}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardFooter className="pt-0 pb-3">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-primary hover:text-primary/80 hover:bg-primary/10 p-0"
-                      >
-                        <ChevronRight className="h-4 w-4 mr-1" />
-                        Ver detalhes
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                router={router} // Pass router
-                icon={CalendarDays}
-                title="Sem eventos futuros"
-                description="Não há eventos futuros da organização associados à sua equipa no momento."
-              />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Scenario 2: One Team WITHOUT Organization */}
-      {promoterTeams.length === 1 && !organizationData && (
-        <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-800 hover:shadow-lg transition-all duration-300">
-          <CardHeader className="text-center">
-            <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 dark:text-yellow-400" />
-            <CardTitle className="mt-4 text-yellow-800 dark:text-yellow-200">Equipa Sem Organização</CardTitle>
+      {/* Grid for Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Equipa Atual</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="text-center text-yellow-700 dark:text-yellow-300">
-            <p>
-              A tua equipa ainda não tem organizações associadas.<br />
-              Fala com o teu chefe de Equipa.
-            </p>
+          <CardContent>
+            <div className="text-lg sm:text-xl font-bold truncate">{currentTeam.name}</div>
+            <p className="text-xs text-muted-foreground">{currentTeam.role === 'leader' ? 'Líder da Equipa' : 'Membro Promotor'}</p>
           </CardContent>
         </Card>
-      )}
-
-      {/* Scenario 3: Multiple Teams */}
-      {promoterTeams.length > 1 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Selecione a Equipa</h2>
-          <p className="text-muted-foreground mb-4">Você pertence a múltiplas equipas. Selecione uma para ver detalhes.</p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {promoterTeams.map((team) => (
-              <Card key={team.id} className="overflow-hidden">
-          <CardHeader>
-                  <CardTitle className="text-lg">{team.name}</CardTitle>
-                  {team.description && (
-                    <CardDescription>{team.description}</CardDescription>
-                  )}
-                  {team.isPartial && (
-                    <Badge variant="outline" className="w-fit mt-2">Detalhes Limitados</Badge>
-                  )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Organização Associada</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-                <CardFooter className="border-t p-4">
-            <Button 
-                    variant="outline"
-              className="w-full"
-                    onClick={() => {
-                      console.log("Selecionou equipa:", team.id);
-                      // TODO: Implement team context switching logic
-                      toast.info(`Seleção da equipa ${team.name} ainda não implementada.`);
-                    }}
-                  >
-                    <ChevronRight className="mr-2 h-4 w-4" />
-                    Ver Dashboard da Equipa
-            </Button>
-          </CardFooter>
+          <CardContent>
+             {organizationData ? (
+                 <div className="text-lg sm:text-xl font-bold truncate">{organizationData.name}</div>
+             ) : (
+                 <div className="text-lg sm:text-xl font-bold text-muted-foreground">N/A</div>
+             )}
+            <p className="text-xs text-muted-foreground">Entidade promotora dos eventos</p>
+          </CardContent>
         </Card>
-            ))}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Eventos Ativos</CardTitle>
+             <CalendarHeart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+             <div className="text-lg sm:text-xl font-bold">{activeEventsCount}</div>
+            <p className="text-xs text-muted-foreground">Eventos futuros disponíveis</p>
+          </CardContent>
+        </Card>
+         {/* Add more metric cards here if needed (e.g., totalSales, eventsJoined from userStats) */}
       </div>
-    </div>
-      )}
+
+      {/* Main Content Area - Using Grid for two columns on larger screens */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Column / Main Area (takes 2 cols on lg screens) */}
+        <div className="lg:col-span-2 space-y-6">
+            {/* Team Details Card */}
+          <Card>
+            <CardHeader>
+               <div className="flex items-center gap-4">
+                 <Avatar className="h-12 w-12">
+                   <AvatarImage src={currentTeam.logo_url || undefined} alt={currentTeam.name} />
+                   <AvatarFallback>{currentTeam.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                 </Avatar>
+                 <div>
+                   <CardTitle className="text-xl md:text-2xl">{currentTeam.name}</CardTitle>
+                   <CardDescription>{currentTeam.description || "Detalhes da equipa."}</CardDescription>
+                 </div>
+               </div>
+            </CardHeader>
+             <CardContent>
+                {/* Add more team details or actions here if needed */}
+                 {currentTeam.isPartial && (
+                    <p className="text-sm text-destructive">Informações da equipa podem estar incompletas.</p>
+                 )}
+             </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => router.push('/app/promotor/equipes')}>
+                Ver Minhas Equipas
+              </Button>
+            </CardFooter>
+          </Card>
+
+           {/* Upcoming Events Card */}
+            <Card>
+             <CardHeader>
+                 <CardTitle className="text-lg md:text-xl">Próximos Eventos da Organização</CardTitle>
+                 <CardDescription>Eventos organizados por {organizationData?.name || 'esta organização'}.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                 {organizationEvents.length > 0 ? (
+                  <ul className="space-y-4">
+                     {organizationEvents.map(event => (
+                       <li key={event.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border rounded-md hover:bg-muted/50">
+                         <div>
+                             <p className="font-semibold">{event.name}</p>
+                             <p className="text-sm text-muted-foreground">
+                                 {formatDate(event.date)} {event.location ? ` - ${event.location}` : ''}
+                             </p>
+                         </div>
+                         {/* Add action button for event if needed */}
+                         <Button variant="ghost" size="sm" className="mt-2 sm:mt-0" onClick={() => router.push(`/evento/${event.id}`)}> {/* Example Link */}
+                           Detalhes <ChevronRight className="h-4 w-4 ml-1" />
+                         </Button>
+                       </li>
+                     ))}
+                   </ul>
+                 ) : (
+                     <EmptyState
+                         icon={CalendarDays}
+                         description={organizationData ? `Nenhum evento futuro encontrado para ${organizationData.name}.` : "Nenhum evento futuro encontrado."}
+                         router={router}
+                         actionLabel={organizationData ? "Ver Organização" : ""}
+                         actionLink={organizationData ? `/organizacao/${organizationData.id}` : ""} // Needs slug/id logic
+                     />
+                 )}
+             </CardContent>
+             {organizationData && (
+                  <CardFooter className="flex justify-end">
+                     <Button variant="outline" size="sm" onClick={navigateToOrgEvents}>
+                       Ver Todos Eventos da Organização
+                     </Button>
+                 </CardFooter>
+             )}
+           </Card>
+        </div>
+
+        {/* Right Column / Sidebar Area (takes 1 col on lg screens) */}
+        <div className="space-y-6">
+            {/* Placeholder for Promoter Stats Card */}
+            <Card>
+             <CardHeader>
+               <CardTitle>Minhas Estatísticas</CardTitle>
+               <CardDescription>Resumo do seu desempenho.</CardDescription>
+             </CardHeader>
+             <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                   <span className="text-muted-foreground">Vendas Totais</span>
+                   <span className="font-semibold">{userStats.totalSales}</span>
+                </div>
+                <div className="flex justify-between">
+                   <span className="text-muted-foreground">Eventos Participados</span>
+                   <span className="font-semibold">{userStats.eventsJoined}</span>
+                </div>
+                 {/* Add more stats as needed */}
+             </CardContent>
+             {/* Optional Footer */}
+           </Card>
+           
+           {/* Placeholder for Quick Actions or Links */}
+           <Card>
+             <CardHeader>
+               <CardTitle>Ações Rápidas</CardTitle>
+             </CardHeader>
+             <CardContent>
+                <Button className="w-full mb-2" onClick={() => router.push('/app/eventos')}> {/* Adjust link */}
+                  Procurar Eventos
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => router.push('/app/promotor/equipes')}>
+                  Gerir Equipas
+                </Button>
+                {/* Add more relevant actions */}
+             </CardContent>
+           </Card>
+        </div>
+
+      </div>
     </div>
   )
 } 

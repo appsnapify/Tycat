@@ -196,20 +196,20 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
                   <div className="bg-white rounded-lg shadow overflow-hidden h-full flex flex-col">
                     <div className="relative h-48 flex-shrink-0">
                       {event.flyer_url ? (
-                        <Image
+                      <Image
                           src={event.flyer_url}
-                          alt={event.title}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <p className="text-gray-400">Sem imagem</p>
-                        </div>
-                      )}
-                    </div>
+                        alt={event.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <p className="text-gray-400">Sem imagem</p>
+                      </div>
+                    )}
+                  </div>
                     <div className="p-4 flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-900">{event.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{event.title}</h3>
                       <p className="mt-2 text-sm text-gray-600 line-clamp-3">{event.description}</p>
                     </div>
                     <div className="p-4 pt-0 mt-auto text-sm text-gray-500">
@@ -230,20 +230,20 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
                   <div className="bg-white rounded-lg shadow overflow-hidden h-full flex flex-col">
                     <div className="relative h-48 flex-shrink-0">
                       {event.flyer_url ? (
-                        <Image
+                      <Image
                           src={event.flyer_url}
-                          alt={event.title}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <p className="text-gray-400">Sem imagem</p>
-                        </div>
-                      )}
-                    </div>
+                        alt={event.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <p className="text-gray-400">Sem imagem</p>
+                      </div>
+                    )}
+                  </div>
                     <div className="p-4 flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-900">{event.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{event.title}</h3>
                       <p className="mt-2 text-sm text-gray-600 line-clamp-3">{event.description}</p>
                     </div>
                     <div className="p-4 pt-0 mt-auto text-sm text-gray-500">

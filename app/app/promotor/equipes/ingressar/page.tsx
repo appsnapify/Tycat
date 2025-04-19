@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertCircle, ArrowLeft, UserPlus, Info } from 'lucide-react'
+import { AlertCircle, ArrowLeft, UserPlus, Info, Loader2 } from 'lucide-react'
 import {
   Alert,
   AlertDescription,
@@ -32,7 +32,7 @@ export default function IngressarEquipePage() {
     e.preventDefault()
     
     if (!teamCode.trim()) {
-      setError('Por favor, insira o código da equipe.')
+      setError('Por favor, insira o código da equipa.')
       return
     }
     
@@ -41,11 +41,11 @@ export default function IngressarEquipePage() {
     setLoading(true)
     
     try {
-      console.log(`Tentando ingressar na equipe com código: ${teamCode.trim()}`);
+      console.log(`Tentando aderir à equipa com código: ${teamCode.trim()} para user ${user?.id}`);
       console.log(`ID do usuário atual: ${user?.id}`);
       
       if (!user?.id) {
-        setError('Você precisa estar logado para ingressar em uma equipe.')
+        setError('Você precisa estar logado para aderir a uma equipa.')
         return
       }
       
@@ -53,26 +53,27 @@ export default function IngressarEquipePage() {
       const { data, error: rpcError } = await supabase.rpc(
         'join_team_with_code',
         {
-          user_id_param: user.id,
-          team_code_param: teamCode.trim()
+          p_team_code: teamCode.trim(),
+          p_user_id: user.id
         }
       )
       
       console.log("Resposta da função join_team_with_code:", data, rpcError);
       
       if (rpcError) {
-        console.error('Erro ao ingressar na equipe:', rpcError);
+        console.error('Erro ao aderir à equipa:', rpcError);
         
         // Tratamento de erros específicos
-        if (rpcError.message?.includes('já pertence')) {
-          setError('Você já faz parte desta equipe.');
-        } else if (rpcError.message?.includes('inválido')) {
-          setError('Código de equipe inválido. Verifique e tente novamente.');
-          setSugestao('Certifique-se de que o código está no formato TEAM-XXXXX e foi fornecido pelo líder da equipe.');
+        if (rpcError.message?.includes('Equipa não encontrada')) {
+          setError('Código da equipa inválido ou equipa não encontrada.');
+          setSugestao('Certifique-se de que o código está no formato TEAM-XXXXX e foi fornecido pelo líder da equipa.');
+        } else if (rpcError.message?.includes('já é membro')) {
+          setError('Você já faz parte desta equipa.');
         } else {
-          setError(`Não foi possível ingressar na equipe: ${rpcError.message || 'Erro desconhecido'}`);
+          setError(`Não foi possível aderir à equipa: ${rpcError.message || 'Erro desconhecido'}`);
           setSugestao('Se o problema persistir, entre em contato com o administrador da plataforma.');
         }
+        toast.error('Falha ao aderir à equipa.');
         return;
       }
       
@@ -83,11 +84,11 @@ export default function IngressarEquipePage() {
       }
       
       // Atualizar a sessão para refletir as mudanças
-      console.log("Atualizando sessão após ingresso bem-sucedido.");
+      console.log("Atualizando sessão após aderição bem-sucedida.");
       
       // Mostrar mensagem de sucesso
       const teamName = data.team_name || 'selecionada';
-      toast.success(`Você ingressou com sucesso na equipe ${teamName}!`);
+      toast.success(`Você aderiu com sucesso à equipa ${teamName}!`);
       
       // Pequeno atraso para permitir que o toast seja visto
       setTimeout(() => {
@@ -95,26 +96,27 @@ export default function IngressarEquipePage() {
       }, 1500);
       
     } catch (error: any) {
-      console.error('Erro geral ao ingressar na equipe:', error);
+      console.error('Erro geral ao aderir à equipa:', error);
       setError(`Ocorreu um erro ao processar seu pedido: ${error.message || 'Tente novamente mais tarde'}`);
+      toast.error('Ocorreu um erro inesperado.');
     } finally {
       setLoading(false);
     }
   }
   
   return (
-    <div className="container max-w-md py-8">
+    <div className="container mx-auto p-4 md:p-8">
       <Link href="/app/promotor/equipes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Voltar para minhas equipes
+        Voltar para minhas equipas
       </Link>
       
-      <Card>
+      <Card className="max-w-md mx-auto">
         <CardHeader className="text-center">
           <UserPlus className="h-12 w-12 mx-auto text-primary mb-4" />
-          <CardTitle>Ingressar em uma Equipe</CardTitle>
+          <CardTitle>Aderir a uma Equipa</CardTitle>
           <CardDescription>
-            Insira o código da equipe fornecido pelo líder
+            Insira o código da equipa fornecido pelo líder
           </CardDescription>
         </CardHeader>
         
@@ -123,7 +125,7 @@ export default function IngressarEquipePage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="team-code">
-                  Código da Equipe
+                  Código da Equipa
                 </Label>
                 <Input
                   id="team-code"
@@ -134,7 +136,7 @@ export default function IngressarEquipePage() {
                   maxLength={10}
                 />
                 <p className="text-xs text-muted-foreground text-center">
-                  Digite o código exatamente como foi fornecido pelo líder da equipe
+                  Digite o código exatamente como foi fornecido pelo líder da equipa
                 </p>
               </div>
               
@@ -166,11 +168,11 @@ export default function IngressarEquipePage() {
               type="submit"
               disabled={loading || !teamCode.trim()}
             >
-              {loading ? 'Verificando...' : 'Ingressar na Equipe'}
+              {loading ? 'A Aderir...' : 'Aderir à Equipa'}
             </Button>
             
             <div className="text-center text-sm text-muted-foreground">
-              <p>Ao ingressar em uma equipe, você concorda em participar como promotor e receber comissões conforme as regras definidas.</p>
+              <p>Ao aderir a uma equipa, você concorda em participar como promotor e receber comissões conforme as regras definidas.</p>
             </div>
           </CardFooter>
         </form>
