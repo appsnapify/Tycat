@@ -289,17 +289,17 @@ export default function PromotorDashboardPage() {
       </div>
     )
   }
-
+  
   // Handle case where user might somehow not be logged in despite checks
   if (!user) {
-    return (
+      return (
       <div className="container mx-auto p-4 md:p-8 text-center">
         <p>Erro: Utilizador não autenticado. Por favor, faça login.</p>
         {/* Optionally add a login button */}
-      </div>
-    );
+          </div>
+      );
   }
-  
+
   // Handle the case where promoter is not associated with any team after loading
   // This should ideally be caught by the redirect in loadDashboardData, but as a fallback:
   if (promoterTeams.length === 0) {
@@ -328,7 +328,7 @@ export default function PromotorDashboardPage() {
         <h1 className="text-2xl md:text-3xl font-bold">Dashboard do Promotor</h1>
          {/* Can add action buttons here if needed later */}
       </div>
-
+      
       {/* Grid for Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <Card>
@@ -345,8 +345,8 @@ export default function PromotorDashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Organização Associada</CardTitle>
             <Building className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+              </CardHeader>
+              <CardContent>
              {organizationData ? (
                  <div className="text-lg sm:text-xl font-bold truncate">{organizationData.name}</div>
              ) : (
@@ -363,11 +363,11 @@ export default function PromotorDashboardPage() {
           <CardContent>
              <div className="text-lg sm:text-xl font-bold">{activeEventsCount}</div>
             <p className="text-xs text-muted-foreground">Eventos futuros disponíveis</p>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
          {/* Add more metric cards here if needed (e.g., totalSales, eventsJoined from userStats) */}
-      </div>
-
+          </div>
+                    
       {/* Main Content Area - Using Grid for two columns on larger screens */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -375,7 +375,7 @@ export default function PromotorDashboardPage() {
         <div className="lg:col-span-2 space-y-6">
             {/* Team Details Card */}
           <Card>
-            <CardHeader>
+                    <CardHeader>
                <div className="flex items-center gap-4">
                  <Avatar className="h-12 w-12">
                    <AvatarImage src={currentTeam.logo_url || undefined} alt={currentTeam.name} />
@@ -386,7 +386,7 @@ export default function PromotorDashboardPage() {
                    <CardDescription>{currentTeam.description || "Detalhes da equipa."}</CardDescription>
                  </div>
                </div>
-            </CardHeader>
+                    </CardHeader>
              <CardContent>
                 {/* Add more team details or actions here if needed */}
                  {currentTeam.isPartial && (
@@ -396,9 +396,9 @@ export default function PromotorDashboardPage() {
             <CardFooter className="flex justify-end">
               <Button variant="outline" size="sm" onClick={() => router.push('/app/promotor/equipes')}>
                 Ver Minhas Equipas
-              </Button>
-            </CardFooter>
-          </Card>
+                      </Button>
+                    </CardFooter>
+                  </Card>
 
            {/* Upcoming Events Card */}
             <Card>
@@ -424,9 +424,9 @@ export default function PromotorDashboardPage() {
                        </li>
                      ))}
                    </ul>
-                 ) : (
-                     <EmptyState
-                         icon={CalendarDays}
+            ) : (
+              <EmptyState
+                icon={CalendarDays}
                          description={organizationData ? `Nenhum evento futuro encontrado para ${organizationData.name}.` : "Nenhum evento futuro encontrado."}
                          router={router}
                          actionLabel={organizationData ? "Ver Organização" : ""}
@@ -451,7 +451,7 @@ export default function PromotorDashboardPage() {
              <CardHeader>
                <CardTitle>Minhas Estatísticas</CardTitle>
                <CardDescription>Resumo do seu desempenho.</CardDescription>
-             </CardHeader>
+          </CardHeader>
              <CardContent className="space-y-2">
                 <div className="flex justify-between">
                    <span className="text-muted-foreground">Vendas Totais</span>
@@ -462,25 +462,25 @@ export default function PromotorDashboardPage() {
                    <span className="font-semibold">{userStats.eventsJoined}</span>
                 </div>
                  {/* Add more stats as needed */}
-             </CardContent>
+          </CardContent>
              {/* Optional Footer */}
-           </Card>
+        </Card>
            
            {/* Placeholder for Quick Actions or Links */}
            <Card>
-             <CardHeader>
+          <CardHeader>
                <CardTitle>Ações Rápidas</CardTitle>
-             </CardHeader>
+          </CardHeader>
              <CardContent>
                 <Button className="w-full mb-2" onClick={() => router.push('/app/eventos')}> {/* Adjust link */}
                   Procurar Eventos
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => router.push('/app/promotor/equipes')}>
                   Gerir Equipas
-                </Button>
+            </Button>
                 {/* Add more relevant actions */}
              </CardContent>
-           </Card>
+        </Card>
         </div>
 
       </div>

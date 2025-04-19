@@ -31,6 +31,9 @@ export default function NewOrganizationPage() {
   const { user } = useAuth()
   const { hideSidebar, showSidebar } = useSidebar()
   const [isLoading, setIsLoading] = useState(false)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -48,6 +51,50 @@ export default function NewOrganizationPage() {
     hideSidebar()
     return () => showSidebar()
   }, [hideSidebar, showSidebar])
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Por favor, selecione um ficheiro de imagem para o logo.");
+        e.target.value = ''; // Limpa a seleção
+        setFormData({ ...formData, logo: null });
+        setLogoPreview(null);
+        return;
+      }
+      setFormData({ ...formData, logo: file });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFormData({ ...formData, logo: null });
+      setLogoPreview(null);
+    }
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Por favor, selecione um ficheiro de imagem para o banner.");
+        e.target.value = ''; // Limpa a seleção
+        setFormData({ ...formData, banner: null });
+        setBannerPreview(null);
+        return;
+      }
+      setFormData({ ...formData, banner: file });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBannerPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFormData({ ...formData, banner: null });
+      setBannerPreview(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,9 +201,9 @@ export default function NewOrganizationPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col lg:flex-row h-full">
       {/* Formulário */}
-      <div className="w-1/2 p-8 overflow-y-auto">
+      <div className="w-full lg:w-1/2 p-4 lg:p-8 overflow-y-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Nova Organização</h1>
           <p className="mt-2 text-gray-600">
@@ -260,7 +307,7 @@ export default function NewOrganizationPage() {
                   type="file"
                   accept="image/*"
                   required
-                  onChange={(e) => setFormData({ ...formData, logo: e.target.files?.[0] || null })}
+                  onChange={handleLogoChange}
                   className="hidden"
                 />
                 <Button
@@ -272,7 +319,7 @@ export default function NewOrganizationPage() {
                   {formData.logo ? (
                     <>
                       <Check className="mr-2 h-4 w-4 text-green-600" />
-                      Logo Carregado
+                      Logo Carregado ({formData.logo.name})
                     </>
                   ) : (
                     <>
@@ -292,7 +339,7 @@ export default function NewOrganizationPage() {
                   type="file"
                   accept="image/*"
                   required
-                  onChange={(e) => setFormData({ ...formData, banner: e.target.files?.[0] || null })}
+                  onChange={handleBannerChange}
                   className="hidden"
                 />
                 <Button
@@ -304,7 +351,7 @@ export default function NewOrganizationPage() {
                   {formData.banner ? (
                     <>
                       <Check className="mr-2 h-4 w-4 text-green-600" />
-                      Banner Carregado
+                      Banner Carregado ({formData.banner.name})
                     </>
                   ) : (
                     <>
@@ -332,20 +379,18 @@ export default function NewOrganizationPage() {
       </div>
 
       {/* Preview */}
-      <div className="w-1/2 p-8 bg-gray-50 overflow-y-auto">
-        <div className="sticky top-8">
+      <div className="w-full lg:w-1/2 bg-gray-50 p-4 lg:p-8 border-l border-gray-200 mt-8 lg:mt-0 lg:sticky top-0 h-screen overflow-y-auto">
+        <div className="lg:sticky top-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Preview</h2>
           <OrganizationPreview
-            formData={{
-              name: formData.name,
-              address: formData.address,
-              instagram: formData.instagram,
-              facebook: formData.facebook,
-              youtube: formData.youtube,
-              tiktok: formData.tiktok,
-              logo: formData.logo || undefined,
-              banner: formData.banner || undefined
-            }} 
+            name={formData.name}
+            address={formData.address}
+            logo={formData.logo}
+            banner={formData.banner}
+            instagram={formData.instagram}
+            facebook={formData.facebook}
+            youtube={formData.youtube}
+            tiktok={formData.tiktok}
           />
           
           {/* Link da Organização */}

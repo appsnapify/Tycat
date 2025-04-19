@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -18,8 +18,8 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { format } from 'date-fns'
-import { Calendar as CalendarIcon, Upload } from 'lucide-react'
+import { format, parse } from 'date-fns'
+import { Calendar as CalendarIcon, Upload, Clock, X as XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -33,33 +33,120 @@ import { createClient } from '@supabase/supabase-js'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { v4 as uuidv4 } from 'uuid'
 import { supabase } from '@/lib/supabase'
+import { Skeleton } from '@/components/ui/skeleton'
 
-// Schema do formulário
+// --- Funções Auxiliares para Data/Hora ---
+function combineDateTime(date: Date | undefined, time: string | undefined): Date | null {
+  if (!date || !time) return null;
+  try {
+    const [hours, minutes] = time.split(':').map(Number);
+    // Validar horas e minutos (básico)
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        throw new Error("Hora inválida");
+    }
+    const newDate = new Date(date);
+    newDate.setHours(hours, minutes, 0, 0); // Definir hora, minuto, segundo=0, ms=0
+    // Verificar se a data resultante é válida
+    if (isNaN(newDate.getTime())) {
+        throw new Error("Data combinada inválida");
+    }
+    return newDate;
+  } catch (error) {
+    console.error("Erro ao combinar data e hora:", date, time, error);
+    return null; // Retornar null em caso de erro
+  }
+}
+
+function extractDate(dateTime: Date | string | null | undefined): Date | undefined {
+  if (!dateTime) return undefined;
+  try {
+    const date = new Date(dateTime);
+    if (isNaN(date.getTime())) return undefined; // Verificar data inválida
+    // Zerar a hora para evitar problemas de fuso horário ao exibir só a data
+    date.setHours(0, 0, 0, 0);
+    return date;
+  } catch (error) {
+    console.error("Erro ao extrair data:", dateTime, error);
+    return undefined;
+  }
+}
+
+function extractTime(dateTime: Date | string | null | undefined): string {
+  if (!dateTime) return '00:00'; // Retorna um padrão caso não haja hora
+  try {
+    const date = new Date(dateTime);
+    if (isNaN(date.getTime())) return '00:00'; // Verificar data inválida
+    return format(date, 'HH:mm'); // Formato HH:mm
+  } catch (error) {
+    console.error("Erro ao extrair hora:", dateTime, error);
+    return '00:00';
+  }
+}
+// --- Fim das Funções Auxiliares ---
+
+// Schema do formulário atualizado
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
+const MAX_PROMO_IMAGES = 3;
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const GuestListFormSchema = z.object({
   title: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
   description: z.string().min(10, 'A descrição deve ter pelo menos 10 caracteres'),
-  startDate: z.date({
-    required_error: 'A data de início do evento é obrigatória',
-  }),
-  endDate: z.date({
-    required_error: 'A data de término do evento é obrigatória',
-  }),
-  guestListOpenDate: z.date({
-    required_error: 'A data de abertura da lista é obrigatória',
-  }),
-  guestListCloseDate: z.date({
-    required_error: 'A data de fechamento da lista é obrigatória',
-  }),
+  startDate: z.date({ required_error: 'A data de início do evento é obrigatória' }),
+  startTime: z.string().regex(timeRegex, "Hora inválida (HH:MM)").default('20:00'),
+  endDate: z.date({ required_error: 'A data de término do evento é obrigatória' }),
+  endTime: z.string().regex(timeRegex, "Hora inválida (HH:MM)").default('23:00'),
+  guestListOpenDate: z.date({ required_error: 'A data de abertura da lista é obrigatória' }),
+  guestListOpenTime: z.string().regex(timeRegex, "Hora inválida (HH:MM)").default('09:00'),
+  guestListCloseDate: z.date({ required_error: 'A data de fechamento da lista é obrigatória' }),
+  guestListCloseTime: z.string().regex(timeRegex, "Hora inválida (HH:MM)").default('17:00'),
   location: z.string().min(3, 'O local deve ter pelo menos 3 caracteres'),
-  flyer: z.instanceof(FileList).optional(),
-  maxGuests: z.number().min(1, 'O limite deve ser no mínimo 1').default(1000),
-  isVisible: z.boolean().default(true)
-}).refine(data => data.guestListOpenDate < data.guestListCloseDate, {
-  message: "A data de abertura da lista deve ser anterior à data de fechamento",
-  path: ["guestListCloseDate"], // Mostra o erro no campo de data de fechamento
-}).refine(data => data.startDate <= data.endDate, {
-  message: "A data de início do evento deve ser anterior ou igual à data de término",
-  path: ["endDate"],
+  flyer: z.instanceof(FileList)
+      .refine(files => files?.length === 1, "O flyer do evento é obrigatório.")
+      .refine(files => files?.[0]?.size <= MAX_FILE_SIZE_BYTES, `O flyer não pode exceder ${MAX_FILE_SIZE_MB}MB.`)
+      .refine(files => files?.[0]?.type.startsWith('image/'), "O flyer deve ser uma imagem."),
+  maxGuests: z.preprocess(
+    (val) => (val === '' || val === null || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number({ invalid_type_error: "Deve ser um número" })
+     .min(1, 'O limite deve ser no mínimo 1')
+     .int("Deve ser um número inteiro")
+     .optional()
+  ).default(1000),
+  isEventActive: z.boolean().default(true),
+  promotionalImages: z.instanceof(FileList)
+    .optional()
+    .refine(files => !files || files.length <= MAX_PROMO_IMAGES, { message: `Pode carregar no máximo ${MAX_PROMO_IMAGES} imagens.` })
+    .refine(files => !files || Array.from(files).every(file => file.size <= MAX_FILE_SIZE_BYTES), { message: `Cada imagem não pode exceder ${MAX_FILE_SIZE_MB}MB.` })
+    .refine(files => !files || Array.from(files).every(file => file.type.startsWith('image/')), { message: "Apenas ficheiros de imagem são permitidos." }),
+}).refine(data => {
+  const openDateTime = combineDateTime(data.guestListOpenDate, data.guestListOpenTime);
+  const closeDateTime = combineDateTime(data.guestListCloseDate, data.guestListCloseTime);
+  return !openDateTime || !closeDateTime || openDateTime < closeDateTime;
+}, {
+  message: "A data/hora de abertura da lista deve ser anterior à data/hora de fechamento",
+  path: ["guestListCloseTime"],
+}).refine(data => {
+  const startDateTime = combineDateTime(data.startDate, data.startTime);
+  const endDateTime = combineDateTime(data.endDate, data.endTime);
+  return !startDateTime || !endDateTime || startDateTime <= endDateTime;
+}, {
+  message: "A data/hora de início do evento deve ser anterior ou igual à data/hora de término",
+  path: ["endTime"],
+}).refine(data => {
+    const guestListOpenDateTime = combineDateTime(data.guestListOpenDate, data.guestListOpenTime);
+    const eventEndDateTime = combineDateTime(data.endDate, data.endTime);
+    return !guestListOpenDateTime || !eventEndDateTime || guestListOpenDateTime < eventEndDateTime;
+}, {
+    message: "A lista não pode abrir depois do fim do evento",
+    path: ["guestListOpenTime"],
+}).refine(data => {
+    const guestListCloseDateTime = combineDateTime(data.guestListCloseDate, data.guestListCloseTime);
+    const eventEndDateTime = combineDateTime(data.endDate, data.endTime);
+    return !guestListCloseDateTime || !eventEndDateTime || guestListCloseDateTime <= eventEndDateTime;
+}, {
+    message: "A lista deve fechar antes ou no momento do fim do evento",
+    path: ["guestListCloseTime"],
 });
 
 type GuestListFormValues = z.infer<typeof GuestListFormSchema>
@@ -68,790 +155,1128 @@ export default function GuestListPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const eventId = searchParams.get('id')
+  const [isLoading, setIsLoading] = useState(!!eventId); // Começa loading se for edit mode
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(!!eventId)
   const [flyerPreview, setFlyerPreview] = useState<string | null>(null)
   const { currentOrganization } = useOrganization()
+  // Adicionar estado para guardar a URL do flyer existente em modo edição
+  const [existingFlyerUrl, setExistingFlyerUrl] = useState<string | null>(null);
+  // Novos estados para materiais promocionais
+  const [promotionalFiles, setPromotionalFiles] = useState<File[]>([]);
+  const [promotionalPreviews, setPromotionalPreviews] = useState<string[]>([]);
+  // Estado para URLs existentes (a ser preenchido no modo edição)
+  const [existingPromoImageUrls, setExistingPromoImageUrls] = useState<string[]>([]); 
 
   const form = useForm<GuestListFormValues>({
     resolver: zodResolver(GuestListFormSchema),
+    // Definir valores default EXPLÍCITOS para TODOS os campos
+    // para evitar erro de uncontrolled/controlled.
+    // Espelhar os defaults do schema Zod.
     defaultValues: {
       title: '',
       description: '',
+      startDate: undefined, // Calendar/Popover pode lidar melhor com undefined inicial
+      startTime: '20:00', // Default do schema
+      endDate: undefined,
+      endTime: '23:00', // Default do schema
+      guestListOpenDate: undefined,
+      guestListOpenTime: '09:00', // Default do schema
+      guestListCloseDate: undefined,
+      guestListCloseTime: '17:00', // Default do schema
       location: '',
-      maxGuests: 1000,
-      isVisible: true
+      flyer: undefined,
+      maxGuests: 1000, // Default do schema
+      isEventActive: true, // Default do schema
+      promotionalImages: undefined, // Adicionar valor padrão
     },
   })
 
-  // Inicializar as datas padrão quando o formulário é carregado
+  // Inicializar as datas padrão APENAS se não for modo edição
+  // (O useEffect de modo edição já faz reset com os dados corretos)
   useEffect(() => {
-    if (!isEditMode) {
-      // Valor padrão para abertura: agora
-      const defaultOpenDate = new Date();
-      
-      // Definir data de início do evento para 3 dias no futuro por padrão
+    if (!isEditMode) { // Apenas para criação
+      console.log("Setting default dates for new event (if needed)");
+      const now = new Date();
+      const defaultOpenDate = new Date(now);
+
       const defaultEventStartDate = new Date();
       defaultEventStartDate.setDate(defaultEventStartDate.getDate() + 3);
-      defaultEventStartDate.setHours(20, 0, 0, 0); // 20:00 (8 PM)
-      
-      // Definir data de fim do evento para 3 horas após o início por padrão
-      const defaultEventEndDate = new Date(defaultEventStartDate);
-      defaultEventEndDate.setHours(defaultEventEndDate.getHours() + 3);
-      
-      // Valor padrão para fechamento: 3h antes do término do evento
-      const defaultCloseDate = new Date(defaultEventStartDate);
-      defaultCloseDate.setHours(defaultCloseDate.getHours() - 3);
-      
-      // Definir valores no formulário
-      form.setValue('startDate', defaultEventStartDate);
-      form.setValue('endDate', defaultEventEndDate);
-      form.setValue('guestListOpenDate', defaultOpenDate);
-      form.setValue('guestListCloseDate', defaultCloseDate);
-    }
-  }, [form, isEditMode]);
+      defaultEventStartDate.setHours(0, 0, 0, 0); // Zerar hora para data
 
-  // Carregar dados do evento quando estiver em modo de edição
+      const defaultEventEndDate = new Date(defaultEventStartDate);
+      defaultEventEndDate.setHours(0, 0, 0, 0); // Zerar hora para data
+
+      const defaultCloseDate = new Date(defaultEventStartDate);
+      defaultCloseDate.setHours(0, 0, 0, 0);
+
+      // Usar reset SÓ para as datas, pois os outros defaults já estão no useForm
+      // E apenas se os valores ainda não foram tocados (isDirty)
+      if (!form.formState.isDirty) {
+          form.reset({
+              ...form.getValues(), // Manter os outros defaults/valores
+              startDate: defaultEventStartDate,
+              endDate: defaultEventEndDate,
+              guestListOpenDate: defaultOpenDate,
+              guestListCloseDate: defaultCloseDate,
+              // Não precisamos de redefinir horas, etc., pois já estão nos defaultValues do useForm
+          });
+       } else {
+           console.log("Form is dirty, not resetting default dates.");
+       }
+    }
+  // Remover form das dependências pode ser mais seguro para evitar loops
+  // A lógica agora depende apenas de isEditMode para definir datas iniciais.
+  }, [isEditMode]);
+
+  // Carregar dados do evento e MATERIAIS PROMOCIONAIS em modo edição
   useEffect(() => {
     async function loadEventData() {
-      if (eventId && currentOrganization) {
+      if (eventId && currentOrganization?.id) {
+        setIsLoading(true);
         try {
-          setIsSubmitting(true)
           console.log("Carregando evento para edição:", eventId)
-          
-          // Buscar evento do Supabase
-          const { data: event, error } = await supabase
+          const { data: event, error: eventError } = await supabase
             .from('events')
             .select('*')
             .eq('id', eventId)
             .eq('organization_id', currentOrganization.id)
             .single()
-          
-          if (error) {
-            console.error("Erro ao carregar evento:", error)
-            toast({
-              title: "Erro",
-              description: "Não foi possível carregar os dados do evento",
-              variant: "destructive"
-            })
+
+          if (eventError || !event) {
+            console.error("Erro ao carregar evento ou evento não encontrado:", eventError)
+            toast({ title: "Erro", description: "Não foi possível carregar os dados do evento ou evento não pertence à organização.", variant: "destructive" })
+            router.push('/app/organizador/eventos')
             return
           }
-          
           console.log("Evento carregado:", event)
-          
-          // Verificar se é um evento de guest list
           if (event.type !== 'guest-list') {
             console.error("Evento não é do tipo guest list")
-            toast({
-              title: "Tipo incorreto",
-              description: "Este evento não é uma guest list",
-              variant: "destructive"
-            })
+            toast({ title: "Tipo incorreto", description: "Este evento não é uma guest list", variant: "destructive" })
+            router.push('/app/organizador/eventos')
             return
           }
-          
-          // Preencher o formulário com os dados do evento
-          form.setValue('title', event.title || '')
-          form.setValue('description', event.description || '')
-          
-          // Converter data de início
-          if (event.date) {
-            const startDate = new Date(event.date)
-            if (event.time) {
-              const [hours, minutes, seconds] = event.time.split(':')
-              startDate.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds || '0'))
-            }
-            form.setValue('startDate', startDate)
-          }
-          
-          // Converter data de término se existir
-          if (event.end_date) {
-            const endDate = new Date(event.end_date)
-            if (event.end_time) {
-              const [hours, minutes, seconds] = event.end_time.split(':')
-              endDate.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds || '0'))
-            }
-            form.setValue('endDate', endDate)
-          } else if (event.date) {
-            // Se não tiver data de término, usar a mesma data de início
-            const endDate = new Date(event.date)
-            // Adicionar 3 horas à data de início
-            endDate.setHours(endDate.getHours() + 3)
-            form.setValue('endDate', endDate)
-          }
-          
-          // Converter data de abertura da lista
-          if (event.guest_list_open_datetime) {
-            form.setValue('guestListOpenDate', new Date(event.guest_list_open_datetime));
+
+          // Buscar materiais promocionais associados
+          console.log("Buscando materiais promocionais para o evento:", eventId);
+          const { data: promoMaterials, error: promoError } = await supabase
+              .from('promotional_materials')
+              .select('image_url')
+              .eq('event_id', eventId);
+
+          if (promoError) {
+              console.warn("Erro ao buscar materiais promocionais:", promoError);
+          } else {
+              const urls = promoMaterials?.map(m => m.image_url) || [];
+              console.log("Materiais promocionais existentes:", urls);
+              setExistingPromoImageUrls(urls);
           }
 
-          // Converter data de fechamento da lista
-          if (event.guest_list_close_datetime) {
-            form.setValue('guestListCloseDate', new Date(event.guest_list_close_datetime));
-          }
-          
-          form.setValue('location', event.location || '')
-          
-          // Carregar limite de convidados
-          if (event.guest_list_settings && typeof event.guest_list_settings.max_guests === 'number') {
-            form.setValue('maxGuests', event.guest_list_settings.max_guests);
-          } else {
-            form.setValue('maxGuests', 1000); // Valor padrão
-          }
-          
-          // Carregar status de visibilidade
-          form.setValue('isVisible', event.is_published !== false); // Se is_published for undefined, assume true
-          
-          // Mostrar preview do flyer
+          // --- Lógica para Flyer Dummy --- 
+          let flyerValue: FileList;
           if (event.flyer_url) {
-            setFlyerPreview(event.flyer_url)
+            console.log("Evento existente tem flyer_url:", event.flyer_url);
+            setExistingFlyerUrl(event.flyer_url); // <<< GUARDAR URL EXISTENTE
+            // Criar dummy FileList com 1 ficheiro placeholder para satisfazer Zod
+            const dummyFile = new File(["existing"], "flyer-placeholder.png", { type: "image/png" });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(dummyFile);
+            flyerValue = dataTransfer.files;
+            setFlyerPreview(event.flyer_url); // Definir preview
+          } else {
+            console.log("Evento existente NÃO tem flyer_url.");
+            setExistingFlyerUrl(null); // Garantir que está nulo
+            // Usar FileList vazio se não houver flyer existente
+            flyerValue = new DataTransfer().files;
+            setFlyerPreview(null); // Limpar preview
           }
+          // --- Fim Lógica Flyer Dummy --- 
+
+          // Estimar hora de fim se não existir (3h após início)
+          let estimatedEndTime = '23:00';
+          if (event.time) {
+            try {
+                const startDate = new Date(`1970-01-01T${event.time}Z`);
+                startDate.setUTCHours(startDate.getUTCHours() + 3);
+                estimatedEndTime = format(startDate, 'HH:mm');
+            } catch { /* manter default */ }
+          }
+
+          // Preencher o formulário com os dados do evento
+          form.reset({
+            title: event.title || '',
+            description: event.description || '',
+            startDate: extractDate(event.date),
+            startTime: event.time ? format(new Date(`1970-01-01T${event.time}`), 'HH:mm') : '00:00',
+            endDate: extractDate(event.end_date || event.date),
+            endTime: event.end_time ? format(new Date(`1970-01-01T${event.end_time}`), 'HH:mm') : estimatedEndTime,
+            guestListOpenDate: extractDate(event.guest_list_open_datetime),
+            guestListOpenTime: extractTime(event.guest_list_open_datetime),
+            guestListCloseDate: extractDate(event.guest_list_close_datetime),
+            guestListCloseTime: extractTime(event.guest_list_close_datetime),
+            location: event.location || '',
+            maxGuests: (event.guest_list_settings as any)?.max_guests ?? 1000,
+            isEventActive: event.is_published !== false,
+            flyer: flyerValue, // Usar o flyerValue (dummy ou vazio)
+            promotionalImages: undefined // Manter vazio ao carregar
+          });
+
         } catch (error) {
-          console.error("Erro ao carregar evento:", error)
-          toast({
-            title: "Erro",
-            description: "Ocorreu um problema ao carregar os dados do evento",
-            variant: "destructive"
-          })
+          console.error("Erro inesperado ao carregar evento:", error)
+          toast({ title: "Erro", description: "Ocorreu um problema ao carregar os dados do evento", variant: "destructive" })
         } finally {
-          setIsSubmitting(false)
+          setIsLoading(false)
         }
+      } else if (!eventId) {
+          setExistingFlyerUrl(null); // Garantir nulo em modo criação
+          setIsLoading(false);
       }
     }
-    
     loadEventData()
-  }, [eventId, currentOrganization, form])
+  }, [eventId, currentOrganization?.id, form, router])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    const dataTransfer = new DataTransfer();
+    const emptyFileList = dataTransfer.files;
+
     if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setFlyerPreview(reader.result as string)
+      if (!file.type.startsWith('image/')) {
+          toast({ title: "Erro", description: "Por favor, selecione um ficheiro de imagem.", variant: "destructive" });
+          e.target.value = '';
+          setFlyerPreview(null);
+          // Corrigir: Usar FileList vazio
+          form.setValue('flyer', emptyFileList, { shouldValidate: true });
+          return;
       }
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+          toast({ title: "Erro", description: `O ficheiro é demasiado grande (máximo ${MAX_FILE_SIZE_MB}MB).`, variant: "destructive" });
+          e.target.value = '';
+          setFlyerPreview(null);
+          // Corrigir: Usar FileList vazio
+          form.setValue('flyer', emptyFileList, { shouldValidate: true });
+          return;
+      }
+      const reader = new FileReader()
+      reader.onloadend = () => { setFlyerPreview(reader.result as string) }
       reader.readAsDataURL(file)
-      
-      // Atualizamos o campo flyer no formulário
-      form.setValue('flyer', e.target.files as FileList)
+      // Passar o FileList selecionado (que tem 1 ficheiro)
+      form.setValue('flyer', e.target.files as FileList, { shouldValidate: true, shouldDirty: true })
+    } else {
+        setFlyerPreview(null);
+        // Corrigir: Usar FileList vazio ao desmarcar
+        form.setValue('flyer', emptyFileList, { shouldValidate: true });
     }
   }
 
-  const onSubmitGuestList = async (data: GuestListFormValues) => {
-    if (!currentOrganization) {
-      toast({
-        title: "Nenhuma organização selecionada",
-        description: "Você precisa selecionar uma organização para criar um evento",
-        variant: "destructive"
-      })
-      return
+  // Novo handler para ficheiros promocionais múltiplos
+  const handlePromotionalFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) {
+        setPromotionalFiles([]);
+        setPromotionalPreviews([]);
+        form.setValue('promotionalImages', undefined);
+        return;
     }
 
-    // Verificar sessão de autenticação
-    const { data: authData, error: authError } = await supabase.auth.getSession()
-    console.log("Informações da sessão:", authData?.session ? "Usuário autenticado" : "Usuário não autenticado")
-    console.log("Detalhes da sessão:", authData)
-    
-    if (authError || !authData.session) {
-      console.error("Erro de autenticação:", authError)
-      toast({
-        title: "Erro de autenticação",
-        description: "Você não está autenticado. Faça login novamente.",
-        variant: "destructive"
-      })
-      return
-    }
+    const newFilesArray = Array.from(selectedFiles);
+    // Combina ficheiros existentes no estado com os novos selecionados
+    // Não permite adicionar mais do que o limite total
+    const combinedFiles = [...promotionalFiles, ...newFilesArray].slice(0, MAX_PROMO_IMAGES);
 
-    try {
-      setIsSubmitting(true)
-      console.log("Dados do formulário:", data)
-      
-      let flyerUrl = null
-      
-      // Só enviar o flyer se for um novo evento ou se for fornecido um novo arquivo
-      if (!isEditMode || (data.flyer && data.flyer.length > 0)) {
-        // Se estiver editando e não tiver novo flyer, manter o atual
-        if (isEditMode && (!data.flyer || data.flyer.length === 0)) {
-          flyerUrl = flyerPreview;
-        } else {
-          // fazer o upload do flyer
-          const file = data.flyer![0]
-          const fileExt = file.name.split('.').pop()
-          const fileName = `${uuidv4()}.${fileExt}`
-          
-          console.log("Iniciando upload do flyer:", fileName)
-          
-          // Verificar buckets disponíveis
-          const { data: bucketList, error: bucketError } = await supabase.storage.listBuckets()
-          
-          if (bucketError) {
-            console.error("Erro ao listar buckets:", bucketError)
-            // Apenas logar o erro, mas continuar com uma URL alternativa
-            console.log("Continuando sem upload de imagem")
-            // Usar dataURL como fallback (não ideal para produção, mas funciona para testes)
-            const reader = new FileReader()
-            const imageDataPromise = new Promise((resolve) => {
-              reader.onloadend = () => resolve(reader.result)
-              reader.readAsDataURL(file)
-            })
-            
-            flyerUrl = await imageDataPromise as string
-            console.log("Usando image data URL como fallback")
-          } else {
-            console.log("Buckets disponíveis:", bucketList)
-            
-            // Ver se temos algum bucket disponível
-            if (bucketList && bucketList.length > 0) {
-              // Usar o primeiro bucket disponível
-              const bucketName = bucketList[0].name
-              console.log(`Usando bucket disponível: ${bucketName}`)
-              
-              // Fazer o upload
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from(bucketName)
-                .upload(fileName, file, {
-                  cacheControl: '3600',
-                  upsert: true
-                })
-                
-              if (uploadError) {
-                console.error("Erro no upload:", uploadError)
-                // Continuar mesmo com erro de upload
-                const reader = new FileReader()
-                const imageDataPromise = new Promise((resolve) => {
-                  reader.onloadend = () => resolve(reader.result)
-                  reader.readAsDataURL(file)
-                })
-                
-                flyerUrl = await imageDataPromise as string
-                console.log("Usando image data URL como fallback após erro de upload")
-              } else {
-                console.log("Upload concluído com sucesso:", uploadData)
-                
-                // Obter URL pública
-                const { data: publicUrlData } = supabase.storage
-                  .from(bucketName)
-                  .getPublicUrl(fileName)
-                  
-                flyerUrl = publicUrlData.publicUrl
-                console.log("URL do flyer:", flyerUrl)
-              }
-            } else {
-              console.log("Nenhum bucket disponível. Usando alternativa.")
-              // Usar dataURL como fallback
-              const reader = new FileReader()
-              const imageDataPromise = new Promise((resolve) => {
-                reader.onloadend = () => resolve(reader.result)
-                reader.readAsDataURL(file)
-              })
-              
-              flyerUrl = await imageDataPromise as string
-              console.log("Usando image data URL como fallback (sem buckets)")
+    const validFiles: File[] = [];
+    const fileProcessingPromises: Promise<string>[] = []; // Para gerar previews
+
+    combinedFiles.forEach((file, index) => {
+        // Validar cada ficheiro individualmente (redundante com Zod, mas bom para feedback imediato)
+        if (!file.type.startsWith('image/')) {
+            if (index >= promotionalFiles.length) { // Só mostrar erro para ficheiros novos
+                toast({ title: "Tipo Inválido", description: `'${file.name}' não é uma imagem.`, variant: "destructive" });
             }
-          }
+            return; // Pular ficheiro inválido
         }
-      } else if (isEditMode) {
-        // Manter o flyer atual se estivermos editando
-        flyerUrl = flyerPreview;
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            if (index >= promotionalFiles.length) {
+                toast({ title: "Tamanho Excedido", description: `'${file.name}' excede ${MAX_FILE_SIZE_MB}MB.`, variant: "destructive" });
+            }
+            return; // Pular ficheiro inválido
+        }
+
+        validFiles.push(file);
+
+        // Criar uma Promise para ler o ficheiro e gerar preview
+        const readerPromise = new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        fileProcessingPromises.push(readerPromise);
+    });
+
+    // Atualizar estado dos ficheiros válidos
+    setPromotionalFiles(validFiles);
+
+    // Processar todas as leituras de ficheiro e atualizar previews
+    Promise.all(fileProcessingPromises).then(previews => {
+        setPromotionalPreviews(previews);
+    }).catch(error => {
+        console.error("Erro ao gerar previews:", error);
+        toast({ title: "Erro de Preview", description: "Não foi possível gerar a pré-visualização de uma imagem.", variant: "destructive" });
+    });
+
+    // Atualizar o campo do formulário
+    const dataTransfer = new DataTransfer();
+    validFiles.forEach(file => dataTransfer.items.add(file));
+    form.setValue('promotionalImages', dataTransfer.files.length > 0 ? dataTransfer.files : undefined, { shouldValidate: true, shouldDirty: true });
+
+    // Limpar o valor do input
+    e.target.value = '';
+  };
+
+  // Função para remover uma imagem promocional selecionada (da lista de NOVOS ficheiros)
+  const removePromotionalImage = (indexToRemove: number) => {
+    const updatedFiles = promotionalFiles.filter((_, index) => index !== indexToRemove);
+    const updatedPreviews = promotionalPreviews.filter((_, index) => index !== indexToRemove);
+
+    setPromotionalFiles(updatedFiles);
+    setPromotionalPreviews(updatedPreviews);
+
+    // Atualizar o campo do formulário
+    const dataTransfer = new DataTransfer();
+    updatedFiles.forEach(file => dataTransfer.items.add(file));
+    form.setValue('promotionalImages', dataTransfer.files.length > 0 ? dataTransfer.files : undefined, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const onSubmitGuestList = async (data: GuestListFormValues) => {
+    console.log("Submetendo formulário com dados:", data);
+
+    if (!currentOrganization) {
+      toast({ title: "Nenhuma organização selecionada", description: "Selecione uma organização", variant: "destructive" })
+      return
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getSession()
+    if (authError || !authData.session) {
+      toast({ title: "Erro de autenticação", description: "Sessão inválida. Faça login novamente.", variant: "destructive" })
+      return
+    }
+
+    setIsSubmitting(true)
+    let finalFlyerUrl: string | null = null; // Variável para URL final do flyer
+
+    // --- Lógica Refinada para Upload/Manutenção do Flyer --- 
+    try { // Envolver a lógica do flyer num try para capturar erros de upload
+      if (isEditMode) {
+        // Cenário 1 (Edição): User selecionou um NOVO flyer
+        if (data.flyer && data.flyer.length > 0 && data.flyer[0].name !== 'flyer-placeholder.png') {
+          console.log("Modo Edição: Novo flyer selecionado. Iniciando upload...");
+          const file = data.flyer[0];
+          const fileName = `${uuidv4()}-${file.name}`;
+          const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('event-flyers')
+            .upload(filePath, file, { upsert: true });
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from('event-flyers').getPublicUrl(uploadData.path);
+          finalFlyerUrl = urlData?.publicUrl;
+          console.log("Modo Edição: Novo flyer carregado. URL:", finalFlyerUrl);
+        }
+        // Cenário 2 (Edição): User NÃO mexeu no flyer (placeholder presente)
+        else if (data.flyer && data.flyer.length > 0 && data.flyer[0].name === 'flyer-placeholder.png') {
+          console.log("Modo Edição: Placeholder detetado. Mantendo flyer URL existente:", existingFlyerUrl);
+          finalFlyerUrl = existingFlyerUrl; // Usar a URL guardada no estado
+        }
+        // Cenário 3 (Edição): User REMOVEU o flyer explicitamente (FileList vazio)
+        else if (!data.flyer || data.flyer.length === 0) {
+          console.log("Modo Edição: Flyer removido explicitamente.");
+          finalFlyerUrl = null;
+        }
+        // Cenário Fallback (não deve acontecer)
+        else {
+          console.warn("Modo Edição: Estado inesperado do flyer. Definindo URL do flyer como null.");
+          finalFlyerUrl = null;
+        }
+      } else { // Modo Criação
+        // Cenário 4 (Criação): User selecionou um flyer
+        if (data.flyer && data.flyer.length > 0) {
+          console.log("Modo Criação: Flyer selecionado. Iniciando upload...");
+          const file = data.flyer[0];
+          const fileName = `${uuidv4()}-${file.name}`;
+          const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('event-flyers')
+            .upload(filePath, file, { upsert: true });
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from('event-flyers').getPublicUrl(uploadData.path);
+          finalFlyerUrl = urlData?.publicUrl;
+          console.log("Modo Criação: Flyer carregado. URL:", finalFlyerUrl);
+        }
+        // Cenário 5 (Criação): User não selecionou flyer
+        else {
+          console.log("Modo Criação: Nenhum flyer selecionado.");
+          finalFlyerUrl = null;
+        }
+      }
+    } catch (uploadCatchError: any) {
+        // Log detalhado do erro de upload
+        console.error("Erro detalhado no upload do flyer:", JSON.stringify(uploadCatchError, null, 2));
+        let uploadUserMessage = "Falha no upload do flyer.";
+        if (uploadCatchError?.message) {
+            uploadUserMessage += ` (${uploadCatchError.message})`;
+        }
+        toast({ title: "Erro de Upload", description: uploadUserMessage, variant: "destructive" })
+        setIsSubmitting(false)
+        return // Interrompe a execução
+    }
+    // --- Fim da Lógica Refinada do Flyer ---
+
+    // 2. Preparar Dados para o Banco de Dados (usar finalFlyerUrl)
+    const startDateTime = combineDateTime(data.startDate, data.startTime);
+    const endDateTime = combineDateTime(data.endDate, data.endTime);
+    const guestListOpenDateTime = combineDateTime(data.guestListOpenDate, data.guestListOpenTime);
+    const guestListCloseDateTime = combineDateTime(data.guestListCloseDate, data.guestListCloseTime);
+
+    // Validação extra das datas combinadas
+    if (!startDateTime || !endDateTime || !guestListOpenDateTime || !guestListCloseDateTime) {
+        console.error("Erro crítico ao combinar datas/horas, verifique os inputs e a lógica:", { startDateTime, endDateTime, guestListOpenDateTime, guestListCloseDateTime });
+        toast({ title: "Erro de Data/Hora", description: "Ocorreu um erro ao processar as datas e horas. Verifique os valores inseridos.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+    }
+    // Re-validar regras de negócio complexas aqui (Zod já o fez, mas como segurança extra)
+     if (startDateTime > endDateTime) {
+         toast({ title: "Erro de Data", description: "A data/hora de início não pode ser depois da data/hora de fim.", variant: "destructive" }); setIsSubmitting(false); return;
+     }
+     if (guestListOpenDateTime >= guestListCloseDateTime) {
+         toast({ title: "Erro de Data", description: "A abertura da lista deve ser antes do fecho.", variant: "destructive" }); setIsSubmitting(false); return;
+     }
+      if (guestListCloseDateTime > endDateTime) {
+          toast({ title: "Erro de Data", description: "A lista deve fechar antes ou ao mesmo tempo que o evento termina.", variant: "destructive" }); setIsSubmitting(false); return;
       }
 
-      // Construir objeto do evento
-      const eventData = {
-        title: data.title,
-        description: data.description,
-        date: new Date(data.startDate).toISOString().split('T')[0],
-        time: new Date(data.startDate).toISOString().split('T')[1].substring(0, 8),
-        end_date: new Date(data.endDate).toISOString().split('T')[0],
-        end_time: new Date(data.endDate).toISOString().split('T')[1].substring(0, 8),
-        location: data.location,
-        flyer_url: flyerUrl,
-        organization_id: currentOrganization.id,
-        type: 'guest-list',
-        is_active: true,
-        is_published: data.isVisible,
-        guest_list_open_datetime: data.guestListOpenDate.toISOString(),
-        guest_list_close_datetime: data.guestListCloseDate.toISOString(),
-        guest_list_settings: {
-          max_guests: data.maxGuests,
-          requires_approval: false // Valor padrão
+    const eventData = {
+      ...(isEditMode && eventId ? { id: eventId } : {}),
+      organization_id: currentOrganization.id,
+      title: data.title,
+      description: data.description,
+      date: format(startDateTime, 'yyyy-MM-dd'),
+      time: format(startDateTime, 'HH:mm:ss'),
+      end_date: format(endDateTime, 'yyyy-MM-dd'),
+      end_time: format(endDateTime, 'HH:mm:ss'),
+      location: data.location,
+      flyer_url: finalFlyerUrl, // <<< Usar a URL final determinada pela lógica acima
+      type: 'guest-list' as const,
+      is_published: data.isEventActive,
+      guest_list_open_datetime: guestListOpenDateTime.toISOString(),
+      guest_list_close_datetime: guestListCloseDateTime.toISOString(),
+      guest_list_settings: {
+        max_guests: data.maxGuests ?? 1000,
+      },
+    };
+
+    console.log("Dados a serem enviados para upsert:", eventData);
+
+    // 3. Fazer Upsert no Supabase
+    try {
+      const { data: upsertResult, error: upsertError } = await supabase
+        .from('events')
+        .upsert(eventData, { onConflict: 'id' })
+        .select('id')
+        .single();
+      
+      if (upsertError) {
+        // Log detalhado do erro para diagnóstico
+        console.error("Erro detalhado no upsert do evento:", JSON.stringify(upsertError, null, 2));
+
+        let userMessage = "Ocorreu um erro desconhecido ao salvar o evento."; // Mensagem padrão
+        if (upsertError.message) {
+            userMessage = `Erro ao salvar: ${upsertError.message}`;
         }
-      }
-      
-      console.log("Dados do evento para " + (isEditMode ? "atualização" : "inserção") + ":", eventData)
-      
-      let result;
-      
-      if (isEditMode && eventId) {
-        // Atualizar evento existente
-        const { data: updatedEvent, error: updateError } = await supabase
-          .from('events')
-          .update(eventData)
-          .eq('id', eventId)
-          .eq('organization_id', currentOrganization.id)
-          .select()
-          .single()
-        
-        if (updateError) {
-          console.error("Erro ao atualizar evento:", updateError)
-          throw new Error(`Erro ao atualizar evento: ${updateError.message}`)
+        if (upsertError.code === '23505') {
+            userMessage = "Erro: Já existe um evento com detalhes semelhantes (possivelmente título e datas iguais).";
+        } else if (upsertError.code === '23503') {
+            userMessage = "Erro: A organização associada não foi encontrada ou houve um problema de permissão.";
+        } else if (upsertError.code === '22007' || upsertError.code === '22008') {
+            userMessage = "Erro: Formato inválido de data ou hora fornecido.";
         }
-        
-        result = updatedEvent
-        
-        toast({
-          title: "Guest List atualizada com sucesso",
-          description: "Sua guest list foi atualizada"
-        })
+        toast({ title: "Erro ao Salvar Evento", description: userMessage, variant: "destructive" })
       } else {
-        // Inserir novo evento
-        const { data: insertedEvent, error } = await supabase
-          .from('events')
-          .insert(eventData)
-          .select()
-          .single()
-        
-        if (error) {
-          console.error("Erro ao inserir evento:", error)
-          throw new Error(`Erro ao criar evento: ${error.message}`)
-        }
-        
-        result = insertedEvent
-        
-        toast({
-          title: "Guest List criada com sucesso",
-          description: "Sua guest list foi criada e já está disponível"
-        })
+         const savedEventId = upsertResult?.id;
+         console.log("Upsert do evento bem-sucedido. Evento ID:", savedEventId);
+
+         // --- Lógica para upload de materiais promocionais (EXISTENTE E CORRETA) --- 
+         if (savedEventId && promotionalFiles.length > 0) {
+            console.log(`Iniciando upload de ${promotionalFiles.length} materiais promocionais para o evento ${savedEventId}`);
+            const userId = authData.session.user.id; // ID do usuário autenticado
+            const BUCKET_NAME = 'promotional-materials-images';
+
+            const uploadPromises = promotionalFiles.map(async (file, index) => {
+                const fileName = `${uuidv4()}-${file.name}`;
+                const filePath = `${currentOrganization.id}/${savedEventId}/${fileName}`;
+                try {
+                    console.log(`Uploading ${index + 1}/${promotionalFiles.length}: ${filePath} para o bucket ${BUCKET_NAME}`);
+                    const { data: promoUploadData, error: promoUploadError } = await supabase.storage
+                        .from(BUCKET_NAME)
+                        .upload(filePath, file, { upsert: true });
+
+                    if (promoUploadError) {
+                        // Log detalhado do erro ANTES de tentar aceder a .message
+                        console.error(`Erro BRUTO recebido do storage.upload (${filePath}):`, promoUploadError);
+                        console.error(`Erro no upload para storage (${filePath}):`, promoUploadError);
+                        throw new Error(`Falha no upload de ${file.name}: ${promoUploadError.message || 'Detalhe indisponível'}`); // Adicionar fallback
+                    }
+
+                    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(promoUploadData.path);
+                    const imageUrl = urlData?.publicUrl;
+
+                    if (!imageUrl) {
+                        console.error(`Não foi possível obter URL pública para ${filePath}`);
+                        throw new Error(`Não foi possível obter URL pública para ${file.name}`);
+                    }
+                    console.log(`URL pública obtida (${filePath}): ${imageUrl}`);
+
+                    console.log(`Inserindo registo na tabela promotional_materials para ${filePath}`);
+                    const { error: insertMaterialError } = await supabase
+                        .from('promotional_materials')
+                        .insert({
+                            event_id: savedEventId,
+                            organization_id: currentOrganization.id,
+                            image_url: imageUrl,
+                            uploaded_by: userId,
+                        });
+
+                    if (insertMaterialError) {
+                        console.error(`Erro ao inserir na DB (${filePath}):`, insertMaterialError);
+                        throw new Error(`Falha ao salvar ${file.name} na base de dados: ${insertMaterialError.message}`);
+                    }
+
+                    console.log(`Material ${filePath} salvo com sucesso.`);
+                    return { status: 'fulfilled', value: filePath };
+
+                } catch (individualError: any) {
+                    console.error(`Erro completo ao processar imagem ${file.name}:`, individualError);
+                    return { status: 'rejected', reason: `Erro com ${file.name}: ${individualError.message || 'Erro desconhecido'}` };
+                }
+            });
+
+            console.log("Aguardando conclusão dos uploads/inserts...");
+            const results = await Promise.allSettled(uploadPromises);
+            console.log("Resultados de Promise.allSettled:", results);
+
+            const failedUploads = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[];
+
+            if (failedUploads.length > 0) {
+                console.warn("Alguns uploads/inserts de materiais promocionais falharam:", failedUploads);
+                const errorMessages = failedUploads.map(f => f.reason).join('; ');
+                toast({
+                    title: "Aviso: Falha no Upload de Materiais",
+                    description: `Alguns materiais promocionais não puderam ser salvos: ${errorMessages}`,
+                    variant: "destructive",
+                    duration: 7000
+                });
+            } else {
+                console.log("Todos os materiais promocionais foram processados com sucesso.");
+            }
+            // Limpar os ficheiros do estado após a tentativa de upload
+            setPromotionalFiles([]);
+            setPromotionalPreviews([]);
+            form.setValue('promotionalImages', undefined);
+         } else {
+            console.log("Nenhum material promocional novo para processar.");
+         }
+         // --- FIM Lógica Materiais Promocionais ---
+
+         // Toast de sucesso principal e redirecionamento
+         toast({
+            title: `Evento ${isEditMode ? 'Atualizado' : 'Criado'}!`,
+            description: `O evento "${data.title}" foi salvo com sucesso.`,
+         })
+         router.push('/app/organizador/eventos')
       }
-      
-      console.log("Evento " + (isEditMode ? "atualizado" : "inserido") + " com sucesso:", result)
-      
-      // Redirecionar para a página de eventos
-      router.push('/app/organizador/eventos')
-    } catch (error) {
-      console.error("Erro ao processar formulário:", error)
-      toast({
-        title: "Erro ao " + (isEditMode ? "atualizar" : "criar") + " guest list",
-        description: error instanceof Error ? error.message : "Ocorreu um erro ao " + (isEditMode ? "atualizar" : "criar") + " sua guest list",
-        variant: "destructive"
-      })
+    } catch (catchError: any) {
+       console.error("Erro inesperado durante o upsert:", catchError);
+       // Melhorar mensagem do catch externo também
+       let catchUserMessage = "Ocorreu um erro inesperado ao processar a operação.";
+       if (catchError instanceof Error && catchError.message) {
+           catchUserMessage = catchError.message;
+       }
+       toast({ title: "Erro Inesperado", description: catchUserMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // Render Loading State
+  if (isLoading) {
+      return (
+          <div className="p-4 md:p-8 lg:p-10 space-y-6 animate-pulse">
+             <Skeleton className="h-10 w-1/3 rounded" />
+             <Card className="max-w-4xl mx-auto">
+                 <CardContent className="p-6 space-y-8">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <Skeleton className="h-10 w-full rounded" />
+                         <Skeleton className="h-10 w-full rounded" />
+                     </div>
+                     <Skeleton className="h-24 w-full rounded" />
+                     <div className="space-y-4 p-4 border rounded-md">
+                         <Skeleton className="h-6 w-1/4 rounded mb-2" />
+                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                         </div>
+                     </div>
+                      <div className="space-y-4 p-4 border rounded-md">
+                         <Skeleton className="h-6 w-1/4 rounded mb-2" />
+                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                             <Skeleton className="h-10 w-full rounded" />
+                         </div>
+                     </div>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                          <Skeleton className="h-20 w-full rounded" />
+                          <Skeleton className="h-32 w-full rounded" />
+                          <Skeleton className="h-20 w-full rounded" />
+                     </div>
+                     <div className="space-y-4 p-4 border rounded-md">
+                          <Skeleton className="h-6 w-1/3 rounded mb-2" />
+                          <Skeleton className="h-20 w-full rounded" />
+                          <div className="flex space-x-4">
+                              <Skeleton className="h-24 w-24 rounded" />
+                              <Skeleton className="h-24 w-24 rounded" />
+                              <Skeleton className="h-24 w-24 rounded" />
+                          </div>
+                      </div>
+                 </CardContent>
+                  <CardFooter className="border-t p-6 flex justify-end">
+                      <Skeleton className="h-10 w-24 rounded" />
+                  </CardFooter>
+             </Card>
+          </div>
+      )
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isEditMode ? 'Editar Guest List' : 'Criar Guest List'}
-        </h1>
-        <p className="text-gray-500">
-          {isEditMode ? 'Atualize os detalhes da sua guest list' : 'Configure os detalhes da sua guest list'}
-        </p>
-      </div>
-
-      <Card className="p-6">
+    <div className="p-4 md:p-8 lg:p-10">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6">
+        {isEditMode ? 'Editar Evento (Guest List)' : 'Criar Novo Evento (Guest List)'}
+      </h1>
+       {!currentOrganization && !isLoading && (
+           <Card className="max-w-4xl mx-auto text-center p-6">
+               <p className="text-destructive">Organização não encontrada. Por favor, selecione uma organização válida.</p>
+            </Card>
+       )}
+      {currentOrganization && (
+          <Card className="max-w-4xl mx-auto">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmitGuestList)} className="space-y-6">
-            {/* Informações básicas do evento */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Informações do Evento</h2>
-              
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome do Evento</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Festa VIP" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <form onSubmit={form.handleSubmit(onSubmitGuestList)}>
+                <CardContent className="p-6 space-y-8">
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Descreva seu evento exclusivo..."
-                        className="resize-none"
-                        {...field}
+                  {/* --- Detalhes Básicos --- */}
+                   <div className="space-y-4">
+                    <h3 className="text-lg font-medium border-b pb-2">Detalhes do Evento</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome do Evento *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Festa de Lançamento" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data de Início <span className="text-xs text-muted-foreground">(Evento)</span></FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                'w-full pl-3 text-left font-normal',
-                                !field.value && 'text-muted-foreground'
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, 'dd/MM/yyyy HH:mm')
-                              ) : (
-                                <span>Selecione data e hora</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date()
-                            }
-                            initialFocus
-                          />
-                          <div className="p-3 border-t border-border">
-                            <p className="text-xs text-muted-foreground">Selecione a hora no campo abaixo (implementação pendente)</p>
-                            <Input 
-                              type="time" 
-                              value={field.value ? format(field.value, 'HH:mm') : ''}
-                              onChange={(e) => {
-                                const time = e.target.value;
-                                const [hours, minutes] = time.split(':');
-                                const newDate = field.value ? new Date(field.value) : new Date();
-                                newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                                field.onChange(newDate);
-                              }}
-                            />
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data de Término <span className="text-xs text-muted-foreground">(Evento)</span></FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                'w-full pl-3 text-left font-normal',
-                                !field.value && 'text-muted-foreground'
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, 'dd/MM/yyyy HH:mm')
-                              ) : (
-                                <span>Selecione data e hora</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              form.getValues('startDate') && date < form.getValues('startDate')
-                            }
-                            initialFocus
-                          />
-                          <div className="p-3 border-t border-border">
-                            <Input 
-                              type="time" 
-                              value={field.value ? format(field.value, 'HH:mm') : ''}
-                              onChange={(e) => {
-                                const time = e.target.value;
-                                const [hours, minutes] = time.split(':');
-                                const newDate = field.value ? new Date(field.value) : new Date();
-                                newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                                
-                                // Validação extra: hora de fechamento no mesmo dia da abertura
-                                const openDate = form.getValues('guestListOpenDate');
-                                if(openDate && 
-                                   newDate.toDateString() === openDate.toDateString() &&
-                                   newDate.getTime() < openDate.getTime()) {
-                                    // Resetar se for inválido? Ou mostrar erro? Por agora, apenas aplicamos.
-                                    // Idealmente, a validação Zod pegaria isso, mas pode ser bom ter feedback imediato.
-                                }
-                                
-                                field.onChange(newDate);
-                              }}
-                            />
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Local</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Club Premium" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="maxGuests"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Limite de Convidados</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1"
-                        placeholder="1000" 
-                        {...field} 
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1000)}
-                        value={field.value || 1000}
+                      <FormField
+                        control={form.control}
+                        name="location"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Localização *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ex: Clube XPTO, Lisboa" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormDescription>
-                      Número máximo de pessoas que podem entrar na guest list
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    </div>
 
-            {/* Datas da Guest List */}
-            <h2 className="text-lg font-semibold pt-4">Período de Registro na Lista</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="guestListOpenDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Abertura da Lista</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              'w-full pl-3 text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'dd/MM/yyyy HH:mm')
-                            ) : (
-                              <span>Selecione data e hora</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                          initialFocus
-                        />
-                        <div className="p-3 border-t border-border">
-                          <p className="text-xs text-muted-foreground">Selecione a hora no campo abaixo (implementação pendente)</p>
-                          <Input 
-                            type="time" 
-                            value={field.value ? format(field.value, 'HH:mm') : ''}
-                            onChange={(e) => {
-                              const time = e.target.value;
-                              const [hours, minutes] = time.split(':');
-                              const newDate = field.value ? new Date(field.value) : new Date();
-                              newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                              field.onChange(newDate);
-                            }}
-                          />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="guestListCloseDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Fechamento da Lista</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              'w-full pl-3 text-left font-normal',
-                              !field.value && 'text-muted-foreground'
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'dd/MM/yyyy HH:mm')
-                            ) : (
-                              <span>Selecione data e hora</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => 
-                            (form.getValues('guestListOpenDate') && date < form.getValues('guestListOpenDate'))
-                          }
-                          initialFocus
-                        />
-                        <div className="p-3 border-t border-border">
-                          <Input 
-                            type="time" 
-                            value={field.value ? format(field.value, 'HH:mm') : ''}
-                            onChange={(e) => {
-                              const time = e.target.value;
-                              const [hours, minutes] = time.split(':');
-                              const newDate = field.value ? new Date(field.value) : new Date();
-                              newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                              
-                              // Validação extra: hora de fechamento no mesmo dia da abertura
-                              const openDate = form.getValues('guestListOpenDate');
-                              if(openDate && 
-                                 newDate.toDateString() === openDate.toDateString() &&
-                                 newDate.getTime() < openDate.getTime()) {
-                                  // Resetar se for inválido? Ou mostrar erro? Por agora, apenas aplicamos.
-                                  // Idealmente, a validação Zod pegaria isso, mas pode ser bom ter feedback imediato.
-                              }
-                              
-                              field.onChange(newDate);
-                            }}
-                          />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Upload do flyer */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Flyer do Evento</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => document.getElementById('flyer-upload')?.click()}>
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm text-gray-500">Clique para fazer upload do flyer</p>
-                    <p className="text-xs text-gray-400">PNG, JPG ou GIF até 5MB</p>
-                    <input
-                      id="flyer-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileChange}
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Descrição Detalhada *</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Descreva o evento, tipo de música, dress code, etc."
+                              className="resize-y min-h-[100px]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                </div>
-                
-                {flyerPreview && (
-                  <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                    <img 
-                      src={flyerPreview} 
-                      alt="Flyer preview" 
-                      className="w-full h-auto object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+                   </div>
 
-            {/* Configurações de Visibilidade */}
-            <FormField
-              control={form.control}
-              name="isVisible"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Evento Visível</FormLabel>
+                  {/* --- Datas e Horas do Evento --- */}
+                  <div className="space-y-4 p-4 border rounded-md">
+                    <h3 className="text-lg font-medium border-b pb-2">Período do Evento *</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                      {/* Start Date */}
+                      <FormField
+                        control={form.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Data Início</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      'w-full justify-start text-left font-normal',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                                    {field.value ? (
+                                      format(field.value, 'dd/MM/yyyy')
+                                    ) : (
+                                      <span>Escolha data</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Start Time */}
+                      <FormField
+                        control={form.control}
+                        name="startTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hora Início</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="time" step="600" className="pl-10" {...field} /> {/* step 10 min */} 
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* End Date */}
+                      <FormField
+                        control={form.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Data Fim</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                       'w-full justify-start text-left font-normal',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                                    {field.value ? (
+                                      format(field.value, 'dd/MM/yyyy')
+                                    ) : (
+                                      <span>Escolha data</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date < (form.getValues("startDate") || new Date(new Date().setHours(0,0,0,0)))
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* End Time */}
+                      <FormField
+                        control={form.control}
+                        name="endTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hora Fim</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="time" step="600" className="pl-10" {...field} /> {/* step 10 min */} 
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* --- Datas e Horas da Guest List --- */}
+                   <div className="space-y-4 p-4 border rounded-md">
+                     <h3 className="text-lg font-medium border-b pb-2">Período da Guest List *</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                       {/* Guest List Open Date */}
+                       <FormField
+                        control={form.control}
+                        name="guestListOpenDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Abertura Data</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                       'w-full justify-start text-left font-normal',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                                    {field.value ? (
+                                      format(field.value, 'dd/MM/yyyy')
+                                    ) : (
+                                      <span>Escolha data</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Guest List Open Time */}
+                      <FormField
+                        control={form.control}
+                        name="guestListOpenTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Abertura Hora</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="time" step="600" className="pl-10" {...field} /> {/* step 10 min */} 
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Guest List Close Date */}
+                      <FormField
+                        control={form.control}
+                        name="guestListCloseDate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Fecho Data</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                       'w-full justify-start text-left font-normal',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                                    {field.value ? (
+                                      format(field.value, 'dd/MM/yyyy')
+                                    ) : (
+                                      <span>Escolha data</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date < (form.getValues("guestListOpenDate") || new Date(new Date().setHours(0,0,0,0)))
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Guest List Close Time */}
+                      <FormField
+                        control={form.control}
+                        name="guestListCloseTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fecho Hora</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="time" step="600" className="pl-10" {...field} /> {/* step 10 min */} 
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormDescription>
-                      Quando desativado, o evento fica completamente oculto de todas as páginas públicas
+                        Define quando os convidados podem entrar na lista. A lista fecha automaticamente.
                     </FormDescription>
                   </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
 
-            <div className="flex items-center justify-end space-x-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-full"
-              >
-                {isSubmitting 
-                  ? 'Salvando...' 
-                  : isEditMode 
-                    ? 'Salvar Alterações' 
-                    : 'Criar Guest List'
-                }
-              </Button>
-            </div>
-          </form>
+                  {/* --- Outras Configurações --- */}
+                  <div className="space-y-4">
+                     <h3 className="text-lg font-medium border-b pb-2">Configurações Adicionais</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start pt-2">
+                      <FormField
+                        control={form.control}
+                        name="maxGuests"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Limite de Convidados</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                placeholder="Ex: 500"
+                                {...field}
+                                // onChange já converte para número devido ao preprocess
+                                onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)} // Lidar com string vazia
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Nº máximo de nomes na lista (padrão 1000).
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="flyer"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Flyer do Evento *</FormLabel>
+                            <FormControl>
+                              <Input
+                                id="flyer-input"
+                                type="file"
+                                accept="image/*"
+                                className="sr-only"
+                                ref={field.ref}
+                                name={field.name}
+                                onBlur={field.onBlur}
+                                onChange={(e) => {
+                                    field.onChange(e.target.files);
+                                    handleFileChange(e);
+                                }}
+                              />
+                            </FormControl>
+                            <label
+                              htmlFor="flyer-input"
+                              className={cn(
+                                "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                                "border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2",
+                                "cursor-pointer w-full"
+                              )}
+                            >
+                               <Upload className="mr-2 h-4 w-4" />
+                               {flyerPreview ? 'Alterar Flyer' : 'Escolher Flyer'}
+                            </label>
+                            {flyerPreview && (
+                              <div className="mt-4">
+                                <p className="text-sm font-medium mb-2">Pré-visualização:</p>
+                                <img src={flyerPreview} alt="Pré-visualização do Flyer" className="max-w-xs max-h-48 object-cover rounded-md border" />
+                              </div>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="isEventActive" // Nome atualizado no schema
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col items-start space-y-3 rounded-md border p-4 h-full justify-center"> {/* Layout ajustado */}
+                            <div className="flex flex-row items-center justify-between w-full">
+                              <FormLabel className="text-base mb-0">Estado do Evento</FormLabel> {/* Rótulo Atualizado */}
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  aria-label="Estado do evento"
+                                />
+                              </FormControl>
+                            </div>
+                            <FormDescription> {/* Descrição Atualizada */}
+                              {field.value
+                               ? "Ativo: Evento visível e funcional."
+                               : "Inativo: Evento oculto (rascunho)."}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                   </div>
+
+                   {/* --- NOVA SECÇÃO: Material Publicitário (Com correção do FormControl) --- */}
+                   <div className="space-y-4 p-4 border rounded-md">
+                     <h3 className="text-lg font-medium border-b pb-2">Material Publicitário (p/ Promotores)</h3>
+                     <FormField
+                       control={form.control}
+                       name="promotionalImages"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>Carregar Imagens (Max: {MAX_PROMO_IMAGES})</FormLabel>
+                           {/* Label/Botão fora do FormControl */}
+                            <label
+                               htmlFor="promotional-images-input"
+                               className={cn(
+                                 "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                                 "border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2",
+                                 "cursor-pointer",
+                                 promotionalFiles.length >= MAX_PROMO_IMAGES && "opacity-50 cursor-not-allowed"
+                               )}
+                             >
+                                 <Upload className="mr-2 h-4 w-4" />
+                                 Escolher Ficheiros
+                             </label>
+                           {/* FormControl contém APENAS o input escondido */}
+                           <FormControl>
+                             <Input
+                               id="promotional-images-input"
+                               type="file"
+                               accept="image/*"
+                               multiple
+                               onChange={handlePromotionalFilesChange}
+                               className="sr-only"
+                               disabled={promotionalFiles.length >= MAX_PROMO_IMAGES}
+                               ref={field.ref}
+                             />
+                           </FormControl> { /* <<< Fechar FormControl aqui */}
+                            {/* Opcional: Mostrar contagem/nomes */}
+                            {promotionalFiles.length > 0 && (
+                                <div className="text-sm text-muted-foreground mt-2">
+                                    {promotionalFiles.length} {promotionalFiles.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}.
+                                </div>
+                            )}
+                           <FormDescription>
+                             Carregue até {MAX_PROMO_IMAGES} imagens (max {MAX_FILE_SIZE_MB}MB cada) para os promotores usarem.
+                              {isEditMode && existingPromoImageUrls.length > 0 && (
+                                  ` ${existingPromoImageUrls.length} imagens existentes serão mantidas a menos que substituídas.`
+                              )}
+                           </FormDescription>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+
+                     {/* Pré-visualização das imagens selecionadas + existentes */}                     
+                      {(promotionalPreviews.length > 0 || existingPromoImageUrls.length > 0) && (
+                          <div className="mt-4 space-y-2">
+                              <p className="text-sm font-medium">Imagens Carregadas:</p>
+                              <div className="flex flex-wrap gap-4">
+                                  {/* Mostrar imagens existentes primeiro (se editando) */}
+                                  {isEditMode && existingPromoImageUrls.map((url, index) => (
+                                      <div key={`existing-${index}`} className="relative group w-24 h-24 border rounded-md overflow-hidden bg-muted">
+                                          <img
+                                              src={url}
+                                              alt={`Material existente ${index + 1}`}
+                                              className="w-full h-full object-cover"
+                                              onError={(e) => { e.currentTarget.src = '/placeholder-image.png'; }} // Fallback
+                                          />
+                                          {/* Adicionar botão de remover para existentes no futuro? */}
+                                          {/* Para já, apenas indica que é existente */}
+                                           <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 px-1 py-0.5">
+                                              <span className="text-white text-xs font-semibold truncate">Existente</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {/* Mostrar previews das novas imagens selecionadas */}
+                                  {promotionalPreviews.map((previewUrl, index) => (
+                                      <div key={`new-${index}`} className="relative group w-24 h-24 border rounded-md overflow-hidden">
+                                          <img src={previewUrl} alt={`Nova imagem ${index + 1}`} className="w-full h-full object-cover" />
+                                          <Button
+                                              variant="destructive"
+                                              size="icon"
+                                              type="button" // Impedir submit do form
+                                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-70 group-hover:opacity-100 transition-opacity z-10"
+                                              onClick={() => removePromotionalImage(index)}
+                                              title="Remover imagem"
+                                          >
+                                              <XIcon className="h-4 w-4" />
+                                          </Button>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+                   </div>
+
+                </CardContent>
+                <CardFooter className="border-t p-6">
+                  <Button type="submit" disabled={isSubmitting || isLoading} className="ml-auto">
+                    {isSubmitting ? 'Salvando...' : (isEditMode ? 'Salvar Alterações' : 'Criar Evento')}
+                  </Button>
+                </CardFooter>
+              </form>
         </Form>
       </Card>
+       )} {/* Fim da verificação currentOrganization */} 
     </div>
   )
 } 

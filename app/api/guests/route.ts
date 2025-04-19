@@ -24,6 +24,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Interface para os dados do evento necessários para validação
+interface EventValidationData {
+  id: string;
+  is_published: boolean | null;
+  guest_list_open_datetime: string | null;
+  guest_list_close_datetime: string | null;
+  guest_list_settings?: { max_guests?: number } | null;
+  type?: string;
+}
+
 // POST: Registrar um convidado na guest list
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +48,108 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('API - Dados recebidos do cliente:', body);
+    
+    // --- INÍCIO: Validação de Backend Adicional ---
+    console.log(`API - Iniciando validação para evento: ${body.event_id}`);
+
+    // 1. Buscar dados do evento para validação
+    const { data: eventData, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select(`
+        id,
+        is_published,
+        guest_list_open_datetime,
+        guest_list_close_datetime,
+        guest_list_settings,
+        type
+      `)
+      .eq('id', body.event_id)
+      .single<EventValidationData>(); // Tipar a resposta
+
+    if (eventError) {
+      console.error('API - Erro ao buscar evento para validação:', eventError);
+      if (eventError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Erro ao verificar dados do evento.' }, { status: 500 });
+    }
+
+    if (!eventData) {
+        return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 });
+    }
+
+    console.log('API - Dados do evento para validação:', eventData);
+
+    // 2. Verificar se é um evento guest-list (redundante com a query do frontend, mas seguro)
+    if (eventData.type !== 'guest-list') {
+        console.warn('API - Tentativa de registro em evento que não é guest-list:', body.event_id);
+        return NextResponse.json({ error: 'Este evento não é uma guest list.' }, { status: 400 });
+    }
+
+    // 3. Verificar se o evento está publicado/ativo
+    if (eventData.is_published !== true) {
+      console.log('API - Tentativa de registro em guest list inativa:', body.event_id);
+      return NextResponse.json(
+        { error: 'Esta guest list não está ativa no momento.' },
+        { status: 403 } // Forbidden
+      );
+    }
+
+    // 4. Verificar janela de tempo
+    const now = new Date();
+    const openTime = eventData.guest_list_open_datetime ? new Date(eventData.guest_list_open_datetime) : null;
+    const closeTime = eventData.guest_list_close_datetime ? new Date(eventData.guest_list_close_datetime) : null;
+
+    if (!openTime || !closeTime || isNaN(openTime.getTime()) || isNaN(closeTime.getTime())) {
+        console.error('API - Datas de abertura/fecho inválidas no evento:', eventData.id);
+        return NextResponse.json(
+            { error: 'Erro na configuração das datas da guest list.' },
+            { status: 500 }
+        );
+    }
+
+    if (now < openTime) {
+        console.log('API - Tentativa de registro antes da abertura:', body.event_id);
+        return NextResponse.json(
+            { error: `A guest list abre apenas em ${openTime.toLocaleString('pt-PT')}.` },
+            { status: 403 } // Forbidden
+        );
+    }
+
+    if (now >= closeTime) {
+        console.log('API - Tentativa de registro após o fecho:', body.event_id);
+        return NextResponse.json(
+            { error: 'O período para entrar na guest list já terminou.' },
+            { status: 403 } // Forbidden
+        );
+    }
+
+    // 5. Verificar limite de convidados
+    const maxGuests = eventData.guest_list_settings?.max_guests;
+    if (maxGuests !== null && maxGuests !== undefined && maxGuests >= 0) { // Verificar se há limite definido
+        console.log(`API - Verificando limite de convidados (${maxGuests}) para o evento: ${body.event_id}`);
+        const { count, error: countError } = await supabaseAdmin
+            .from('guests') // Assumindo que a tabela principal é 'guests'
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', body.event_id);
+
+        if (countError) {
+            console.error('API - Erro ao contar convidados:', countError);
+            // Não bloquear necessariamente, mas logar o erro. Pode decidir bloquear se for crítico.
+        } else {
+            console.log(`API - Contagem atual de convidados: ${count}`);
+            if (count !== null && count >= maxGuests) {
+                console.log('API - Tentativa de registro em guest list cheia:', body.event_id);
+                return NextResponse.json(
+                    { error: 'A guest list atingiu o limite máximo de convidados.' },
+                    { status: 409 } // Conflict
+                );
+            }
+        }
+    }
+
+    console.log(`API - Validação concluída com sucesso para evento: ${body.event_id}`);
+    // --- FIM: Validação de Backend Adicional ---
     
     // Gerar ID único para o convidado
     const guestId = uuidv4();
