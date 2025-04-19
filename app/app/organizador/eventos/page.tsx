@@ -18,8 +18,9 @@ import {
   Pencil,
   UserCheck,
   RefreshCw,
-  Link,
-  ExternalLink
+  Link as LinkIcon,
+  ExternalLink,
+  ListPlus
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ import { useOrganization } from '@/app/contexts/organization-context'
 import { useToast } from '@/components/ui/use-toast'
 import { supabase } from '@/lib/supabase'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import NextLink from 'next/link'
 
 // Interface para os eventos
 interface Event {
@@ -415,6 +417,13 @@ export default function EventosPage() {
              <Plus className="mr-2 h-4 w-4" />
              Criar Evento
            </Button>
+            {/* Restore Create Guest List button */}
+           <NextLink href="/app/organizador/evento/criar/guest-list">
+              <Button>
+                <ListPlus className="mr-2 h-4 w-4" />
+                Criar Guest List
+              </Button>
+           </NextLink>
         </div>
       </div>
 
@@ -720,7 +729,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           className="flex-1"
           onClick={handleCopyLink}
         >
-          <Link className="w-4 h-4 mr-1" />
+          <LinkIcon className="w-4 h-4 mr-1" />
           Link Evento
         </Button>
         
