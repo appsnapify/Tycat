@@ -246,25 +246,23 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header do evento com imagem */}
-      <div className="relative w-full h-[30vh] md:h-[40vh] bg-gray-900">
+      <div className="relative w-full h-[30vh] md:h-[40vh] bg-gray-900 overflow-hidden">
         {event.flyer_url ? (
           <Image
             src={event.flyer_url}
             alt={event.title}
             fill
-            style={{ objectFit: 'cover' }}
-            className="opacity-70"
+            className="object-cover opacity-80"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-r from-purple-600 to-blue-600"></div>
-        )}
-        
-        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
-          <div className="container max-w-4xl mx-auto px-4 pb-8">
-            <Badge className="mb-2 bg-blue-600">Guest List</Badge>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{event.title}</h1>
+          <div className="h-full w-full flex items-center justify-center bg-gray-700">
+             <p className="text-gray-400">Sem imagem</p> 
           </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end justify-center pb-8">
+           <h1 className="text-4xl md:text-6xl font-bold text-white text-center px-4 drop-shadow-lg">{event.title}</h1>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-50 via-gray-50/80 to-transparent backdrop-blur-md"></div>
       </div>
       
       {/* Conteúdo da guest list */}

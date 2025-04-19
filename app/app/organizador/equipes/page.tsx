@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { v4 as uuidv4 } from 'uuid'
 import { Label } from '@/components/ui/label'
 import { associateTeamAction } from '@/app/actions/organizerActions'
 
@@ -73,22 +72,39 @@ export default function OrganizadorEquipesPage() {
     setLoading(true);
     
     try {
-      const { data: orgData, error: orgError } = await supabase
+      const { data: orgDataArray, error: orgError } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user?.id)
-        .eq('role', 'owner')
-        .single();
+        .in('role', ['owner', 'organizador'])
+        .limit(1);
 
-      if (orgError || !orgData?.organization_id) {
-        console.error('Erro ao carregar ID da organização:', orgError);
+      if (orgError) {
+        console.error('Erro DETALHADO ao buscar user_organizations na página de equipas:', {
+          message: orgError.message,
+          details: orgError.details,
+          hint: orgError.hint,
+          code: orgError.code
+        });
         requestAnimationFrame(() => {
-          toast.error('Não foi possível carregar os dados da organização.');
+           toast.error('Não foi possível carregar os dados da organização.');
         });
         setLoading(false);
         return;
       }
-      
+
+      if (!orgDataArray || orgDataArray.length === 0) {
+         console.log('Nenhuma organização encontrada para o usuário nesta página.');
+         requestAnimationFrame(() => {
+           toast.error('Nenhuma organização associada encontrada.');
+         });
+         setLoading(false);
+         setTeams([]);
+         setFilteredTeams([]);
+         return;
+      }
+
+      const orgData = orgDataArray[0];
       const organizationId = orgData.organization_id;
       console.log('ID da organização a ser usado na RPC:', organizationId);
       

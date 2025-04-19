@@ -112,40 +112,48 @@ export default function OrganizadorDashboardPage() {
     try {
       // Buscar organização do usuário
       console.log('Buscando organizações do usuário:', user.id)
-      const { data: orgData, error: orgError } = await supabase
+      const { data: orgDataArray, error: orgError } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user.id)
-        .eq('role', 'owner')
-        .single()
-        
+        .in('role', ['owner', 'organizador'])
+        .limit(1)
+
+      // Log detalhado do resultado
       if (orgError) {
-        console.error('Erro ao buscar organização:', {
-          code: orgError.code,
+        console.error('Erro DETALHADO ao buscar user_organizations:', {
           message: orgError.message,
-          details: orgError.details
+          details: orgError.details,
+          hint: orgError.hint,
+          code: orgError.code
         })
+        if (orgError.code === 'PGRST116') {
+           console.warn('A query retornou múltiplas linhas onde apenas uma era esperada. Verifique RLS ou dados duplicados.')
+        }
         setLoading(false)
         setLoadingError(true)
         return
       }
-      
-      if (!orgData || !orgData.organization_id) {
-        console.log('Nenhuma organização encontrada para o usuário')
+
+      // Verificar se o array tem dados
+      if (!orgDataArray || orgDataArray.length === 0) {
+        console.log('Nenhuma organização encontrada para o usuário (array vazio ou nulo).', orgDataArray)
         setLoading(false)
         return
       }
+
+      // Se chegou aqui, temos pelo menos uma organização
+      const orgData = orgDataArray[0]
+      console.log('Organização encontrada via user_organizations, ID:', orgData.organization_id)
       
-      console.log('Organização encontrada, ID:', orgData.organization_id)
-      
-        // Buscar detalhes da organização
-        const { data: orgDetails, error: detailsError } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .eq('id', orgData.organization_id)
-          .single()
-          
-        if (detailsError) {
+      // Buscar detalhes da organização
+      const { data: orgDetails, error: detailsError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('id', orgData.organization_id)
+        .single()
+        
+      if (detailsError) {
         console.error('Erro ao buscar detalhes da organização:', {
           code: detailsError.code,
           message: detailsError.message,
@@ -153,9 +161,9 @@ export default function OrganizadorDashboardPage() {
         })
         setLoading(false)
         setLoadingError(true)
-          return
-        }
-        
+        return
+      }
+      
       if (!orgDetails) {
         console.log('Detalhes da organização não encontrados')
         setLoading(false)
@@ -176,7 +184,7 @@ export default function OrganizadorDashboardPage() {
       // Carregar dados em paralelo com tratamento individual de erros
       try {
         loadKpis(organizationId)
-    } catch (e) {
+      } catch (e) {
         console.error('Erro ao iniciar loadKpis:', e)
       }
       
@@ -955,9 +963,9 @@ export default function OrganizadorDashboardPage() {
           <p className="text-muted-foreground">
             Visão geral da sua organização
           </p>
-            </div>
-            </div>
-        
+        </div>
+      </div>
+      
       {/* Cards de KPIs simplificados - apenas eventos e equipes */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mb-8">
         {/* Eventos */}

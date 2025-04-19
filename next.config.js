@@ -7,7 +7,14 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['*'], // Permitir imagens de qualquer domínio (ajuste conforme necessário)
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'xejpwdpumzalewamttjv.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     formats: ['image/webp'],

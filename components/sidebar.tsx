@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   Building2,
+  CreditCard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 

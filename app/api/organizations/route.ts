@@ -12,12 +12,20 @@ export async function POST(request: Request) {
     const logo = formData.get('logo') as File
     const banner = formData.get('banner') as File
     const userId = formData.get('userId') as string
+    const instagram = formData.get('instagram') as string
+    const facebook = formData.get('facebook') as string
+    const youtube = formData.get('youtube') as string
+    const tiktok = formData.get('tiktok') as string
 
     console.log('API: Dados recebidos para criar organização', {
       name, email, address,
       logoName: logo?.name, 
       bannerName: banner?.name,
-      userId
+      userId,
+      instagram,
+      facebook,
+      youtube,
+      tiktok
     })
 
     if (!name || !email || !userId || !logo || !banner) {
@@ -122,8 +130,6 @@ export async function POST(request: Request) {
     }
 
     // Adicionar redes sociais (opcional)
-    const instagram = formData.get('instagram') as string
-    const facebook = formData.get('facebook') as string
     const twitter = formData.get('twitter') as string
     const website = formData.get('website') as string
     
@@ -131,6 +137,8 @@ export async function POST(request: Request) {
     const social_media = {
       instagram: instagram || '',
       facebook: facebook || '',
+      youtube: youtube || '',
+      tiktok: tiktok || '',
       twitter: twitter || '',
       website: website || ''
     }
@@ -143,7 +151,7 @@ export async function POST(request: Request) {
         name,
         email,
         address,
-        logotipo: logoUrl,
+        logo_url: logoUrl,
         banner_url: bannerUrl,
         social_media, // Usando o objeto criado
         slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),

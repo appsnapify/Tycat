@@ -28,6 +28,28 @@ export default function CriarEquipePage() {
   const [teamDescription, setTeamDescription] = useState('')
   const [error, setError] = useState('')
   
+  // Role Check and Redirection Effect
+  useEffect(() => {
+    if (user && router) {
+      const userRole = user.user_metadata?.role?.toLowerCase();
+      const allowedRoles = ['promotor', 'chefe-equipe', 'team-leader']; // Allow promoter and team leader roles
+
+      console.log(`[CriarEquipePage] Checking role: ${userRole}`); // Log para depuração
+
+      if (userRole && !allowedRoles.includes(userRole)) {
+        toast.error("Acesso não autorizado a esta página.");
+        let redirectUrl = '/app/dashboard'; // Default redirect
+        if (userRole === 'organizador') {
+          redirectUrl = '/app/organizador/dashboard';
+        }
+        // Adicione mais condições else if para outras roles se necessário
+        
+        console.log(`[CriarEquipePage] Role '${userRole}' not allowed. Redirecting to ${redirectUrl}`);
+        router.replace(redirectUrl);
+      }
+    }
+  }, [user, router]); // Depend on user and router
+  
   const generateTeamCode = () => {
     // Gerar um código de equipa no formato TEAM-XXXXX
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

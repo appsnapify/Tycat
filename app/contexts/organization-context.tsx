@@ -9,7 +9,7 @@ interface Organization {
   id: string
   name: string
   slug: string
-  logotipo?: string
+  logo_url?: string
   banner_url?: string
   address?: string
 }
@@ -80,7 +80,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         try {
           const { data: orgsData, error: orgsError } = await supabase
             .from('organizations')
-            .select('id, name, slug, logotipo, banner_url, address')
+            .select('id, name, slug, logo_url, banner_url, address')
             .in('id', orgIds)
           
           if (orgsError) {

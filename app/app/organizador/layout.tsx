@@ -175,6 +175,13 @@ export default function OrganizadorLayout({
               Relatórios
             </NavItem>
             <NavItem 
+              href="/app/organizador/organizacao" 
+              icon={<span>🏢</span>}
+              disabled={!hasOrganizations}
+            >
+              Organização
+            </NavItem>
+            <NavItem 
               href="/app/organizador/configuracoes" 
               icon={<span>⚙️</span>}
               disabled={!hasOrganizations}

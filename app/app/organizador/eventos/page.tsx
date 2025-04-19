@@ -12,18 +12,14 @@ import {
   MapPin,
   Search,
   Plus,
-  Filter,
-  MoreVertical,
   Edit,
-  Trash,
   Copy,
-  Archive,
-  ExternalLink,
   Scan,
   Pencil,
   UserCheck,
   RefreshCw,
-  Link
+  Link,
+  ExternalLink
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -32,11 +28,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import Image from 'next/image'
-import { CalendarIcon, ExternalLinkIcon, PencilIcon } from "lucide-react"
-import { ScanIcon } from "lucide-react"
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useToast } from '@/components/ui/use-toast'
-import { PlusCircleIcon, ListPlusIcon } from "lucide-react"
 import { supabase } from '@/lib/supabase'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -138,7 +131,6 @@ export default function EventosPage() {
   const { currentOrganization, isLoading: orgLoading } = useOrganization()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  const [filter, setFilter] = useState('all')
   const [statusTab, setStatusTab] = useState('all') // Novo estado para tabs de status
   const { toast } = useToast()
   const [refreshKey, setRefreshKey] = useState(0) // Estado para forçar refresh
@@ -339,18 +331,13 @@ export default function EventosPage() {
     // Filtro por texto de busca
     const matchesSearch = event.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
     
-    // Filtro por status de publicação
-    const matchesPublishFilter = filter === 'all' || 
-                              (filter === 'active' && event.is_active) || 
-                              (filter === 'draft' && !event.is_active);
-    
     // Filtro por status temporal (agendado, em andamento, realizado)
     const matchesStatusFilter = statusTab === 'all' || 
                               (statusTab === 'scheduled' && event.status === 'scheduled') ||
                               (statusTab === 'active' && event.status === 'active') ||
                               (statusTab === 'completed' && event.status === 'completed');
     
-    return matchesSearch && matchesPublishFilter && matchesStatusFilter;
+    return matchesSearch && matchesStatusFilter;
   });
 
   const handleAction = (action: string, eventId: string) => {
@@ -415,22 +402,19 @@ export default function EventosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Eventos</h1>
-          <p className="text-gray-500">
-            Gerencie seus eventos e guest lists de {currentOrganization.name}
+          <h1 className="text-3xl font-bold">Eventos</h1>
+          <p className="text-muted-foreground mt-1">
+            Gerencie os eventos da sua organização: {currentOrganization?.name || '...'}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={() => router.push('/app/organizador/eventos/criar')}>
-            <PlusCircleIcon className="h-4 w-4 mr-2" />
-            Criar Evento
-          </Button>
-          <Button variant="outline" onClick={() => router.push('/app/organizador/evento/criar/guest-list')}>
-            <ListPlusIcon className="h-4 w-4 mr-2" />
-            Criar Guest List
-          </Button>
+        <div className="flex gap-2">
+            {/* Temporarily disable Create Event button */}
+           <Button onClick={() => router.push('/app/organizador/evento/criar')} disabled>
+             <Plus className="mr-2 h-4 w-4" />
+             Criar Evento
+           </Button>
         </div>
       </div>
 
@@ -465,25 +449,6 @@ export default function EventosPage() {
             className="pl-10"
           />
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtrar
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setFilter('all')}>
-              Todos
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilter('active')}>
-              Publicados
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setFilter('draft')}>
-              Rascunhos
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         <Button variant="outline" onClick={updateEventStatus} disabled={loading}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Atualizar Status
@@ -508,7 +473,7 @@ export default function EventosPage() {
           <p className="mt-2 text-sm text-gray-500">
             Tente ajustar seus critérios de busca ou filtros.
           </p>
-          <Button onClick={() => { setSearchQuery(''); setFilter('all'); setStatusTab('all'); }} className="mt-4">
+          <Button onClick={() => { setSearchQuery(''); setStatusTab('all'); }} className="mt-4">
             Limpar Filtros
           </Button>
         </div>
@@ -710,7 +675,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           {event.description || 'Sem descrição'}
         </p>
         <div className="flex items-center gap-1 text-xs mt-2">
-          <CalendarIcon className="w-3 h-3" />
+          <Calendar className="w-3 h-3" />
           <span>{event.date ? new Date(event.date).toLocaleDateString('pt-BR') : '-'}</span>
         </div>
         
@@ -777,7 +742,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           onClick={handleEditClick}
           disabled={isPast}
         >
-          <PencilIcon className="w-4 h-4 mr-1" />
+          <Pencil className="w-4 h-4 mr-1" />
           Editar
         </Button>
         

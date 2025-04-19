@@ -90,6 +90,7 @@ export default function RegisterPage() {
       }
       // Exibe o toast de erro imediatamente no catch
       toast.error(registrationError.message);
+      setIsLoading(false);
     } finally {
       // Definir isLoading como false apenas se não estivermos redirecionando
       // O redirecionamento cuidará da mudança de página

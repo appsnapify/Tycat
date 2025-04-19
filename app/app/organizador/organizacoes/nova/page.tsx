@@ -6,13 +6,12 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Upload, Link as LinkIcon } from 'lucide-react'
+import { ArrowLeft, Upload, Link as LinkIcon, Check } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { OrganizationPreview } from '@/components/organization-preview'
 import { generateSlug } from '@/lib/utils'
-import { uploadOrganizationImage } from '@/lib/storage'
 
 interface FormData {
   name: string
@@ -21,6 +20,8 @@ interface FormData {
   contacts: string
   instagram: string
   facebook: string
+  youtube: string
+  tiktok: string
   logo: File | null
   banner: File | null
 }
@@ -37,6 +38,8 @@ export default function NewOrganizationPage() {
     contacts: '',
     instagram: '',
     facebook: '',
+    youtube: '',
+    tiktok: '',
     logo: null,
     banner: null
   })
@@ -48,16 +51,40 @@ export default function NewOrganizationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // --- Validações Adicionadas ---
+    if (!formData.name.trim()) {
+      toast.error("Por favor, preencha o Nome da Organização.");
+      return;
+    }
+    if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) { // Check basic email format
+      toast.error("Por favor, insira um E-mail válido.");
+      return;
+    }
+    if (!formData.address.trim()) {
+      toast.error("Por favor, preencha a Morada.");
+      return;
+    }
+    if (!formData.contacts.trim()) {
+      toast.error("Por favor, preencha o Telemóvel.");
+      return;
+    }
+    if (!formData.logo) {
+      toast.error("Por favor, selecione um Logo para a organização.");
+      return;
+    }
+    if (!formData.banner) {
+      toast.error("Por favor, selecione um Banner para a organização.");
+      return;
+    }
+    // --- Fim das Validações ---
+
     setIsLoading(true)
     let submissionError: Error | null = null;
 
     try {
       if (!user) {
         throw new Error('Usuário não autenticado')
-      }
-
-      if (!formData.logo || !formData.banner) {
-        throw new Error('Logo e Banner são obrigatórios')
       }
 
       console.log('Enviando dados do formulário:', formData)
@@ -73,6 +100,8 @@ export default function NewOrganizationPage() {
       uploadData.append('contacts', formData.contacts)
       uploadData.append('instagram', formData.instagram || '')
       uploadData.append('facebook', formData.facebook || '')
+      uploadData.append('youtube', formData.youtube || '')
+      uploadData.append('tiktok', formData.tiktok || '')
       uploadData.append('logo', formData.logo)
       uploadData.append('banner', formData.banner)
       uploadData.append('userId', user.id)
@@ -119,14 +148,10 @@ export default function NewOrganizationPage() {
         // de reativar o botão imediatamente, mas podemos fazê-lo se quisermos.
         // Se o redirect falhar por algum motivo, o botão ficaria desativado.
         // Para maior segurança, podemos reativar se não houver erro:
-        // setIsLoading(false); 
+        setIsLoading(false);
       }
     }
   }
-
-  const organizationUrl = formData.name
-    ? `${window.location.origin}/organizacao/${generateSlug(formData.name)}`
-    : ''
 
   return (
     <div className="flex h-full">
@@ -194,7 +219,7 @@ export default function NewOrganizationPage() {
                 id="instagram"
                 value={formData.instagram}
                 onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                placeholder="@seu.instagram"
+                placeholder="https://instagram.com/suaorganizacao"
               />
             </div>
             <div>
@@ -203,7 +228,25 @@ export default function NewOrganizationPage() {
                 id="facebook"
                 value={formData.facebook}
                 onChange={(e) => setFormData({ ...formData, facebook: e.target.value })}
-                placeholder="Link do Facebook"
+                placeholder="https://facebook.com/suaorganizacao"
+              />
+            </div>
+            <div>
+              <Label htmlFor="youtube">YouTube</Label>
+              <Input
+                id="youtube"
+                value={formData.youtube}
+                onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
+                placeholder="https://youtube.com/c/seu-canal"
+              />
+            </div>
+            <div>
+              <Label htmlFor="tiktok">TikTok</Label>
+              <Input
+                id="tiktok"
+                value={formData.tiktok}
+                onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
+                placeholder="https://tiktok.com/@seu-usuario"
               />
             </div>
           </div>
@@ -226,8 +269,17 @@ export default function NewOrganizationPage() {
                   onClick={() => document.getElementById('logo')?.click()}
                   className="w-full"
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {formData.logo ? formData.logo.name : 'Selecionar Logo'}
+                  {formData.logo ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 text-green-600" />
+                      Logo Carregado
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Selecionar Logo
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -249,8 +301,17 @@ export default function NewOrganizationPage() {
                   onClick={() => document.getElementById('banner')?.click()}
                   className="w-full"
                 >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {formData.banner ? formData.banner.name : 'Selecionar Banner'}
+                  {formData.banner ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 text-green-600" />
+                      Banner Carregado
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Selecionar Banner
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -280,13 +341,15 @@ export default function NewOrganizationPage() {
               address: formData.address,
               instagram: formData.instagram,
               facebook: formData.facebook,
+              youtube: formData.youtube,
+              tiktok: formData.tiktok,
               logo: formData.logo || undefined,
               banner: formData.banner || undefined
             }} 
           />
           
           {/* Link da Organização */}
-          {organizationUrl && (
+          {/* {organizationUrl && (
             <div className="mt-6 p-4 bg-white rounded-lg shadow">
               <h3 className="text-sm font-medium text-gray-900 mb-2">Link da sua organização</h3>
               <div className="flex items-center space-x-2">
@@ -308,7 +371,7 @@ export default function NewOrganizationPage() {
                 </Button>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </div>

@@ -52,15 +52,14 @@ const GuestListFormSchema = z.object({
   }),
   location: z.string().min(3, 'O local deve ter pelo menos 3 caracteres'),
   flyer: z.instanceof(FileList).optional(),
+  maxGuests: z.number().min(1, 'O limite deve ser no mínimo 1').default(1000),
+  isVisible: z.boolean().default(true)
 }).refine(data => data.guestListOpenDate < data.guestListCloseDate, {
   message: "A data de abertura da lista deve ser anterior à data de fechamento",
   path: ["guestListCloseDate"], // Mostra o erro no campo de data de fechamento
 }).refine(data => data.startDate <= data.endDate, {
   message: "A data de início do evento deve ser anterior ou igual à data de término",
   path: ["endDate"],
-}).refine(data => data.guestListCloseDate <= data.startDate, {
-  message: "A lista deve fechar antes ou no momento em que o evento começa",
-  path: ["guestListCloseDate"],
 });
 
 type GuestListFormValues = z.infer<typeof GuestListFormSchema>
@@ -80,8 +79,37 @@ export default function GuestListPage() {
       title: '',
       description: '',
       location: '',
+      maxGuests: 1000,
+      isVisible: true
     },
   })
+
+  // Inicializar as datas padrão quando o formulário é carregado
+  useEffect(() => {
+    if (!isEditMode) {
+      // Valor padrão para abertura: agora
+      const defaultOpenDate = new Date();
+      
+      // Definir data de início do evento para 3 dias no futuro por padrão
+      const defaultEventStartDate = new Date();
+      defaultEventStartDate.setDate(defaultEventStartDate.getDate() + 3);
+      defaultEventStartDate.setHours(20, 0, 0, 0); // 20:00 (8 PM)
+      
+      // Definir data de fim do evento para 3 horas após o início por padrão
+      const defaultEventEndDate = new Date(defaultEventStartDate);
+      defaultEventEndDate.setHours(defaultEventEndDate.getHours() + 3);
+      
+      // Valor padrão para fechamento: 3h antes do término do evento
+      const defaultCloseDate = new Date(defaultEventStartDate);
+      defaultCloseDate.setHours(defaultCloseDate.getHours() - 3);
+      
+      // Definir valores no formulário
+      form.setValue('startDate', defaultEventStartDate);
+      form.setValue('endDate', defaultEventEndDate);
+      form.setValue('guestListOpenDate', defaultOpenDate);
+      form.setValue('guestListCloseDate', defaultCloseDate);
+    }
+  }, [form, isEditMode]);
 
   // Carregar dados do evento quando estiver em modo de edição
   useEffect(() => {
@@ -163,6 +191,16 @@ export default function GuestListPage() {
           }
           
           form.setValue('location', event.location || '')
+          
+          // Carregar limite de convidados
+          if (event.guest_list_settings && typeof event.guest_list_settings.max_guests === 'number') {
+            form.setValue('maxGuests', event.guest_list_settings.max_guests);
+          } else {
+            form.setValue('maxGuests', 1000); // Valor padrão
+          }
+          
+          // Carregar status de visibilidade
+          form.setValue('isVisible', event.is_published !== false); // Se is_published for undefined, assume true
           
           // Mostrar preview do flyer
           if (event.flyer_url) {
@@ -329,10 +367,11 @@ export default function GuestListPage() {
         organization_id: currentOrganization.id,
         type: 'guest-list',
         is_active: true,
+        is_published: data.isVisible,
         guest_list_open_datetime: data.guestListOpenDate.toISOString(),
         guest_list_close_datetime: data.guestListCloseDate.toISOString(),
         guest_list_settings: {
-          max_guests: 100, // Valor padrão
+          max_guests: data.maxGuests,
           requires_approval: false // Valor padrão
         }
       }
@@ -585,6 +624,30 @@ export default function GuestListPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="maxGuests"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite de Convidados</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1"
+                        placeholder="1000" 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1000)}
+                        value={field.value || 1000}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Número máximo de pessoas que podem entrar na guest list
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             {/* Datas da Guest List */}
@@ -675,8 +738,7 @@ export default function GuestListPage() {
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) => 
-                            (form.getValues('guestListOpenDate') && date < form.getValues('guestListOpenDate')) ||
-                            (form.getValues('startDate') && date > form.getValues('startDate'))
+                            (form.getValues('guestListOpenDate') && date < form.getValues('guestListOpenDate'))
                           }
                           initialFocus
                         />
@@ -742,6 +804,28 @@ export default function GuestListPage() {
                 )}
               </div>
             </div>
+
+            {/* Configurações de Visibilidade */}
+            <FormField
+              control={form.control}
+              name="isVisible"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Evento Visível</FormLabel>
+                    <FormDescription>
+                      Quando desativado, o evento fica completamente oculto de todas as páginas públicas
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             <div className="flex items-center justify-end space-x-4 pt-4">
               <Button

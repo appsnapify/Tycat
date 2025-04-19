@@ -1,26 +1,44 @@
 "use client"
 
 import { Card } from '@/components/ui/card'
-import { Instagram, Facebook, Twitter, Globe } from 'lucide-react'
+import { Instagram, Facebook, Twitter, Globe, Youtube, Music, Building } from 'lucide-react'
 
+// Accept individual props, including URL strings or File objects
 interface OrganizationPreviewProps {
-  formData: {
-    name: string
-    banner?: File
-    logo?: File
-    address?: string
-    instagram?: string
-    facebook?: string
-    twitter?: string
-    website?: string
-  }
+  name?: string
+  address?: string
+  email?: string // Added email for completeness
+  logo?: File | string // Accept File or URL string
+  banner?: File | string // Accept File or URL string
+  instagram?: string
+  facebook?: string
+  youtube?: string
+  tiktok?: string
+  twitter?: string
+  website?: string
 }
 
-export function OrganizationPreview({ formData }: OrganizationPreviewProps) {
-  // Função para gerar URL temporária para preview de imagens
-  const getImagePreviewUrl = (file?: File) => {
-    if (!file) return ''
-    return URL.createObjectURL(file)
+// Destructure props directly
+export function OrganizationPreview({
+  name = "Nome Organização", // Default values
+  address,
+  logo,
+  banner,
+  instagram,
+  facebook,
+  youtube,
+  tiktok,
+  twitter,
+  website
+}: OrganizationPreviewProps) {
+  
+  // Updated function to handle File or URL string
+  const getImagePreviewUrl = (fileOrUrl?: File | string) => {
+    if (!fileOrUrl) return ''
+    if (typeof fileOrUrl === 'string') {
+      return fileOrUrl // It's already a URL
+    }
+    return URL.createObjectURL(fileOrUrl) // It's a File object
   }
 
   // Função para renderizar ícone de rede social
@@ -30,29 +48,26 @@ export function OrganizationPreview({ formData }: OrganizationPreviewProps) {
     const icons = {
       instagram: <Instagram className="h-5 w-5" />,
       facebook: <Facebook className="h-5 w-5" />,
+      youtube: <Youtube className="h-5 w-5" />,
+      tiktok: <Music className="h-5 w-5" />,
       twitter: <Twitter className="h-5 w-5" />,
       website: <Globe className="h-5 w-5" />
     }
 
-    // Garantir que a URL está completa
-    const getFullUrl = (url: string, type: string) => {
-      if (url.startsWith('http')) return url
-      
-      switch(type) {
-        case 'instagram':
-          return `https://instagram.com/${url.replace('@', '')}`
-        case 'facebook':
-          return `https://facebook.com/${url}`
-        case 'twitter':
-          return `https://twitter.com/${url.replace('@', '')}`
-        default:
-          return url.startsWith('http') ? url : `https://${url}`
-      }
+    // Simplified: Assume URL is already full
+    const getFullUrl = (url: string) => {
+      // Basic check if it looks like a URL
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      } 
+      // If not, attempt to make it https (might not always be correct, but better than nothing)
+      console.warn(`[Preview] Received potentially incomplete URL: ${url}. Assuming https.`);
+      return `https://${url}`; 
     }
 
     return (
       <a 
-        href={getFullUrl(url, type)} 
+        href={getFullUrl(url)}
         target="_blank" 
         rel="noopener noreferrer"
         className="text-gray-600 hover:text-gray-900"
@@ -63,45 +78,54 @@ export function OrganizationPreview({ formData }: OrganizationPreviewProps) {
   }
 
   return (
-    <Card className="overflow-hidden">
-      {/* Banner */}
-      <div className="relative h-32 w-full bg-gray-100">
-        {formData.banner && (
+    <Card className="overflow-hidden shadow-lg font-sans">
+      {/* Banner Container - Ensure it's relative */}
+      <div className="relative h-36 w-full bg-gray-200">
+        {/* Use the updated function for banner */}
+        {banner && (
           <img
-            src={getImagePreviewUrl(formData.banner)}
+            src={getImagePreviewUrl(banner)}
             alt="Banner"
             className="h-full w-full object-cover"
           />
         )}
-      </div>
+        
+        {/* Frosted Glass Effect Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent backdrop-blur-sm"></div>
 
-      {/* Logo */}
-      <div className="relative -mt-12 px-4">
-        <div className="h-24 w-24 rounded-full border-4 border-white bg-white overflow-hidden">
-          {formData.logo && (
-            <img
-              src={getImagePreviewUrl(formData.logo)}
-              alt="Logo"
-              className="h-full w-full object-cover"
-            />
-          )}
+        {/* Logo Centered Over Banner - Ensure higher z-index */}
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-10">
+          <div className="h-24 w-24 rounded-full border-4 border-white bg-gray-100 overflow-hidden flex items-center justify-center shadow-md">
+            {/* Use the updated function for logo */}
+            {logo ? (
+              <img
+                src={getImagePreviewUrl(logo)}
+                alt="Logo"
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <Building className="h-12 w-12 text-gray-400" />
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Informações */}
-      <div className="p-4">
-        <h2 className="text-xl font-bold">{formData.name}</h2>
+      {/* Informações - Added mt-16 for spacing below logo */}
+      <div className="p-6 pt-16 text-center">
+        <h2 className="text-2xl font-bold">{name}</h2>
         
-        {formData.address && (
-          <p className="mt-2 text-gray-600">{formData.address}</p>
+        {address && (
+          <p className="mt-2 text-sm text-gray-500">{address}</p>
         )}
 
-        {/* Redes Sociais */}
-        <div className="mt-4 flex gap-3">
-          {renderSocialIcon('instagram', formData.instagram)}
-          {renderSocialIcon('facebook', formData.facebook)}
-          {renderSocialIcon('twitter', formData.twitter)}
-          {renderSocialIcon('website', formData.website)}
+        {/* Redes Sociais - Centered */}
+        <div className="mt-5 flex gap-4 flex-wrap justify-center">
+          {renderSocialIcon('instagram', instagram)}
+          {renderSocialIcon('facebook', facebook)}
+          {renderSocialIcon('youtube', youtube)}
+          {renderSocialIcon('tiktok', tiktok)}
+          {renderSocialIcon('twitter', twitter)}
+          {renderSocialIcon('website', website)}
         </div>
       </div>
     </Card>

@@ -17,8 +17,6 @@ interface AuthContextType {
   signOut: () => Promise<void>
   isTeamLeader: boolean
   updateUserRole: (newRole: string) => void
-  selectedOrganization: any | null
-  setSelectedOrganization: (org: any | null) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -28,7 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isTeamLeader, setIsTeamLeader] = useState(false)
-  const [selectedOrganization, setSelectedOrganization] = useState<any | null>(null)
 
   // Adicionar função para normalizar terminologia entre front-end e banco de dados
   // Isso permite manter compatibilidade com o esquema existente sem refatoração completa
@@ -336,24 +333,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Adicionar função para atualizar organização selecionada
-  const updateSelectedOrganization = (org: any | null) => {
-    setSelectedOrganization(org)
-    if (org) {
-      localStorage.setItem('selectedOrganization', JSON.stringify(org))
-    } else {
-      localStorage.removeItem('selectedOrganization')
-    }
-  }
-
-  // Carregar organização selecionada do localStorage
-  useEffect(() => {
-    const savedOrg = localStorage.getItem('selectedOrganization')
-    if (savedOrg) {
-      setSelectedOrganization(JSON.parse(savedOrg))
-    }
-  }, [])
-
   useEffect(() => {
     const supabase = createClient()
 
@@ -525,8 +504,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     isTeamLeader,
     updateUserRole,
-    selectedOrganization,
-    setSelectedOrganization: updateSelectedOrganization
   }
 
   return (
