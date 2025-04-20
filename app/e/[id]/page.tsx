@@ -43,24 +43,25 @@ function EventPageContent({ eventId }: { eventId: string }) {
         setLoading(true)
         
         // Buscar evento do Supabase
-        const { data, error } = await supabase
+        const { data: eventData, error: eventError } = await supabase
           .from('events')
           .select('*')
           .eq('id', eventId)
+          .eq('is_published', true)
           .eq('is_active', true)
           .not('type', 'eq', 'guest-list') // Eventos normais, não guest list
           .single()
           
-        if (error) {
+        if (eventError) {
           throw new Error('Evento não encontrado ou não está ativo')
         }
         
-        if (!data) {
+        if (!eventData) {
           throw new Error('Evento não encontrado')
         }
         
-        console.log("Dados do evento carregados:", data)
-        setEvent(data)
+        console.log("Dados do evento carregados:", eventData)
+        setEvent(eventData)
       } catch (err) {
         console.error("Erro ao carregar evento:", err)
         setError(err instanceof Error ? err.message : 'Erro ao carregar evento')

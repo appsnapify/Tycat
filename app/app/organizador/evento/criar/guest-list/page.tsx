@@ -203,10 +203,10 @@ export default function GuestListPage() {
       const defaultEventStartDate = new Date();
       defaultEventStartDate.setDate(defaultEventStartDate.getDate() + 3);
       defaultEventStartDate.setHours(0, 0, 0, 0); // Zerar hora para data
-
+      
       const defaultEventEndDate = new Date(defaultEventStartDate);
       defaultEventEndDate.setHours(0, 0, 0, 0); // Zerar hora para data
-
+      
       const defaultCloseDate = new Date(defaultEventStartDate);
       defaultCloseDate.setHours(0, 0, 0, 0);
 
@@ -242,7 +242,7 @@ export default function GuestListPage() {
             .eq('id', eventId)
             .eq('organization_id', currentOrganization.id)
             .single()
-
+          
           if (eventError || !event) {
             console.error("Erro ao carregar evento ou evento não encontrado:", eventError)
             toast({ title: "Erro", description: "Não foi possível carregar os dados do evento ou evento não pertence à organização.", variant: "destructive" })
@@ -256,7 +256,7 @@ export default function GuestListPage() {
             router.push('/app/organizador/eventos')
             return
           }
-
+          
           // Buscar materiais promocionais associados
           console.log("Buscando materiais promocionais para o evento:", eventId);
           const { data: promoMaterials, error: promoError } = await supabase
@@ -555,22 +555,22 @@ export default function GuestListPage() {
           toast({ title: "Erro de Data", description: "A lista deve fechar antes ou ao mesmo tempo que o evento termina.", variant: "destructive" }); setIsSubmitting(false); return;
       }
 
-    const eventData = {
+      const eventData = {
       ...(isEditMode && eventId ? { id: eventId } : {}),
       organization_id: currentOrganization.id,
-      title: data.title,
-      description: data.description,
+        title: data.title,
+        description: data.description,
       date: format(startDateTime, 'yyyy-MM-dd'),
       time: format(startDateTime, 'HH:mm:ss'),
       end_date: format(endDateTime, 'yyyy-MM-dd'),
       end_time: format(endDateTime, 'HH:mm:ss'),
-      location: data.location,
+        location: data.location,
       flyer_url: finalFlyerUrl, // <<< Usar a URL final determinada pela lógica acima
       type: 'guest-list' as const,
       is_published: data.isEventActive,
       guest_list_open_datetime: guestListOpenDateTime.toISOString(),
       guest_list_close_datetime: guestListCloseDateTime.toISOString(),
-      guest_list_settings: {
+        guest_list_settings: {
         max_guests: data.maxGuests ?? 1000,
       },
     };
@@ -669,7 +669,7 @@ export default function GuestListPage() {
             if (failedUploads.length > 0) {
                 console.warn("Alguns uploads/inserts de materiais promocionais falharam:", failedUploads);
                 const errorMessages = failedUploads.map(f => f.reason).join('; ');
-                toast({
+        toast({
                     title: "Aviso: Falha no Upload de Materiais",
                     description: `Alguns materiais promocionais não puderam ser salvos: ${errorMessages}`,
                     variant: "destructive",
@@ -688,7 +688,7 @@ export default function GuestListPage() {
          // --- FIM Lógica Materiais Promocionais ---
 
          // Toast de sucesso principal e redirecionamento
-         toast({
+      toast({
             title: `Evento ${isEditMode ? 'Atualizado' : 'Criado'}!`,
             description: `O evento "${data.title}" foi salvo com sucesso.`,
          })
@@ -709,7 +709,7 @@ export default function GuestListPage() {
 
   // Render Loading State
   if (isLoading) {
-      return (
+  return (
           <div className="p-4 md:p-8 lg:p-10 space-y-6 animate-pulse">
              <Skeleton className="h-10 w-1/3 rounded" />
              <Card className="max-w-4xl mx-auto">
@@ -717,7 +717,7 @@ export default function GuestListPage() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <Skeleton className="h-10 w-full rounded" />
                          <Skeleton className="h-10 w-full rounded" />
-                     </div>
+      </div>
                      <Skeleton className="h-24 w-full rounded" />
                      <div className="space-y-4 p-4 border rounded-md">
                          <Skeleton className="h-6 w-1/4 rounded mb-2" />
@@ -780,19 +780,19 @@ export default function GuestListPage() {
                    <div className="space-y-4">
                     <h3 className="text-lg font-medium border-b pb-2">Detalhes do Evento</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
                             <FormLabel>Nome do Evento *</FormLabel>
-                            <FormControl>
+                    <FormControl>
                               <Input placeholder="Ex: Festa de Lançamento" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                       <FormField
                         control={form.control}
                         name="location"
@@ -808,23 +808,23 @@ export default function GuestListPage() {
                       />
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
                           <FormLabel>Descrição Detalhada *</FormLabel>
-                          <FormControl>
-                            <Textarea
+                    <FormControl>
+                      <Textarea
                               placeholder="Descreva o evento, tipo de música, dress code, etc."
                               className="resize-y min-h-[100px]"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                    </div>
 
                   {/* --- Datas e Horas do Evento --- */}
@@ -832,45 +832,45 @@ export default function GuestListPage() {
                     <h3 className="text-lg font-medium border-b pb-2">Período do Evento *</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                       {/* Start Date */}
-                      <FormField
-                        control={form.control}
-                        name="startDate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
                             <FormLabel>Data Início</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
                                       'w-full justify-start text-left font-normal',
-                                      !field.value && 'text-muted-foreground'
-                                    )}
-                                  >
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
                                     <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                                    {field.value ? (
+                              {field.value ? (
                                       format(field.value, 'dd/MM/yyyy')
-                                    ) : (
+                              ) : (
                                       <span>Escolha data</span>
-                                    )}
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
                                   disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                       {/* Start Time */}
                       <FormField
                         control={form.control}
@@ -889,110 +889,110 @@ export default function GuestListPage() {
                         )}
                       />
                       {/* End Date */}
-                      <FormField
-                        control={form.control}
-                        name="endDate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
                             <FormLabel>Data Fim</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
                                        'w-full justify-start text-left font-normal',
-                                      !field.value && 'text-muted-foreground'
-                                    )}
-                                  >
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
                                     <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                                    {field.value ? (
+                              {field.value ? (
                                       format(field.value, 'dd/MM/yyyy')
-                                    ) : (
+                              ) : (
                                       <span>Escolha data</span>
-                                    )}
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  disabled={(date) =>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
                                     date < (form.getValues("startDate") || new Date(new Date().setHours(0,0,0,0)))
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                       {/* End Time */}
-                      <FormField
-                        control={form.control}
+              <FormField
+                control={form.control}
                         name="endTime"
-                        render={({ field }) => (
-                          <FormItem>
+                render={({ field }) => (
+                  <FormItem>
                             <FormLabel>Hora Fim</FormLabel>
-                            <FormControl>
+                    <FormControl>
                               <div className="relative">
                                 <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input type="time" step="600" className="pl-10" {...field} /> {/* step 10 min */} 
                               </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                     </div>
-                  </div>
+            </div>
 
                   {/* --- Datas e Horas da Guest List --- */}
                    <div className="space-y-4 p-4 border rounded-md">
                      <h3 className="text-lg font-medium border-b pb-2">Período da Guest List *</h3>
                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                        {/* Guest List Open Date */}
-                       <FormField
-                        control={form.control}
-                        name="guestListOpenDate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
+              <FormField
+                control={form.control}
+                name="guestListOpenDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
                             <FormLabel>Abertura Data</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
                                        'w-full justify-start text-left font-normal',
-                                      !field.value && 'text-muted-foreground'
-                                    )}
-                                  >
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
                                     <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                                    {field.value ? (
+                            {field.value ? (
                                       format(field.value, 'dd/MM/yyyy')
-                                    ) : (
+                            ) : (
                                       <span>Escolha data</span>
-                                    )}
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                       {/* Guest List Open Time */}
                       <FormField
                         control={form.control}
@@ -1011,47 +1011,47 @@ export default function GuestListPage() {
                         )}
                       />
                       {/* Guest List Close Date */}
-                      <FormField
-                        control={form.control}
-                        name="guestListCloseDate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
+              <FormField
+                control={form.control}
+                name="guestListCloseDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
                             <FormLabel>Fecho Data</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
                                        'w-full justify-start text-left font-normal',
-                                      !field.value && 'text-muted-foreground'
-                                    )}
-                                  >
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
                                     <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                                    {field.value ? (
+                            {field.value ? (
                                       format(field.value, 'dd/MM/yyyy')
-                                    ) : (
+                            ) : (
                                       <span>Escolha data</span>
-                                    )}
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  disabled={(date) =>
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => 
                                     date < (form.getValues("guestListOpenDate") || new Date(new Date().setHours(0,0,0,0)))
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                       {/* Guest List Close Time */}
                       <FormField
                         control={form.control}
@@ -1073,10 +1073,10 @@ export default function GuestListPage() {
                     <FormDescription>
                         Define quando os convidados podem entrar na lista. A lista fecha automaticamente.
                     </FormDescription>
-                  </div>
+            </div>
 
                   {/* --- Outras Configurações --- */}
-                  <div className="space-y-4">
+            <div className="space-y-4">
                      <h3 className="text-lg font-medium border-b pb-2">Configurações Adicionais</h3>
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start pt-2">
                       <FormField
@@ -1112,8 +1112,8 @@ export default function GuestListPage() {
                             <FormControl>
                               <Input
                                 id="flyer-input"
-                                type="file"
-                                accept="image/*"
+                      type="file"
+                      accept="image/*"
                                 className="sr-only"
                                 ref={field.ref}
                                 name={field.name}
@@ -1135,31 +1135,31 @@ export default function GuestListPage() {
                                <Upload className="mr-2 h-4 w-4" />
                                {flyerPreview ? 'Alterar Flyer' : 'Escolher Flyer'}
                             </label>
-                            {flyerPreview && (
+                {flyerPreview && (
                               <div className="mt-4">
                                 <p className="text-sm font-medium mb-2">Pré-visualização:</p>
                                 <img src={flyerPreview} alt="Pré-visualização do Flyer" className="max-w-xs max-h-48 object-cover rounded-md border" />
-                              </div>
-                            )}
+                  </div>
+                )}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
+            <FormField
+              control={form.control}
                         name="isEventActive" // Nome atualizado no schema
-                        render={({ field }) => (
+              render={({ field }) => (
                           <FormItem className="flex flex-col items-start space-y-3 rounded-md border p-4 h-full justify-center"> {/* Layout ajustado */}
                             <div className="flex flex-row items-center justify-between w-full">
                               <FormLabel className="text-base mb-0">Estado do Evento</FormLabel> {/* Rótulo Atualizado */}
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
                                   aria-label="Estado do evento"
-                                />
-                              </FormControl>
+                    />
+                  </FormControl>
                             </div>
                             <FormDescription> {/* Descrição Atualizada */}
                               {field.value
@@ -1167,9 +1167,9 @@ export default function GuestListPage() {
                                : "Inativo: Evento oculto (rascunho)."}
                             </FormDescription>
                             <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                </FormItem>
+              )}
+            />
                     </div>
                    </div>
 
@@ -1250,7 +1250,7 @@ export default function GuestListPage() {
                                   {promotionalPreviews.map((previewUrl, index) => (
                                       <div key={`new-${index}`} className="relative group w-24 h-24 border rounded-md overflow-hidden">
                                           <img src={previewUrl} alt={`Nova imagem ${index + 1}`} className="w-full h-full object-cover" />
-                                          <Button
+              <Button 
                                               variant="destructive"
                                               size="icon"
                                               type="button" // Impedir submit do form
@@ -1259,8 +1259,8 @@ export default function GuestListPage() {
                                               title="Remover imagem"
                                           >
                                               <XIcon className="h-4 w-4" />
-                                          </Button>
-                                      </div>
+              </Button>
+            </div>
                                   ))}
                               </div>
                           </div>
@@ -1273,7 +1273,7 @@ export default function GuestListPage() {
                     {isSubmitting ? 'Salvando...' : (isEditMode ? 'Salvar Alterações' : 'Criar Evento')}
                   </Button>
                 </CardFooter>
-              </form>
+          </form>
         </Form>
       </Card>
        )} {/* Fim da verificação currentOrganization */} 

@@ -34,6 +34,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { supabase } from '@/lib/supabase'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import NextLink from 'next/link'
+import { Badge } from '@/components/ui/badge'
 
 // Interface para os eventos
 interface Event {
@@ -50,6 +51,7 @@ interface Event {
   type?: string
   flyer_url?: string
   status?: 'scheduled' | 'active' | 'completed' // Novo campo de status
+  is_published?: boolean
   // Outros campos que podem existir
 }
 
@@ -508,6 +510,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
   
   // Verificar se o evento já ocorreu com base no status ou data
   const isPast = event.status === 'completed' || isEventPast(event);
+  const isPublished = event.is_published ?? true; // Assumir publicado se for null/undefined
   
   // Definir cor do badge de status
   const statusConfig = {
@@ -640,7 +643,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
   }, [event.id, event.type]);
 
   return (
-    <Card className={`overflow-hidden ${isPast ? 'opacity-80 border-gray-300' : ''}`}>
+    <Card className={`overflow-hidden ${isPast ? 'opacity-80 border-gray-300' : ''} ${!isPublished ? 'border-dashed border-orange-400' : ''}`}>
       <CardHeader className="p-0">
         <div className="relative h-40">
           <Image 
@@ -651,23 +654,32 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
           
-          {/* Overlay para eventos passados */}
-          {isPast && (
-            <div className="absolute inset-0 bg-gray-200 bg-opacity-20"></div>
+          {/* Overlay para eventos passados ou inativos */}
+          {(isPast || !isPublished) && (
+            <div className={`absolute inset-0 ${isPast ? 'bg-gray-200 bg-opacity-20' : 'bg-black bg-opacity-10'}`}></div>
           )}
           
-          {/* Badge para indicar tipo de evento */}
-          <div className="absolute top-2 left-2 right-2 flex justify-between items-center">
-            {event.type === 'guest-list' && (
-              <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-md">
-                Guest List
-              </div>
-            )}
-            
-            {/* Badge de status */}
-            <div className={`${statusConfig[status].color} text-white text-xs px-2 py-1 rounded-md ml-auto`}>
-              {statusConfig[status].label}
+          {/* Badges */}
+          <div className="absolute top-2 left-2 right-2 flex justify-between items-start gap-1 flex-wrap">
+            {/* Badge Tipo & Publicação (lado esquerdo) */}
+            <div className="flex flex-col gap-1 items-start">
+              {event.type === 'guest-list' && (
+                <Badge variant="outline" className="bg-blue-600/80 border-blue-700 text-white text-xs backdrop-blur-sm">
+                  Guest List
+                </Badge>
+              )}
+               {/* Badge Ativo/Inativo */}
+              <Badge variant={isPublished ? "success" : "destructive"} className="text-xs backdrop-blur-sm shadow">
+                {isPublished ? "Ativo" : "Inativo"}
+              </Badge>
             </div>
+            
+            {/* Badge Status Temporal (lado direito) */}
+            {!isPast && (
+                <Badge className={`${statusConfig[status].color} text-white text-xs backdrop-blur-sm shadow`}>
+                  {statusConfig[status].label}
+                </Badge>
+            )}
           </div>
           
           {/* Badge para eventos passados - mais visível */}
@@ -678,7 +690,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           )}
         </div>
       </CardHeader>
-      <CardContent className={`p-4 ${isPast ? 'bg-gray-50' : ''}`}>
+      <CardContent className={`p-4 ${isPast ? 'bg-gray-50' : ''} ${!isPublished ? 'bg-orange-50' : ''}`}>
         <h3 className="font-semibold text-lg">{event.title}</h3>
         <p className="text-sm text-muted-foreground truncate">
           {event.description || 'Sem descrição'}
@@ -722,12 +734,14 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           </div>
         )}
       </CardContent>
-      <CardFooter className={`p-4 pt-0 flex flex-wrap gap-2 ${isPast ? 'bg-gray-50' : ''}`}>
+      <CardFooter className={`p-4 pt-0 flex flex-wrap gap-2 ${isPast ? 'bg-gray-50' : ''} ${!isPublished ? 'bg-orange-50' : ''}`}>
         <Button 
           variant="outline" 
           size="sm" 
           className="flex-1"
           onClick={handleCopyLink}
+          disabled={!isPublished || isPast}
+          title={!isPublished ? "Evento inativo" : isPast ? "Evento realizado" : "Copiar Link Público"}
         >
           <LinkIcon className="w-4 h-4 mr-1" />
           Link Evento
@@ -738,7 +752,8 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           size="sm" 
           className="flex-1"
           onClick={handleCheckinClick}
-          disabled={isPast}
+          disabled={!isPublished || isPast}
+          title={!isPublished ? "Evento inativo" : isPast ? "Evento realizado" : "Ver Detalhes"}
         >
           <ExternalLink className="w-4 h-4 mr-1" />
           Detalhes
@@ -750,6 +765,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           className="flex-1"
           onClick={handleEditClick}
           disabled={isPast}
+          title={isPast ? "Evento realizado" : "Editar Evento"}
         >
           <Pencil className="w-4 h-4 mr-1" />
           Editar
@@ -761,6 +777,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
             size="sm" 
             className="flex-1"
             onClick={handleDuplicateClick}
+            title="Duplicar Evento"
           >
             <Copy className="w-4 h-4 mr-1" />
             Duplicar

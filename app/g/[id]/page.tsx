@@ -97,16 +97,16 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   const [guestCount, setGuestCount] = useState<number>(0)
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
-
+  
   const form = useForm<GuestFormValues>({
     resolver: zodResolver(guestFormSchema),
     defaultValues: { name: "", phone: "" },
   })
-
+  
   // Buscar dados do evento e contagem de convidados
   useEffect(() => {
     let isMounted = true;
-
+    
     async function loadEvent() {
       try {
         if (!isMounted) return;
@@ -115,7 +115,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
 
         // Buscar evento - Selecionar campos necessários
         const { data: eventData, error: eventError } = await supabase
-          .from('events')
+            .from('events')
           .select(`
             id,
             title,
@@ -133,11 +133,12 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
             guest_list_open_datetime,
             guest_list_close_datetime
           `)
-          .eq('id', eventId)
+            .eq('id', eventId)
           .eq('type', 'guest-list') // Garantir que é guest list
+          .eq('is_published', true) // <<< Adicionar filtro
           .single();
 
-        // Tratar erro de busca ou evento não encontrado
+        // Tratar erro de busca ou evento não encontrado/publicado
         if (eventError) {
            if (eventError.code === 'PGRST116') { // code for 'Not found'
                throw new Error('Guest list não encontrada.');
@@ -159,9 +160,9 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
             .from('guests')
             .select('*', { count: 'exact', head: true })
             .eq('event_id', eventId);
-
-         if (!isMounted) return;
-
+        
+        if (!isMounted) return;
+        
         if (countError) {
           console.warn("Erro ao buscar contagem de convidados:", countError);
           setGuestCount(0); // Assumir 0 em caso de erro na contagem
@@ -179,12 +180,12 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
         }
       }
     }
-
+    
     loadEvent();
-
+    
     return () => { isMounted = false; };
   }, [eventId]);
-
+  
   // Calcular o estado atual da guest list
   const guestListStatus: GuestListStatus = useMemo(() => {
     if (loading) return 'LOADING';
@@ -258,7 +259,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     } catch { return ""; }
   };
 
-
+  
   // Função para registrar convidado
   const onSubmit = async (data: GuestFormValues) => {
     // Validação extra no frontend (embora a API deva ser a principal)
@@ -267,19 +268,19 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
         return;
     }
     if (!event) return;
-
+    
     setSubmitting(true);
     try {
       const sanitizedPhone = data.phone.replace(/D/g, '');
       const fullPhone = `${selectedCountry.prefix}${sanitizedPhone}`;
-
+      
       const guestData = {
         event_id: event.id,
         name: data.name,
         phone: fullPhone,
         // created_at é definido pela API ou DB
       };
-
+      
       console.log("Enviando dados para /api/guests:", guestData);
 
       const response = await fetch('/api/guests', {
@@ -289,19 +290,19 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
       });
 
       const result = await response.json(); // Ler JSON mesmo se não for ok
-
+      
       if (!response.ok) {
           console.error("Erro da API /api/guests:", result);
         // Usar a mensagem de erro da API se disponível
         throw new Error(result.error || `Erro ${response.status}: ${response.statusText}`);
       }
-
+      
       console.log("Resposta da API /api/guests:", result);
-
+      
       if (result.qrCodeUrl) {
         setQrCodeUrl(result.qrCodeUrl);
       }
-
+      
       // Lógica de LocalStorage (simplificada, assumindo que API retorna se foi local)
       if (result.source === "local_storage" && result.data) {
         try {
@@ -315,15 +316,15 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
           // Não bloquear o fluxo por erro de localStorage
         }
       }
-
+      
       setRegistrationSuccess(true);
       setGuestCount(prevCount => prevCount + 1);
-
+      
       toast({
         title: result.message || "Registro confirmado!",
         description: "Você foi adicionado à guest list com sucesso.",
       });
-
+      
     } catch (err) {
       console.error("Erro ao registrar convidado:", err);
       toast({
@@ -335,14 +336,14 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
       setSubmitting(false);
     }
   }
-
-   const shareViaWhatsApp = () => {
+  
+  const shareViaWhatsApp = () => {
     if (!event) return;
     const message = `Olá! Veja este evento: ${event.title}. Detalhes: ${window.location.href}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
-
+  
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href)
       .then(() => toast({ title: "Link Copiado!", description: "Link do evento copiado para a área de transferência." }))
@@ -368,11 +369,11 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                  <div className="h-48 bg-muted rounded-lg"></div>
                  <div className="h-40 bg-muted rounded-lg"></div>
              </div>
-         </div>
+        </div>
       </div>
     );
   }
-
+  
   if (error) {
     return (
       <div className="container mx-auto p-4 md:p-8 text-center">
@@ -401,7 +402,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   const maxGuests = event.guest_list_settings?.max_guests ?? Infinity; // Default para infinito se não definido
   const spotsLeft = maxGuests === Infinity ? Infinity : Math.max(0, maxGuests - guestCount);
   const isListFull = spotsLeft === 0;
-
+  
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -410,15 +411,15 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
         <div className="md:col-span-2 space-y-6">
           {/* Imagem do Flyer */}
           <div className="relative w-full h-64 md:h-96 overflow-hidden rounded-lg shadow-lg bg-muted">
-            {event.flyer_url ? (
-              <Image
-                src={event.flyer_url}
+        {event.flyer_url ? (
+          <Image
+            src={event.flyer_url}
                 alt={`Flyer do evento ${event.title}`}
                 layout="fill"
                 objectFit="cover"
                 priority // Carregar imagem principal mais rápido
-              />
-            ) : (
+          />
+        ) : (
               <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                 Sem flyer disponível
               </div>
@@ -440,14 +441,14 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
             <div className="flex items-center space-x-2 text-muted-foreground">
               <MapPin className="h-5 w-5" />
               <span>{event.location}</span>
-            </div>
-          </div>
-
+        </div>
+      </div>
+      
           {/* Descrição */}
           <div className="prose prose-sm md:prose-base max-w-none dark:prose-invert">
             <p>{event.description}</p>
-          </div>
-
+                </div>
+                
           {/* Ações (Compartilhar) */}
           <div className="flex space-x-2">
             <Button variant="outline" onClick={shareViaWhatsApp}>
@@ -456,46 +457,46 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
             <Button variant="outline" onClick={copyLink}>
               Copiar Link
             </Button>
-          </div>
-        </div>
-
+                  </div>
+                </div>
+                
         {/* Coluna Lateral (Direita) - Formulário / Info Lista */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-5 w-5"/> Guest List</CardTitle>
               {maxGuests !== Infinity && (
-                  <CardDescription>
+                <CardDescription>
                      {guestCount} de {maxGuests} lugares preenchidos. ({spotsLeft} restantes)
-                  </CardDescription>
+                </CardDescription>
               )}
-            </CardHeader>
-
+              </CardHeader>
+              
              {/* --- Lógica Condicional para Formulário/Mensagens --- */} 
 
              {guestListStatus === 'OPEN' && !isListFull && !registrationSuccess && (
                  <CardContent>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome Completo</FormLabel>
-                              <FormControl>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome Completo</FormLabel>
+                            <FormControl>
                                 <Input placeholder="Seu nome como no documento" {...field} disabled={submitting} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Telefone</FormLabel>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone</FormLabel>
                               <div className="flex items-center space-x-2">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -519,15 +520,15 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                                   <Input type="tel" placeholder="Seu número" {...field} disabled={submitting} />
                                 </FormControl>
                               </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                          <Button type="submit" className="w-full" disabled={submitting}>
                            {submitting ? 'Registrando...' : 'Entrar na Lista'}
-                         </Button>
-                       </form>
-                     </Form>
+                      </Button>
+                    </form>
+                  </Form>
                  </CardContent>
              )}
 
@@ -599,10 +600,10 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                          Não foi possível determinar o estado da lista. Tente novamente mais tarde.
                        </AlertDescription>
                     </Alert>
-                </CardContent>
+              </CardContent>
              )}
 
-          </Card>
+            </Card>
         </div>
 
       </div>

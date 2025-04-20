@@ -143,7 +143,7 @@ export default function OrganizationEventsPage() {
       
       // Verificar se alguma das equipes pertence à organização solicitada
       const hasAccess = teamAssociations.some(
-        ta => ta.teams.organization_id === organizationId
+        ta => ta.teams && ta.teams[0]?.organization_id === organizationId
       )
       
       setUserCanAccessEvents(hasAccess)
@@ -169,12 +169,13 @@ export default function OrganizationEventsPage() {
       
       setOrganization(orgData)
       
-      // Se tiver acesso, carregar eventos
+      // Se tiver acesso, carregar eventos PUBLICADOS
       if (hasAccess) {
         const { data: eventsData, error: eventsError } = await supabase
           .from('events')
           .select('id, name, description, event_date, time, end_date, end_time, location, status, is_featured, max_promoters, organization_id')
           .eq('organization_id', organizationId)
+          .eq('is_published', true)
           .gte('event_date', new Date().toISOString().split('T')[0]) // Eventos a partir de hoje
           .order('event_date', { ascending: true })
         

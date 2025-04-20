@@ -196,6 +196,7 @@ export default function PromotorDashboardPage() {
           .from('events')
           .select('id, name, event_date:date, location')
           .eq('organization_id', orgDetails.id)
+          .eq('is_published', true)
           .gte('event_date', new Date().toISOString().split('T')[0]) // Eventos a partir de hoje
           .order('event_date', { ascending: true })
           .limit(5); // Limitando aos próximos 5 eventos
@@ -440,7 +441,7 @@ export default function PromotorDashboardPage() {
                        Ver Todos Eventos da Organização
                      </Button>
                  </CardFooter>
-             )}
+            )}
            </Card>
         </div>
 

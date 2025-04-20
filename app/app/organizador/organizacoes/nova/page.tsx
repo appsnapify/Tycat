@@ -323,7 +323,7 @@ export default function NewOrganizationPage() {
                     </>
                   ) : (
                     <>
-                      <Upload className="mr-2 h-4 w-4" />
+                  <Upload className="mr-2 h-4 w-4" />
                       Selecionar Logo
                     </>
                   )}
@@ -355,7 +355,7 @@ export default function NewOrganizationPage() {
                     </>
                   ) : (
                     <>
-                      <Upload className="mr-2 h-4 w-4" />
+                  <Upload className="mr-2 h-4 w-4" />
                       Selecionar Banner
                     </>
                   )}
