@@ -205,7 +205,7 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
                       )}
                     </div>
                     <div className="p-6 flex flex-col flex-grow relative">
-                      <div className="absolute top-8 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
+                      <div className="absolute top-16 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
                         <span className="block text-xs font-bold uppercase text-blue-600 tracking-wide">
                           {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
                         </span>
@@ -250,7 +250,7 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
                       )}
                     </div>
                     <div className="p-6 flex flex-col flex-grow relative">
-                      <div className="absolute top-8 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
+                      <div className="absolute top-16 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
                         <span className="block text-xs font-bold uppercase text-blue-600 tracking-wide">
                           {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
                         </span>

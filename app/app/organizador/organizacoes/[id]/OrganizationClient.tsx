@@ -83,6 +83,12 @@ export default function OrganizationClient({ id }: OrganizationClientProps) {
 
     setIsSaving(true)
 
+    // Gerar o novo slug a partir do nome atualizado no estado
+    const newSlug = organization.name.toLowerCase().replace(/[^\w\s-]/g, '') // Remove caracteres não-palavra (exceto espaços e hifens)
+                                 .replace(/\s+/g, '-') // Substitui espaços por hifens
+                                 .replace(/-+/g, '-') // Remove hifens múltiplos
+                                 .trim(); // Remove espaços no início/fim
+
     try {
       const { error } = await supabase
         .from('organizations')
@@ -93,7 +99,9 @@ export default function OrganizationClient({ id }: OrganizationClientProps) {
           location: organization.location,
           contacts: organization.contacts,
           social_media: organization.social_media,
-          logotipo: organization.logotipo
+          logotipo: organization.logotipo,
+          slug: newSlug, // Adicionar o novo slug
+          updated_at: new Date().toISOString() // Atualizar timestamp
         })
         .eq('id', organization.id)
 
