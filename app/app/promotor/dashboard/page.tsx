@@ -4,487 +4,194 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/hooks/use-auth'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, CalendarDays, AlertCircle, ChevronRight, Building, CalendarHeart } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from '@/components/ui/badge'
+import { Users, PlusCircle, Loader2, AlertCircle, CalendarDays, Building, ShieldCheck, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
-import Link from 'next/link'
-import { Skeleton } from '@/components/ui/skeleton'
 
-// Interfaces (mantendo as definições anteriores)
-interface PromoterTeam {
+// Interface Mínima
+interface Team {
   id: string;
   name: string;
-  description?: string | null;
-  logo_url?: string | null;
+  team_code?: string | null;
   role?: string;
-  isPartial?: boolean;
 }
-
-interface Organization {
-  id: string;
-  name: string;
-  logotipo?: string | null; // Nome correto do campo na tabela organizations
-}
-
-interface EventSummary {
-  id: string;
-  name: string;
-  date: string;
-  location?: string | null;
-}
-
-// Componente EmptyState (mantido)
-const EmptyState = ({
-  icon: Icon = AlertCircle,
-  title = "Sem dados",
-  description = "Não foram encontrados dados para mostrar",
-  actionLabel = "",
-  actionLink = "",
-  onAction,
-  router // Pass router for navigation
-}: {
-  icon?: React.ElementType,
-  title?: string,
-  description?: string,
-  actionLabel?: string,
-  actionLink?: string,
-  onAction?: () => void,
-  router: ReturnType<typeof useRouter> // Ensure router type
-}) => (
-  <div className="text-center py-8">
-    <Icon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-    <p className="text-muted-foreground mb-4">{description}</p>
-    {actionLabel && (
-      <Button
-        variant="outline"
-        onClick={onAction || (actionLink ? () => router.push(actionLink) : undefined)}
-      >
-        {actionLabel}
-      </Button>
-    )}
-  </div>
-)
 
 export default function PromotorDashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
   const supabase = createClientComponentClient()
   
-  // State variables
-  const [loading, setLoading] = useState(true)
-  const [promoterTeams, setPromoterTeams] = useState<PromoterTeam[]>([])
-  const [organizationData, setOrganizationData] = useState<Organization | null>(null)
-  const [organizationEvents, setOrganizationEvents] = useState<EventSummary[]>([]) // Placeholder for future use
-  const [activeEventsCount, setActiveEventsCount] = useState(0) // Contador para eventos ativos
-  const [userStats, setUserStats] = useState({ totalSales: 0, eventsJoined: 0 }) // Simplified stats
-
-  // --- Data Loading Effect ---
-  useEffect(() => {
-    console.log("PromotorDashboard: useEffect triggered.")
-    if (user) {
-      console.log("PromotorDashboard: User found, calling loadDashboardData.")
-      loadDashboardData()
-    } else {
-      // If user is null after initial load, maybe set loading false or handle appropriately
-      // Adding a small delay in case user object is loading async
-      console.log("PromotorDashboard: User not found yet, waiting...")
-      const timer = setTimeout(() => {
-         // Re-check user after delay, only set loading false if still no user
-         if (!user) { 
-            console.log("PromotorDashboard: User still not found after delay, setting loading false (may redirect later if needed).")
-        setLoading(false)
-            // Consider redirecting here too if auth state is definitely 'unauthenticated'
-            // However, the primary check is after the RPC call.
-    }
-      }, 1500); // Increased delay slightly
-      return () => clearTimeout(timer);
-    }
-  }, [user]) // Dependency on user object
+  // Estado Essencial
+  const [loadingTeams, setLoadingTeams] = useState(true)
+  const [error, setError] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([])
   
-  // --- Data Loading Function ---
-  const loadDashboardData = async () => {
-    console.log("PromotorDashboard: loadDashboardData started.")
-    setLoading(true)
-    // Reset states at the beginning
-    setPromoterTeams([])
-    setOrganizationData(null)
-    setOrganizationEvents([])
-    setActiveEventsCount(0)
-    setUserStats({ totalSales: 0, eventsJoined: 0 })
-
+  // --- Lógica de Busca de Equipas (Simplificada) ---
+  const loadTeams = async () => {
+    console.log("DashboardPromotor: loadTeams iniciado");
     if (!user?.id) {
-      console.error("PromotorDashboard: loadDashboardData called without user ID. Aborting.")
-      toast.error("Erro de autenticação. Tente recarregar a página.")
-        setLoading(false)
-      // Potentially redirect to login here if desired
-        return
+      console.warn("DashboardPromotor: loadTeams chamado sem user ID.");
+      setError("Utilizador não autenticado.");
+      setLoadingTeams(false);
+      return;
+    }
+    setLoadingTeams(true);
+    setError(null);
+    setTeams([]); 
+
+    try {
+      // Buscar associação
+      const { data: memberData, error: memberError } = await supabase
+        .from('team_members')
+        .select(`team_id, role`)
+        .eq('user_id', user.id);
+
+      if (memberError) throw new Error("Erro ao buscar suas associações de equipa.");
+      if (!memberData || memberData.length === 0) {
+        console.log("DashboardPromotor: Nenhuma associação de equipe encontrada.");
+        setTeams([]);
+        setLoadingTeams(false);
+        return; 
       }
+
+      const teamIds = memberData.map(member => member.team_id);
       
-    const userId = user.id
-    console.log(`PromotorDashboard: Calling RPC get_promoter_dashboard_data for user: ${userId}`)
+      // Buscar detalhes das equipas (apenas o necessário)
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('teams')
+        .select('id, name, team_code') // Apenas id, nome, código
+        .in('id', teamIds);
 
-    try {
-      const { data: dashboardData, error: rpcError } = await supabase.rpc(
-        'get_promoter_dashboard_data',
-        { promoter_user_id: userId }
-      )
+      if (teamsError) throw new Error("Erro ao carregar detalhes das equipas.");
 
-      if (rpcError) {
-        console.error("PromotorDashboard: Error calling RPC:", rpcError)
-        toast.error(`Erro ao carregar dados: ${rpcError.message}`)
-        setLoading(false) // Stop loading on error
-        return // Stop processing
-      }
-
-      console.log("PromotorDashboard: RPC successful. Data received:", dashboardData)
-
-      if (!dashboardData?.team_association?.team_id) {
-        console.log("PromotorDashboard: No team association found in RPC data. Redirecting...")
-        router.push('/app/promotor/equipes') // Redirect
-        // No need to setLoading(false) here, the component will unmount.
-        return // Stop processing immediately after initiating redirect
-      }
-
-      console.log("PromotorDashboard: Team association found. Processing data...")
-
-      const teamAssoc = dashboardData.team_association
-      const teamDetails = dashboardData.team_details
-      const orgDetails = dashboardData.organization_details
-      const metrics = dashboardData.metrics
-
-      // Usar os dados da equipe que já vêm da RPC
-      if (teamDetails) {
-        const finalTeamData: PromoterTeam = {
-          id: teamAssoc.team_id,
-          name: teamDetails.name || `Equipa (${teamAssoc.team_id.substring(0, 6)}...)`,
-          description: teamDetails.description,
-          logo_url: teamDetails.logo_url,
-          role: teamAssoc.role || 'promotor',
-          isPartial: false
-        };
-        
-        setPromoterTeams([finalTeamData]);
-        console.log("PromotorDashboard: promoterTeams state set (from RPC data):", [finalTeamData]);
+      if (teamsData && teamsData.length > 0) {
+        const formattedTeams = teamsData.map(team => {
+          const membership = memberData.find(m => m.team_id === team.id);
+          return {
+            id: team.id,
+            name: team.name || 'Equipe sem nome',
+            team_code: team.team_code,
+            role: membership?.role || 'member'
+          };
+        });
+        setTeams(formattedTeams);
       } else {
-        console.warn("PromotorDashboard: Dados da equipa não encontrados na RPC");
-        const fallbackTeamData: PromoterTeam = {
-          id: teamAssoc.team_id,
-          name: `Equipa (${teamAssoc.team_id.substring(0, 6)}...)`,
-          role: teamAssoc.role || 'promotor',
-          isPartial: true,
-          description: "Detalhes não disponíveis."
-        };
-        setPromoterTeams([fallbackTeamData]);
-        console.log("PromotorDashboard: promoterTeams state set with fallback data");
+        setTeams([]);
       }
 
-      // Set Organization State
-      if (orgDetails?.id) {
-        const org: Organization = {
-            id: orgDetails.id,
-            name: orgDetails.name || 'Organização s/ Nome',
-            logotipo: orgDetails.logotipo  // Nome correto do campo
-        }
-        setOrganizationData(org)
-        console.log("PromotorDashboard: organizationData state set:", org)
-        
-        // Buscar eventos reais da organização
-        const { data: events, error: eventsError } = await supabase
-          .from('events')
-          .select('id, name, event_date:date, location')
-          .eq('organization_id', orgDetails.id)
-          .eq('is_published', true)
-          .gte('event_date', new Date().toISOString().split('T')[0]) // Eventos a partir de hoje
-          .order('event_date', { ascending: true })
-          .limit(5); // Limitando aos próximos 5 eventos
-
-        if (eventsError) {
-          console.error("PromotorDashboard: Error loading events:", eventsError);
-        } else if (events && events.length > 0) {
-          const formattedEvents: EventSummary[] = events.map(event => ({
-            id: event.id,
-            name: event.name,
-            date: event.event_date,
-            location: event.location
-          }));
-          
-          setOrganizationEvents(formattedEvents);
-          setActiveEventsCount(formattedEvents.length);
-          console.log("PromotorDashboard: organizationEvents loaded:", formattedEvents.length);
-        } else {
-          console.log("PromotorDashboard: No events found for organization");
-          setOrganizationEvents([]);
-          setActiveEventsCount(0);
-        }
-      } else {
-        setOrganizationData(null)
-        console.log("PromotorDashboard: No organization details found in RPC.")
-      }
-
-      // Set Metrics State
-      if (metrics) {
-         const stats = {
-             totalSales: metrics.totalSales || 0,
-             eventsJoined: metrics.eventsJoined || 0,
-         }
-         setUserStats(stats)
-         console.log("PromotorDashboard: userStats state set:", stats)
-      }
-
-    } catch (error: any) {
-      console.error("PromotorDashboard: General error in loadDashboardData:", error)
-      toast.error(error.message || "Ocorreu um erro inesperado ao carregar o dashboard.")
-      // Ensure loading is set to false even if a non-RPC error occurs
-       setLoading(false)
+    } catch (err: any) {
+      console.error('DashboardPromotor: Erro geral ao carregar equipes:', err);
+      setError(err.message || "Ocorreu um erro inesperado ao buscar suas equipas.");
+      setTeams([]);
     } finally {
-      // Ensure loading is always set to false eventually, unless redirecting
-      // Check if redirect happened before setting loading state
-      // This finally block might run even after a redirect is initiated, but before it completes.
-      // It's generally safe, but checking if the component is still mounted could be more robust if needed.
-      console.log("PromotorDashboard: loadDashboardData finished.")
-      setLoading(false);
-    }
-  }
-
-  // --- Helper Functions ---
-  const formatDate = (dateString: string | null | undefined): string => {
-     if (!dateString) return 'Data Indisponível';
-    try {
-    return new Date(dateString).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-    } catch (e) {
-        console.error("Error formatting date:", e);
-        return 'Data Inválida';
-    }
-  }
-
-  // Função para navegar para a página de eventos da organização
-  const navigateToOrgEvents = () => {
-    if (organizationData?.id) {
-      router.push(`/app/promotor/eventos-organizacao/${organizationData.id}`);
-    } else {
-      toast.error("Não foi possível acessar os eventos da organização.");
+      setLoadingTeams(false);
     }
   };
 
-  // --- Render Logic ---
-  if (loading) {
-    // Enhanced loading state with multiple skeletons
+  // --- Use Effects --- 
+  // 1. Carrega as equipas
+  useEffect(() => {
+    if (user) {
+      loadTeams();
+    } else {
+      const timer = setTimeout(() => !user && setLoadingTeams(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+  
+  // --- Render Logic --- 
+  if (loadingTeams) { // Loading inicial
     return (
-      <div className="container mx-auto p-4 md:p-8 animate-pulse">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <Skeleton className="h-32 rounded-lg" />
-          <Skeleton className="h-32 rounded-lg" />
-          <Skeleton className="h-32 rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Skeleton className="h-64 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-150px)]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2">A carregar os seus dados...</span>
       </div>
-    )
+    );
   }
   
-  // Handle case where user might somehow not be logged in despite checks
-  if (!user) {
+  if (error) { // Erro na busca de equipas
+     return (
+       <div className="container mx-auto p-4 md:p-8">
+         <Alert variant="destructive">
+           <AlertCircle className="h-4 w-4" />
+           <AlertTitle>Erro ao Carregar</AlertTitle>
+           <AlertDescription>{error}</AlertDescription>
+         </Alert>
+       </div>
+     );
+  }
+  
+  if (!user) { // Segurança extra
       return (
       <div className="container mx-auto p-4 md:p-8 text-center">
         <p>Erro: Utilizador não autenticado. Por favor, faça login.</p>
-        {/* Optionally add a login button */}
-          </div>
+      </div>
       );
   }
 
-  // Handle the case where promoter is not associated with any team after loading
-  // This should ideally be caught by the redirect in loadDashboardData, but as a fallback:
-  if (promoterTeams.length === 0) {
-     return (
-       <div className="container mx-auto p-4 md:p-8">
-         <EmptyState
-            icon={Users}
-            title="Nenhuma Equipa Encontrada"
-            description="Parece que você não está associado a nenhuma equipa ativa."
-            actionLabel="Gerir Equipas"
-            actionLink="/app/promotor/equipes"
-            router={router}
-         />
-       </div>
-     )
-  }
-
-  // Main dashboard content
-  const currentTeam = promoterTeams[0]; // Assuming only one team association is primary for the dashboard view
-
+  // --- Renderização Principal Focada na Equipa --- 
   return (
-    <div className="container mx-auto p-4 md:p-8 space-y-6">
-      
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl md:text-3xl font-bold">Dashboard do Promotor</h1>
-         {/* Can add action buttons here if needed later */}
+    <div className="space-y-6">
+      {/* Cabeçalho principal da página */}
+      <div className="mb-6">
+         <h1 className="text-2xl md:text-3xl font-bold">Dashboard Promotor</h1>
+         <p className="text-muted-foreground mt-1">
+             Bem-vindo {user?.user_metadata?.full_name || user?.email || 'Promotor'}!
+         </p>
       </div>
       
-      {/* Grid for Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Equipa Atual</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-xl font-bold truncate">{currentTeam.name}</div>
-            <p className="text-xs text-muted-foreground">{currentTeam.role === 'leader' ? 'Líder da Equipa' : 'Membro Promotor'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Organização Associada</CardTitle>
-            <Building className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-             {organizationData ? (
-                 <div className="text-lg sm:text-xl font-bold truncate">{organizationData.name}</div>
-             ) : (
-                 <div className="text-lg sm:text-xl font-bold text-muted-foreground">N/A</div>
-             )}
-            <p className="text-xs text-muted-foreground">Entidade promotora dos eventos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Eventos Ativos</CardTitle>
-             <CalendarHeart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             <div className="text-lg sm:text-xl font-bold">{activeEventsCount}</div>
-            <p className="text-xs text-muted-foreground">Eventos futuros disponíveis</p>
-              </CardContent>
-            </Card>
-         {/* Add more metric cards here if needed (e.g., totalSales, eventsJoined from userStats) */}
-          </div>
-                    
-      {/* Main Content Area - Using Grid for two columns on larger screens */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column / Main Area (takes 2 cols on lg screens) */}
-        <div className="lg:col-span-2 space-y-6">
-            {/* Team Details Card */}
-          <Card>
-                    <CardHeader>
-               <div className="flex items-center gap-4">
-                 <Avatar className="h-12 w-12">
-                   <AvatarImage src={currentTeam.logo_url || undefined} alt={currentTeam.name} />
-                   <AvatarFallback>{currentTeam.name?.charAt(0).toUpperCase()}</AvatarFallback>
-                 </Avatar>
-                 <div>
-                   <CardTitle className="text-xl md:text-2xl">{currentTeam.name}</CardTitle>
-                   <CardDescription>{currentTeam.description || "Detalhes da equipa."}</CardDescription>
-                 </div>
-               </div>
-                    </CardHeader>
-             <CardContent>
-                {/* Add more team details or actions here if needed */}
-                 {currentTeam.isPartial && (
-                    <p className="text-sm text-destructive">Informações da equipa podem estar incompletas.</p>
-                 )}
-             </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => router.push('/app/promotor/equipes')}>
-                Ver Minhas Equipas
-                      </Button>
-                    </CardFooter>
-                  </Card>
-
-           {/* Upcoming Events Card */}
-            <Card>
-             <CardHeader>
-                 <CardTitle className="text-lg md:text-xl">Próximos Eventos da Organização</CardTitle>
-                 <CardDescription>Eventos organizados por {organizationData?.name || 'esta organização'}.</CardDescription>
-             </CardHeader>
-             <CardContent>
-                 {organizationEvents.length > 0 ? (
-                  <ul className="space-y-4">
-                     {organizationEvents.map(event => (
-                       <li key={event.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border rounded-md hover:bg-muted/50">
-                         <div>
-                             <p className="font-semibold">{event.name}</p>
-                             <p className="text-sm text-muted-foreground">
-                                 {formatDate(event.date)} {event.location ? ` - ${event.location}` : ''}
-                             </p>
-                         </div>
-                         {/* Add action button for event if needed */}
-                         <Button variant="ghost" size="sm" className="mt-2 sm:mt-0" onClick={() => router.push(`/evento/${event.id}`)}> {/* Example Link */}
-                           Detalhes <ChevronRight className="h-4 w-4 ml-1" />
-                         </Button>
-                       </li>
-                     ))}
-                   </ul>
-            ) : (
-              <EmptyState
-                icon={CalendarDays}
-                         description={organizationData ? `Nenhum evento futuro encontrado para ${organizationData.name}.` : "Nenhum evento futuro encontrado."}
-                         router={router}
-                         actionLabel={organizationData ? "Ver Organização" : ""}
-                         actionLink={organizationData ? `/organizacao/${organizationData.id}` : ""} // Needs slug/id logic
-                     />
-                 )}
-             </CardContent>
-             {organizationData && (
-                  <CardFooter className="flex justify-end">
-                     <Button variant="outline" size="sm" onClick={navigateToOrgEvents}>
-                       Ver Todos Eventos da Organização
-                     </Button>
-                 </CardFooter>
-            )}
-           </Card>
-        </div>
-
-        {/* Right Column / Sidebar Area (takes 1 col on lg screens) */}
-        <div className="space-y-6">
-            {/* Placeholder for Promoter Stats Card */}
-            <Card>
-             <CardHeader>
-               <CardTitle>Minhas Estatísticas</CardTitle>
-               <CardDescription>Resumo do seu desempenho.</CardDescription>
-          </CardHeader>
-             <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                   <span className="text-muted-foreground">Vendas Totais</span>
-                   <span className="font-semibold">{userStats.totalSales}</span>
-                </div>
-                <div className="flex justify-between">
-                   <span className="text-muted-foreground">Eventos Participados</span>
-                   <span className="font-semibold">{userStats.eventsJoined}</span>
-                </div>
-                 {/* Add more stats as needed */}
-          </CardContent>
-             {/* Optional Footer */}
-        </Card>
-           
-           {/* Placeholder for Quick Actions or Links */}
-           <Card>
-          <CardHeader>
-               <CardTitle>Ações Rápidas</CardTitle>
-          </CardHeader>
-             <CardContent>
-                <Button className="w-full mb-2" onClick={() => router.push('/app/eventos')}> {/* Adjust link */}
-                  Procurar Eventos
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => router.push('/app/promotor/equipes')}>
-                  Gerir Equipas
-            </Button>
-                {/* Add more relevant actions */}
-             </CardContent>
-        </Card>
-        </div>
-
+      {/* --- Secção da Equipa Associada --- */} 
+      <div className="flex flex-col items-center"> {/* Centraliza o card na página */} 
+        <h2 className="text-xl font-semibold tracking-tight mb-4 self-start">Equipa Associada</h2> {/* Mantém título alinhado à esquerda */} 
+        {teams.length === 0 ? (
+          // --- Estado Sem Equipas (Mantido, ligeiramente ajustado) --- 
+          <Card className="border-dashed bg-muted/50 max-w-xs w-full"> {/* Mais pequeno e full width dentro do container flex */} 
+            <CardContent className="flex flex-col items-center justify-center py-10 px-4 text-center"> {/* Centralizado e padding */} 
+              <Users className="h-10 w-10 text-muted-foreground mb-3" />
+              <h3 className="text-base font-medium mb-1">Nenhuma equipa associada</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Adira a uma equipa existente usando o código.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/app/promotor/equipes/ingressar">
+                  <Users className="mr-1.5 h-3.5 w-3.5" />
+                  Aderir
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          // --- Estado Com Equipa (Card Compacto e Centrado) --- 
+          <Card className="max-w-xs w-full overflow-hidden"> {/* Max width e full width */} 
+            <CardContent className="p-4 flex flex-col items-center space-y-3"> {/* Padding, flex column, centralizado */} 
+              {/* Nome da Equipa em Destaque */} 
+              <p className="text-lg font-semibold text-indigo-600 truncate"> 
+                {teams[0].name}
+              </p>
+              {/* Código da Equipa */} 
+              <div className="flex items-center text-xs text-muted-foreground">
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" /> 
+                <span>Código: {teams[0].team_code || 'N/A'}</span>
+              </div>
+               {/* Linha Separadora */}
+              <hr className="my-2 w-full" /> {/* Separador a toda a largura */} 
+               {/* Botão de Ação */} 
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                onClick={() => router.push('/app/promotor/equipes')}
+              >
+                 <LogIn className="mr-1.5 h-3.5 w-3.5" /> {/* Ícone LogIn */} 
+                 Entrar {/* Texto do botão alterado */} 
+              </Button>
+            </CardContent>
+            {/* Remover CardFooter se não for necessário */}
+          </Card>
+        )}
       </div>
-    </div>
+    </div> 
   )
 } 
