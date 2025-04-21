@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from 'react'
 import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { LogOut, Loader2, Building, AlertCircle } from 'lucide-react'
+import { LogOut, Loader2, Building, AlertCircle, Calendar, Settings } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { TeamType, TeamMemberType } from '@/lib/database.types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PieChart, TeamMembers, TeamHeader } from '@/components/dashboard'
 import { TeamMembersList } from '@/components/dashboard/team-members-list'
@@ -20,6 +20,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Link from 'next/link'
 
 // Função para normalizar papéis
 function normalizeRole(role: string | null | undefined): string {
@@ -235,6 +236,7 @@ interface LeaderDashboardData {
   organization_id?: string;
   organization_name?: string;
   organization_logo_url?: string;
+  active_event_count?: number;
   // Adicione outros campos que a RPC retorna, se houver
 }
 
@@ -268,9 +270,11 @@ export default function TeamLeaderDashboard() {
 
         console.log(`Dashboard Chefe: Chamando RPC get_team_leader_dashboard_data para team_id: ${teamId}`);
 
-        // Chamar a RPC correta
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_team_leader_dashboard_data', { p_team_id: teamId });
+
+        // LOG ADICIONADO PARA VER O RESULTADO BRUTO DA RPC
+        console.log("Dashboard Chefe: Dados BRUTOS recebidos da RPC:", JSON.stringify(rpcData, null, 2));
 
         // Tratamento de erro aprimorado
         if (rpcError) {
@@ -288,16 +292,29 @@ export default function TeamLeaderDashboard() {
 
         // Verificar se os dados são válidos
         if (!rpcData) {
-             console.warn("Dashboard Chefe: RPC retornou dados nulos.");
-             setDashboardInfo({ team_id: teamId }); // Definir ao menos o ID da equipa
-        } else if (rpcData.error) {
-             console.error("Dashboard Chefe: Erro retornado dentro da resposta RPC:", rpcData.error);
-             setError(`Erro ao processar dados: ${rpcData.error}`);
-             setLoading(false);
-             return;
+             console.warn("Dashboard Chefe: RPC retornou dados nulos ou indefinidos.");
+             // Manter dashboardInfo como null ou definir um estado de erro mais específico?
+             // Por agora, vamos manter null para que o !dashboardInfo check funcione.
+             setError("Não foram recebidos dados do dashboard."); // Definir erro
+             setDashboardInfo(null); 
+        } else if (!Array.isArray(rpcData)) {
+             console.error("Dashboard Chefe: Resposta da RPC não é um array:", rpcData);
+             setError("Formato de dados inesperado recebido.");
+             setDashboardInfo(null);
+        } else if (rpcData.length === 0) {
+             console.warn("Dashboard Chefe: RPC retornou um array vazio.");
+             // Isso pode significar que a equipa não foi encontrada pela RPC?
+             setError("Dados da equipa não encontrados.");
+             setDashboardInfo(null);
+        } else if (rpcData[0].error) { // Verificar erro *dentro* do primeiro objeto, se aplicável
+             console.error("Dashboard Chefe: Erro retornado dentro da resposta RPC:", rpcData[0].error);
+             setError(`Erro ao processar dados: ${rpcData[0].error}`);
+             setDashboardInfo(null);
         } else {
-            console.log("Dashboard Chefe: Dados recebidos da RPC:", rpcData);
-            setDashboardInfo(rpcData as LeaderDashboardData);
+            console.log("Dashboard Chefe: Definindo estado com o primeiro objeto da RPC:", rpcData[0]);
+            // Definir o estado com o PRIMEIRO objeto do array
+            setDashboardInfo(rpcData[0] as LeaderDashboardData); 
+            setError(null); // Limpar erro se dados foram carregados com sucesso
         }
 
       } catch (err: any) {
@@ -349,30 +366,55 @@ export default function TeamLeaderDashboard() {
   }
   
   return (
-    <div className="container py-8 space-y-6">
+    <div className="container pb-8 space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Dashboard Chefe de Equipa</h1>
-      <p className="text-muted-foreground">Bem-vindo, chefe da equipa {dashboardInfo.team_name || `(ID: ${dashboardInfo.team_id})`}!</p>
       
-      <Separator />
+      {/* Container para linha abaixo do título */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 sm:gap-4 border-b pb-4">
+        {/* Mensagem de boas-vindas (já existente, apenas movida) */}
+        <p className="text-muted-foreground">
+          Bem-vindo{' '}
+          <strong className="font-medium text-foreground">
+            {`${user?.user_metadata?.first_name || user?.profile?.first_name || ''} ${user?.user_metadata?.last_name || user?.profile?.last_name || ''}`.trim() || 'Chefe'}
+          </strong>!
+        </p>
+        
+        {/* Nome da Equipa (Formatado) */}
+        {dashboardInfo?.team_name && (
+            <p className="text-sm text-muted-foreground">
+                 {/* Label normal */}
+                <span className="tracking-wide">EQUIPA:</span>{' '}
+                 {/* Nome da equipa em maiúsculas e negrito */}
+                <strong className="font-semibold uppercase text-foreground/90">
+                    {dashboardInfo.team_name}
+                </strong>
+            </p>
+        )}
+      </div>
       
-       <h2 className="text-2xl font-semibold tracking-tight">Organização Associada</h2>
-      {dashboardInfo.organization_name ? (
-          <Card className="hover:shadow-lg transition-shadow duration-200">
-            <CardHeader className="flex flex-row items-center space-x-4 p-4">
-              <Avatar className="h-16 w-16 border">
-                <AvatarImage src={dashboardInfo.organization_logo_url || undefined} alt={dashboardInfo.organization_name} />
-                <AvatarFallback className="bg-muted text-muted-foreground">
-                   <Building className="h-8 w-8" />
-                </AvatarFallback> 
-              </Avatar>
-              <div className="flex-1">
-                 <CardTitle className="text-xl font-semibold">{dashboardInfo.organization_name}</CardTitle>
-                 <CardDescription>Organização principal da sua equipa</CardDescription>
-              </div>
-            </CardHeader>
+       <h2 className="text-2xl font-semibold tracking-tight pt-4">Organizações Associadas</h2>
+      {dashboardInfo?.organization_id && dashboardInfo.organization_name ? (
+          <Card key={dashboardInfo.organization_id} className="max-w-xs border rounded-lg">
+              <CardHeader className="pb-3 text-center">
+                  <CardTitle className="text-primary text-xl">
+                      {dashboardInfo.organization_name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center justify-center pt-1">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {dashboardInfo.active_event_count ?? 0} evento{dashboardInfo.active_event_count !== 1 ? 's' : ''} ativo{dashboardInfo.active_event_count !== 1 ? 's' : ''}
+                  </CardDescription>
+              </CardHeader>
+              <CardFooter className="flex justify-center border-t pt-4">
+                  <Link href={`/app/chefe-equipe/eventos?orgId=${dashboardInfo.organization_id}`} className="w-2/3 flex justify-center">
+                      <Button variant="outline" size="sm" className="w-full">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Ver eventos
+                      </Button>
+                  </Link>
+              </CardFooter>
           </Card>
       ) : (
-         <Card className="border-dashed bg-muted/50">
+         <Card className="border-dashed bg-muted/50 max-w-xs">
              <CardContent className="p-6 text-center flex flex-col items-center justify-center min-h-[120px]">
                  <Building className="h-10 w-10 text-muted-foreground/60 mb-3" />
                  <h3 className="font-medium mb-1 text-muted-foreground">Sem Organização Associada</h3>

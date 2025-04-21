@@ -141,7 +141,7 @@ export default function ChefeEquipeLayout({
       )}
 
       {/* Conteúdo principal */}
-      <main className="flex-1 overflow-auto p-8 md:p-8 pt-16 md:pt-8">
+      <main className="flex-1 overflow-auto p-8 md:p-8 pt-12 md:pt-6">
         {children}
       </main>
     </div>

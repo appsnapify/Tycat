@@ -39,20 +39,23 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // Extrair promoter_id e team_id (podem ser null)
+    const { event_id, name, phone, promoter_id, team_id } = body;
+    
     // Validação básica
-    if (!body.event_id || !body.name || !body.phone) {
+    if (!event_id || !name || !phone) { // promoter_id e team_id são opcionais
       return NextResponse.json(
-        { error: 'Campos obrigatórios ausentes' },
+        { error: 'Campos obrigatórios ausentes (event_id, name, phone)' }, 
         { status: 400 }
       );
     }
     
-    console.log('API - Dados recebidos do cliente:', body);
+    console.log('API - Dados recebidos do cliente:', body); // Log inclui novos campos
     
     // --- INÍCIO: Validação de Backend Adicional ---
-    console.log(`API - Iniciando validação para evento: ${body.event_id}`);
+    console.log(`API - Iniciando validação para evento: ${event_id}`);
 
-    // 1. Buscar dados do evento para validação
+    // 1. Buscar dados do evento para validação (usando event_id extraído)
     const { data: eventData, error: eventError } = await supabaseAdmin
       .from('events')
       .select(`
@@ -63,7 +66,7 @@ export async function POST(request: NextRequest) {
         guest_list_settings,
         type
       `)
-      .eq('id', body.event_id)
+      .eq('id', event_id)
       .single<EventValidationData>(); // Tipar a resposta
 
     if (eventError) {
@@ -82,13 +85,13 @@ export async function POST(request: NextRequest) {
 
     // 2. Verificar se é um evento guest-list (redundante com a query do frontend, mas seguro)
     if (eventData.type !== 'guest-list') {
-        console.warn('API - Tentativa de registro em evento que não é guest-list:', body.event_id);
+        console.warn('API - Tentativa de registro em evento que não é guest-list:', event_id);
         return NextResponse.json({ error: 'Este evento não é uma guest list.' }, { status: 400 });
     }
 
     // 3. Verificar se o evento está publicado/ativo
     if (eventData.is_published !== true) {
-      console.log('API - Tentativa de registro em guest list inativa:', body.event_id);
+      console.log('API - Tentativa de registro em guest list inativa:', event_id);
       return NextResponse.json(
         { error: 'Esta guest list não está ativa no momento.' },
         { status: 403 } // Forbidden
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (now < openTime) {
-        console.log('API - Tentativa de registro antes da abertura:', body.event_id);
+        console.log('API - Tentativa de registro antes da abertura:', event_id);
         return NextResponse.json(
             { error: `A guest list abre apenas em ${openTime.toLocaleString('pt-PT')}.` },
             { status: 403 } // Forbidden
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (now >= closeTime) {
-        console.log('API - Tentativa de registro após o fecho:', body.event_id);
+        console.log('API - Tentativa de registro após o fecho:', event_id);
         return NextResponse.json(
             { error: 'O período para entrar na guest list já terminou.' },
             { status: 403 } // Forbidden
@@ -127,11 +130,11 @@ export async function POST(request: NextRequest) {
     // 5. Verificar limite de convidados
     const maxGuests = eventData.guest_list_settings?.max_guests;
     if (maxGuests !== null && maxGuests !== undefined && maxGuests >= 0) { // Verificar se há limite definido
-        console.log(`API - Verificando limite de convidados (${maxGuests}) para o evento: ${body.event_id}`);
+        console.log(`API - Verificando limite de convidados (${maxGuests}) para o evento: ${event_id}`);
         const { count, error: countError } = await supabaseAdmin
             .from('guests') // Assumindo que a tabela principal é 'guests'
             .select('*', { count: 'exact', head: true })
-            .eq('event_id', body.event_id);
+            .eq('event_id', event_id);
 
         if (countError) {
             console.error('API - Erro ao contar convidados:', countError);
@@ -139,7 +142,7 @@ export async function POST(request: NextRequest) {
         } else {
             console.log(`API - Contagem atual de convidados: ${count}`);
             if (count !== null && count >= maxGuests) {
-                console.log('API - Tentativa de registro em guest list cheia:', body.event_id);
+                console.log('API - Tentativa de registro em guest list cheia:', event_id);
                 return NextResponse.json(
                     { error: 'A guest list atingiu o limite máximo de convidados.' },
                     { status: 409 } // Conflict
@@ -148,7 +151,7 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    console.log(`API - Validação concluída com sucesso para evento: ${body.event_id}`);
+    console.log(`API - Validação concluída com sucesso para evento: ${event_id}`);
     // --- FIM: Validação de Backend Adicional ---
     
     // Gerar ID único para o convidado
@@ -156,10 +159,11 @@ export async function POST(request: NextRequest) {
     
     // Preparar dados para QR code
     const qrData = {
-      eventId: body.event_id,
+      eventId: event_id,
       guestId: guestId,
-      name: body.name,
-      phone: body.phone,
+      name: name,
+      phone: phone,
+      // Incluir promoter/team no QR? Opcional, por enquanto não.
       timestamp: new Date().toISOString()
     };
     
@@ -177,25 +181,34 @@ export async function POST(request: NextRequest) {
     }
     
     // METODO DIRETO COM SQL PARA SALVAR O CONVIDADO
-    // Este método contorna potenciais problemas de RLS
     console.log('API - Tentando inserir convidado via SQL direto...');
     
     try {
-      const insertSQL = `
+        // **MODIFICAÇÃO SQL**: Adicionar colunas e valores para promoter_id e team_id
+        // Usar COALESCE(value, NULL) ou formatar corretamente NULL para SQL
+        const promoterIdSqlValue = promoter_id ? `'${promoter_id}'` : 'NULL';
+        const teamIdSqlValue = team_id ? `'${team_id}'` : 'NULL';
+        
+        const insertSQL = `
         INSERT INTO public.guests (
-          id, event_id, name, phone, qr_code, checked_in, created_at
+          id, event_id, name, phone, qr_code, checked_in, created_at,
+          promoter_id, team_id  -- Novas colunas
         ) VALUES (
           '${guestId}',
-          '${body.event_id}',
-          '${body.name.replace(/'/g, "''")}',
-          '${body.phone.replace(/'/g, "''")}',
-          '${qrCodeJson.replace(/'/g, "''")}',
+          '${event_id}',
+          '${name.replace(/'/g, "''")}',    -- Escapar apóstrofos
+          '${phone.replace(/'/g, "''")}',   -- Escapar apóstrofos
+          '${qrCodeJson.replace(/'/g, "''")}', -- Escapar apóstrofos
           false,
-          '${new Date().toISOString()}'
+          '${new Date().toISOString()}',
+          ${promoterIdSqlValue},  -- Novo valor
+          ${teamIdSqlValue}   -- Novo valor
         )
         RETURNING *;
       `;
       
+      console.log("API - SQL Gerado:", insertSQL); // Log para depuração
+
       const { data: sqlData, error: sqlError } = await supabaseAdmin.rpc('exec_sql', { 
         sql: insertSQL 
       });
@@ -213,24 +226,30 @@ export async function POST(request: NextRequest) {
       }
     } catch (sqlErr) {
       console.error('API - Erro ao executar SQL direto:', sqlErr);
-      // Continuar tentando outros métodos
     }
     
     // TENTAR MÉTODO PADRÃO (COM SERVICE ROLE)
     console.log('API - Tentando inserir na tabela guests com service role...');
     try {
-      const { data, error } = await supabaseAdmin
-        .from('guests')
-        .insert({
-          id: guestId,
-          event_id: body.event_id,
-          name: body.name,
-          phone: body.phone,
-          qr_code: qrCodeJson,
-          checked_in: false,
-          created_at: new Date().toISOString()
-        })
-        .select('*');
+        // **MODIFICAÇÃO OBJETO**: Adicionar promoter_id e team_id ao objeto
+        const insertObject = {
+            id: guestId,
+            event_id: event_id,
+            name: name,
+            phone: phone,
+            qr_code: qrCodeJson,
+            checked_in: false,
+            created_at: new Date().toISOString(),
+            promoter_id: promoter_id, // Novo campo
+            team_id: team_id          // Novo campo
+        };
+        
+        console.log("API - Objeto para Insert:", insertObject); // Log para depuração
+
+        const { data, error } = await supabaseAdmin
+            .from('guests')
+            .insert(insertObject)
+            .select('*');
       
       if (error) {
         console.error('API - Erro ao inserir convidado (método service role):', error);
@@ -254,9 +273,9 @@ export async function POST(request: NextRequest) {
         .from('guest_list_guests')
         .insert({
           id: guestId,
-          event_id: body.event_id,
-          name: body.name,
-          phone: body.phone,
+          event_id: event_id,
+          name: name,
+          phone: phone,
           qr_code: qrCodeJson,
           checked_in: false,
           created_at: new Date().toISOString()
@@ -280,7 +299,7 @@ export async function POST(request: NextRequest) {
     
     // Se nenhum método funcionou, criar uma tabela específica para o evento
     // e salvar lá
-    const tempTableName = `guests_${body.event_id.replace(/-/g, '_')}`;
+    const tempTableName = `guests_${event_id.replace(/-/g, '_')}`;
     console.log(`API - Tentando criar e usar tabela específica: ${tempTableName}`);
     
     try {
@@ -316,9 +335,9 @@ export async function POST(request: NextRequest) {
             id, event_id, name, phone, qr_code, checked_in, created_at
           ) VALUES (
             '${guestId}',
-            '${body.event_id}',
-            '${body.name.replace(/'/g, "''")}',
-            '${body.phone.replace(/'/g, "''")}',
+            '${event_id}',
+            '${name.replace(/'/g, "''")}',
+            '${phone.replace(/'/g, "''")}',
             '${qrCodeJson.replace(/'/g, "''")}',
             false,
             '${new Date().toISOString()}'
@@ -355,9 +374,9 @@ export async function POST(request: NextRequest) {
       warning: 'Não foi possível salvar o convidado no banco de dados, mas o QR code foi gerado',
       data: {
         id: guestId,
-        event_id: body.event_id,
-        name: body.name,
-        phone: body.phone,
+        event_id: event_id,
+        name: name,
+        phone: phone,
         qr_code: qrCodeJson,
         checked_in: false,
         created_at: new Date().toISOString()
@@ -366,7 +385,7 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('API - Erro geral na rota POST:', error);
+    console.error('API - Erro inesperado na função POST:', error);
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
