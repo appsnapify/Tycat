@@ -554,12 +554,12 @@ export default function OrganizadorDashboardPage() {
         console.warn('A tabela teams não existe. Usando dados simulados.');
         setTeams([
           {
-            id: `simulated-1`,
+            id: "simulated-1",
             name: 'Equipe Simulada 1',
             eventCount: 0
           },
           {
-            id: `simulated-2`,
+            id: "simulated-2",
             name: 'Equipe Simulada 2',
             eventCount: 0
           }

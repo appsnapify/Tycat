@@ -150,7 +150,7 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
     
     // Tentar carregar diretamente da tabela
     try {
-      console.log(`[loadTeamMembersAlternative] Tentando SELECT direto em team_members (com profiles)...`);
+      console.log("[loadTeamMembersAlternative] Tentando SELECT direto em team_members (com profiles)...");
       const response = await supabase
         .from('team_members')
         .select(`

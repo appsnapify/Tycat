@@ -421,7 +421,7 @@ export async function PUT(request: NextRequest) {
     
     // Verificar se o convidado existe em qualquer uma das tabelas possíveis
     // 1. Primeiro, tentar na tabela guests
-    console.log(`API Check-in - Buscando convidado na tabela 'guests'...`);
+    console.log("API Check-in - Buscando convidado na tabela 'guests'...");
     const { data: existingGuest, error: fetchError } = await supabase
       .from('guests')
       .select('*')
@@ -431,7 +431,7 @@ export async function PUT(request: NextRequest) {
     // 2. Se não encontrar na tabela guests, tente na guest_list_guests
     if (fetchError || !existingGuest) {
       console.log(`API Check-in - Convidado não encontrado na tabela 'guests' ou erro: ${fetchError?.message}`);
-      console.log(`API Check-in - Tentando buscar na tabela 'guest_list_guests'...`);
+      console.log("API Check-in - Tentando buscar na tabela 'guest_list_guests'...");
       
       const { data: guestListGuest, error: guestListError } = await supabase
         .from('guest_list_guests')
@@ -452,7 +452,7 @@ export async function PUT(request: NextRequest) {
           console.log(`API Check-in - Erro: Convidado pertence a outro evento: ${guestListGuest.event_id}`);
           return NextResponse.json({ 
             success: false, 
-            error: `Este convidado pertence a outro evento.` 
+            error: "Este convidado pertence a outro evento." 
           }, { status: 400 });
         }
         
@@ -468,7 +468,7 @@ export async function PUT(request: NextRequest) {
           updated_at: new Date().toISOString()
         };
         
-        console.log(`API Check-in - Atualizando na tabela 'guest_list_guests' com:`, updateData);
+        console.log("API Check-in - Atualizando na tabela 'guest_list_guests' com:", updateData);
         
         const { data, error } = await supabase
           .from('guest_list_guests')
@@ -484,7 +484,7 @@ export async function PUT(request: NextRequest) {
           )
         }
         
-        console.log(`API Check-in - Atualização bem-sucedida na 'guest_list_guests':`, data);
+        console.log("API Check-in - Atualização bem-sucedida na 'guest_list_guests':", data);
         return NextResponse.json({ 
           success: true, 
           data: data[0],
@@ -496,9 +496,9 @@ export async function PUT(request: NextRequest) {
       }
       
       // Se chegou aqui, não encontrou em nenhuma tabela
-      console.log(`API Check-in - Convidado não encontrado em nenhuma tabela.`);
+      console.log("API Check-in - Convidado não encontrado em nenhuma tabela.");
       return NextResponse.json(
-        { success: false, error: `Convidado não encontrado nas tabelas guests ou guest_list_guests.` },
+        { success: false, error: "Convidado não encontrado nas tabelas guests ou guest_list_guests." },
         { status: 404 }
       )
     }
@@ -527,7 +527,7 @@ export async function PUT(request: NextRequest) {
       updated_at: new Date().toISOString()
     };
     
-    console.log(`API Check-in - Dados de atualização:`, updateData);
+    console.log("API Check-in - Dados de atualização:", updateData);
     
     const { data, error } = await supabase
       .from('guests')
@@ -543,7 +543,7 @@ export async function PUT(request: NextRequest) {
       )
     }
     
-    console.log(`API Check-in - Atualização bem-sucedida:`, data);
+    console.log("API Check-in - Atualização bem-sucedida:", data);
     return NextResponse.json({ 
       success: true, 
       data: data[0],

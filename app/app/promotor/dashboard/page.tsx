@@ -45,7 +45,7 @@ export default function PromotorDashboardPage() {
       // Buscar associação
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
-        .select(`team_id, role`)
+        .select("team_id, role")
         .eq('user_id', user.id);
 
       if (memberError) throw new Error("Erro ao buscar suas associações de equipa.");
