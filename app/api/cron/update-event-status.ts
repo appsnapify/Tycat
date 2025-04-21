@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      message: `Atualização de status de eventos concluída`,
+      message: "Atualização de status de eventos concluída",
       updates,
       timestamp: new Date().toISOString()
     });

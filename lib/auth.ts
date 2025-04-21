@@ -163,7 +163,7 @@ export async function signIn(email: string, password: string) {
         // Se for líder de equipe, definir o redirecionamento automaticamente
         if (data.user.user_metadata.role === 'chefe-equipe' || 
             data.user.user_metadata.role === 'team-leader') {
-          console.log(`🏆 Usuário é um chefe de equipe, definindo redirecionamento para dashboard de equipe`)
+          console.log("🏆 Usuário é um chefe de equipe, definindo redirecionamento para dashboard de equipe")
           let redirectUrl = '/app/chefe-equipe/dashboard'
           
           // Guardar no localStorage para referência e uso pelo middleware
