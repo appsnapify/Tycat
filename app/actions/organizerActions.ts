@@ -77,7 +77,7 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
             console.error("Server Action: FALHA CRÍTICA ao associar equipa (Admin Client):", updateError);
             return { success: false, message: "Erro crítico ao atualizar dados da equipa." };
         }
-        console.log(`Server Action: UPDATE em teams bem-sucedido.`);
+        console.log("Server Action: UPDATE em teams bem-sucedido.");
 
         // 5. Insert into organization_teams (Admin Client)
         const { error: orgTeamInsertError } = await supabaseAdmin
@@ -96,7 +96,7 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
                  return { success: false, message: "Erro ao registar a ligação da equipa à organização." };
             }
         } else {
-             console.log(`Server Action: Inserção em organization_teams bem-sucedida.`);
+             console.log("Server Action: Inserção em organization_teams bem-sucedida.");
         }
 
         // 6. Insert into organization_members (Admin Client)
@@ -112,7 +112,7 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
                  return { success: false, message: "Erro ao adicionar o chefe de equipa como membro da organização." };
             }
         } else {
-             console.log(`Server Action: Inserção em organization_members bem-sucedida.`);
+             console.log("Server Action: Inserção em organization_members bem-sucedida.");
         }
 
         console.log(`Server Action: Processo completo para ${teamIdToAssociate}.`);

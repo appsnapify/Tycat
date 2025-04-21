@@ -88,7 +88,7 @@ export async function GET() {
     
     return NextResponse.json({
       success: true,
-      message: `Status dos eventos atualizado com sucesso`,
+      message: "Status dos eventos atualizado com sucesso",
       updates
     });
     

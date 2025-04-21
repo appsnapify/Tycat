@@ -236,7 +236,7 @@ export default function EquipePage() {
         </div>
          {/* Botão Configurações (Corrigido/Reintroduzido) */}
          <div className="flex items-center space-x-2">
-             <Link href={`/app/chefe-equipe/configuracoes`}>
+             <Link href={"/app/chefe-equipe/configuracoes"}>
                  <Button variant="outline" size="sm">
                     <Settings className="mr-2 h-4 w-4"/> Configurações
                  </Button>
