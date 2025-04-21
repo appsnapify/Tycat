@@ -403,7 +403,7 @@ export default function TeamLeaderDashboard() {
                       <Calendar className="h-4 w-4 mr-1" />
                       {dashboardInfo.active_event_count ?? 0} evento{dashboardInfo.active_event_count !== 1 ? 's' : ''} ativo{dashboardInfo.active_event_count !== 1 ? 's' : ''}
                   </CardDescription>
-              </CardHeader>
+            </CardHeader>
               <CardFooter className="flex justify-center border-t pt-4">
                   <Link href={`/app/chefe-equipe/eventos?orgId=${dashboardInfo.organization_id}`} className="w-2/3 flex justify-center">
                       <Button variant="outline" size="sm" className="w-full">

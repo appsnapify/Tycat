@@ -70,7 +70,7 @@ export default function ChefeEquipeLayout({
     { href: '/app/chefe-equipe/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/app/chefe-equipe/equipe', label: 'Equipe', icon: Users },
     { href: '/app/chefe-equipe/organizacoes', label: 'Organizações', icon: Building },
-    { href: '/app/chefe-equipe/eventos', label: 'Eventos', icon: CalendarDays },
+    // { href: '/app/chefe-equipe/eventos', label: 'Eventos', icon: CalendarDays },
     { href: '/app/chefe-equipe/vendas', label: 'Vendas', icon: ShoppingBag },
     { href: '/app/chefe-equipe/financeiro', label: 'Financeiro', icon: BarChart3 },
     { href: '/app/chefe-equipe/wallet', label: 'Wallet', icon: Wallet },
