@@ -1,25 +1,32 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/hooks/use-auth'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, PlusCircle, Loader2, AlertCircle, CalendarDays, Building, ShieldCheck, LogIn } from 'lucide-react'
-import { toast } from 'sonner'
+import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Users, Loader2, AlertCircle, ShieldCheck, LogIn, Building } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-// Interface Mínima
+// Interface Atualizada
+interface OrganizationInfo {
+  id: string;
+  name: string | null;
+  logo_url: string | null;
+}
+
 interface Team {
   id: string;
   name: string;
   team_code?: string | null;
+  organizations: OrganizationInfo[];
   role?: string;
 }
 
 export default function PromotorDashboardPage() {
-  const router = useRouter()
   const { user } = useAuth()
   const supabase = createClientComponentClient()
   
@@ -45,7 +52,7 @@ export default function PromotorDashboardPage() {
       // Buscar associação
       const { data: memberData, error: memberError } = await supabase
         .from('team_members')
-        .select(`team_id, role`)
+        .select('team_id, role')
         .eq('user_id', user.id);
 
       if (memberError) throw new Error("Erro ao buscar suas associações de equipa.");
@@ -53,29 +60,49 @@ export default function PromotorDashboardPage() {
         console.log("DashboardPromotor: Nenhuma associação de equipe encontrada.");
         setTeams([]);
         setLoadingTeams(false);
-        return; 
+        return;
       }
 
       const teamIds = memberData.map(member => member.team_id);
       
-      // Buscar detalhes das equipas (apenas o necessário)
+      // Buscar detalhes das equipas e da organização associada
       const { data: teamsData, error: teamsError } = await supabase
         .from('teams')
-        .select('id, name, team_code') // Apenas id, nome, código
+        .select(`
+          id,
+          name,
+          team_code,
+          organizations ( id, name, logo_url )
+        `)
         .in('id', teamIds);
 
-      if (teamsError) throw new Error("Erro ao carregar detalhes das equipas.");
+      if (teamsError) throw new Error(`Erro ao carregar detalhes das equipas: ${teamsError.message}`);
 
       if (teamsData && teamsData.length > 0) {
         const formattedTeams = teamsData.map(team => {
           const membership = memberData.find(m => m.team_id === team.id);
+          
+          // Garantir que organizations é sempre um array
+          let orgList: OrganizationInfo[] = [];
+          if (Array.isArray(team.organizations)) {
+             orgList = team.organizations as OrganizationInfo[];
+          } else if (team.organizations) { // Caso retorne objeto único
+             orgList = [team.organizations as OrganizationInfo];
+          }
+
           return {
             id: team.id,
             name: team.name || 'Equipe sem nome',
             team_code: team.team_code,
+            organizations: orgList.map(org => ({
+                 id: org.id,
+                 name: org.name || null,
+                 logo_url: org.logo_url || null,
+             })),
             role: membership?.role || 'member'
           };
         });
+
         setTeams(formattedTeams);
       } else {
         setTeams([]);
@@ -100,8 +127,8 @@ export default function PromotorDashboardPage() {
       return () => clearTimeout(timer);
     }
   }, [user]);
-  
-  // --- Render Logic --- 
+
+  // --- Render Logic ---
   if (loadingTeams) { // Loading inicial
     return (
       <div className="flex items-center justify-center h-[calc(100vh-150px)]">
@@ -127,7 +154,7 @@ export default function PromotorDashboardPage() {
       return (
       <div className="container mx-auto p-4 md:p-8 text-center">
         <p>Erro: Utilizador não autenticado. Por favor, faça login.</p>
-      </div>
+          </div>
       );
   }
 
@@ -160,8 +187,8 @@ export default function PromotorDashboardPage() {
                   Aderir
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         ) : (
           // --- Estado Com Equipa (Card Compacto e Centrado) --- 
           <Card className="max-w-xs w-full overflow-hidden"> {/* Max width e full width */} 
@@ -174,24 +201,74 @@ export default function PromotorDashboardPage() {
               <div className="flex items-center text-xs text-muted-foreground">
                 <ShieldCheck className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" /> 
                 <span>Código: {teams[0].team_code || 'N/A'}</span>
-              </div>
+          </div>
                {/* Linha Separadora */}
               <hr className="my-2 w-full" /> {/* Separador a toda a largura */} 
-               {/* Botão de Ação */} 
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full" 
-                onClick={() => router.push('/app/promotor/equipes')}
-              >
-                 <LogIn className="mr-1.5 h-3.5 w-3.5" /> {/* Ícone LogIn */} 
-                 Entrar {/* Texto do botão alterado */} 
-              </Button>
-            </CardContent>
+               {/* Botão de Ação com Popup */}
+              <Dialog>
+                 <DialogTrigger asChild>
+                   <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <LogIn className="mr-1.5 h-3.5 w-3.5" /> {/* Ícone LogIn */}
+                      Entrar {/* Texto do botão mantido */}
+                    </Button>
+                 </DialogTrigger>
+                 <DialogContent className="sm:max-w-[425px] p-6">
+                    <DialogHeader className="mb-4">
+                      <DialogTitle className="text-lg">Organizações Associadas</DialogTitle>
+                      <DialogDescription>
+                        Esta equipa pertence a estas organizações.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {/* Listagem de Organizações Clicáveis */} 
+                    <div className="space-y-3 py-4"> {/* Espaçamento entre itens */} 
+                       {(teams[0]?.organizations && teams[0].organizations.length > 0) ? (
+                         teams[0].organizations.map((org) => (
+                           <Link 
+                             key={org.id} 
+                             href={`/app/promotor/eventos?orgId=${org.id}`}
+                             passHref
+                             legacyBehavior={false} // Recomendado para App Router
+                             className="block p-3 rounded-md hover:bg-muted transition-colors cursor-pointer" // Estilo do link clicável
+                           >
+                             <div className="flex items-center gap-3"> {/* Layout interno do item */} 
+                               {/* Logo Condicional */} 
+                               {org.logo_url ? (
+                                 <Image
+                                   src={org.logo_url}
+                                   alt={`Logo de ${org.name || 'Organização'}`}
+                                   width={32} // Tamanho menor para lista
+                                   height={32}
+                                   className="rounded-md object-cover flex-shrink-0"
+                                 />
+                               ) : (
+                                 <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0"> {/* Placeholder */} 
+                                   <Building className="w-5 h-5 text-muted-foreground" />
+               </div>
+                               )}
+                               {/* Nome da Organização */} 
+                               <p className="text-base font-medium leading-tight flex-grow truncate"> {/* Tamanho base, truncado */} 
+                                 {org.name || 'Organização Sem Nome'}
+                             </p>
+                         </div>
+                           </Link>
+                         ))
+                       ) : (
+                         <p className="text-center text-muted-foreground py-4">
+                           Nenhuma organização diretamente associada a esta equipa.
+                         </p>
+                       )}
+        </div>
+                 </DialogContent>
+              </Dialog>
+          </CardContent>
             {/* Remover CardFooter se não for necessário */}
-          </Card>
+        </Card>
         )}
       </div>
-    </div> 
+    </div>
   )
 } 

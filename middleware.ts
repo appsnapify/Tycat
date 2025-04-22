@@ -87,7 +87,7 @@ export async function middleware(request: NextRequest) {
   
   // Log para depuração
   console.log(`[Middleware] Usuário autenticado: ${session.user.email}`)
-  console.log(`[Middleware] Metadados do usuário:`, JSON.stringify(session.user.user_metadata))
+  console.log('[Middleware] Metadados do usuário:', JSON.stringify(session.user.user_me))
   
   // Definir papel base do usuário e normalizar
   let userRole = normalizeRole(session.user.user_metadata?.role || 'desconhecido')

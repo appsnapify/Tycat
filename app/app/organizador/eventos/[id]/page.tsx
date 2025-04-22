@@ -2,7 +2,6 @@ import { Metadata } from 'next'
 // import { supabase } from '@/lib/supabase'; // Remover, usar server client
 import { CalendarIcon, MapPinIcon, ArrowLeftIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Suspense } from 'react';
 // import DiagnosticWrapper from './DiagnosticWrapper'; // Removido
 import EventDetailsClient from './EventDetailsClient';
 import { notFound } from 'next/navigation';
@@ -85,11 +84,11 @@ async function fetchTopTeamsStats(eventId: string, supabaseClient: any) {
     .from('guests')
     .select(`
       team_id,
-      teams ( id, name ),
+      teams!inner ( id, name ),
       checked_in
     `)
     .eq('event_id', eventId)
-    .not('team_id', 'is', null); // Equivalente a IS NOT NULL
+    .not('team_id', 'is', null); // Ainda manter para otimização inicial
 
   if (error) {
     console.error("[Stats] Erro ao buscar dados de equipas:", error);
@@ -105,11 +104,13 @@ async function fetchTopTeamsStats(eventId: string, supabaseClient: any) {
   const statsMap = new Map<string, { id: string; name: string; total_guests: number; total_checked_in: number }>();
 
   data.forEach((guest: any) => {
-    if (!guest.teams) return; // Skip se o join falhou ou equipa não existe
+    const teamName = guest.teams?.name; 
+    if (!guest.teams || !teamName) {
+        console.warn(`[Stats] Guest ${guest.id} tem team_id ${guest.team_id} mas não foi possível obter dados da equipa.`);
+        return; // Skip se o join falhou ou equipa não existe/sem nome
+    }
 
     const teamId = guest.team_id;
-    const teamName = guest.teams.name;
-    const isCheckedIn = guest.checked_in;
 
     if (!statsMap.has(teamId)) {
       statsMap.set(teamId, { id: teamId, name: teamName, total_guests: 0, total_checked_in: 0 });
@@ -117,7 +118,7 @@ async function fetchTopTeamsStats(eventId: string, supabaseClient: any) {
 
     const currentStats = statsMap.get(teamId)!;
     currentStats.total_guests += 1;
-    if (isCheckedIn) {
+    if (guest.checked_in) {
       currentStats.total_checked_in += 1;
     }
   });
