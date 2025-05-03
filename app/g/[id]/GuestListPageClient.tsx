@@ -252,16 +252,45 @@ export default function GuestListPageClient({ eventId, promoterId, teamId }: Gue
 
   // Funções de formatação
   const formatDate = (dateString: string | null | undefined) => {
-    // ... (lógica permanece a mesma) ...
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
+  
   const formatTime = (timeString: string | null | undefined) => {
-    // ... (lógica permanece a mesma) ...
+    if (!timeString) return '';
+    
+    // Se for uma string de hora (formato HH:MM:SS)
+    if (timeString.includes(':') && !timeString.includes('-') && !timeString.includes('T')) {
+      const [hours, minutes] = timeString.split(':');
+      return `${hours}:${minutes}`;
+    }
+    
+    // Se for uma string de data completa
+    const date = new Date(timeString);
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
+  
   const formatFullDateTime = (dateTimeString: string | null | undefined) => {
-    // ... (lógica permanece a mesma) ...
+    if (!dateTimeString) return '';
+    const date = new Date(dateTimeString);
+    return date.toLocaleString('pt-BR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
+  
   const formatRelativeTime = (dateTimeString: string | null | undefined) => {
-    // ... (lógica permanece a mesma) ...
+    if (!dateTimeString) return '';
+    return formatDistanceToNow(new Date(dateTimeString), { addSuffix: true, locale: pt });
   };
 
   // Função para registrar convidado
@@ -274,15 +303,23 @@ export default function GuestListPageClient({ eventId, promoterId, teamId }: Gue
 
     setSubmitting(true);
     try {
-      const sanitizedPhone = data.phone.replace(/D/g, '');
+      const sanitizedPhone = data.phone.replace(/\D/g, '');
       const fullPhone = `${selectedCountry.prefix}${sanitizedPhone}`;
+
+      // Verificar se temos promoterId e teamId válidos
+      console.log("[GuestListPageClient] onSubmit -> IDs rastreamento:", { 
+        promoterId, 
+        teamId,
+        isValidPromoterId: promoterId && typeof promoterId === 'string' && promoterId.length > 10,
+        isValidTeamId: teamId && typeof teamId === 'string' && teamId.length > 10
+      });
 
       const guestData = {
         event_id: event.id,
         name: data.name,
         phone: fullPhone,
-        promoter_id: promoterId, // Usa as props recebidas
-        team_id: teamId,         // Usa as props recebidas
+        promoter_id: promoterId || null, // Garantir que valores vazios sejam null
+        team_id: teamId || null,         // Garantir que valores vazios sejam null
       };
 
       console.log("Enviando dados para /api/guests:", guestData);
@@ -315,10 +352,32 @@ export default function GuestListPageClient({ eventId, promoterId, teamId }: Gue
   }
 
   const shareViaWhatsApp = () => {
-    // ... (lógica permanece a mesma) ...
+    if (!event) return;
+    
+    const eventURL = window.location.href;
+    const message = `${event.title} - ${formatDate(event.date)} às ${formatTime(event.time)}. ${event.location}. Inscreva-se aqui: ${eventURL}`;
+    
+    // Encode a mensagem para URL
+    const encodedMessage = encodeURIComponent(message);
+    
+    // Criar URL do WhatsApp
+    const whatsappURL = `https://wa.me/?text=${encodedMessage}`;
+    
+    // Abrir em nova janela
+    window.open(whatsappURL, '_blank');
   };
+  
   const copyLink = () => {
-    // ... (lógica permanece a mesma) ...
+    const eventURL = window.location.href;
+    
+    navigator.clipboard.writeText(eventURL)
+      .then(() => {
+        toast({ title: "Link copiado!", description: "O link do evento foi copiado para a área de transferência." });
+      })
+      .catch((err) => {
+        console.error("Erro ao copiar link:", err);
+        toast({ title: "Erro", description: "Não foi possível copiar o link", variant: "destructive" });
+      });
   };
 
   // Cálculo de limite de convidados

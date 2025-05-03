@@ -154,44 +154,6 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
   
-  // Função para compartilhar no WhatsApp
-  const shareViaWhatsApp = () => {
-    if (!event) return;
-    
-    const eventURL = window.location.href;
-    const message = `${event.title} - ${formatDate(event.date)} às ${formatTime(event.time)}. ${event.location}. Inscreva-se aqui: ${eventURL}`;
-    
-    // Encode a mensagem para URL
-    const encodedMessage = encodeURIComponent(message);
-    
-    // Criar URL do WhatsApp
-    const whatsappURL = `https://wa.me/?text=${encodedMessage}`;
-    
-    // Abrir em nova janela
-    window.open(whatsappURL, '_blank');
-  };
-  
-  // Função para copiar link
-  const copyLink = () => {
-    const eventURL = window.location.href;
-    
-    navigator.clipboard.writeText(eventURL)
-      .then(() => {
-        toast({ 
-          title: "Link copiado!", 
-          description: "O link do evento foi copiado para a área de transferência." 
-        });
-      })
-      .catch((err) => {
-        console.error("Erro ao copiar link:", err);
-        toast({ 
-          title: "Erro", 
-          description: "Não foi possível copiar o link", 
-          variant: "destructive" 
-        });
-      });
-  };
-  
   // Função para registrar convidado
   const onSubmit = async (data: GuestFormValues) => {
     if (!event) return
@@ -342,13 +304,10 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                   <p className="text-gray-600 whitespace-pre-wrap">{event.description}</p>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={shareViaWhatsApp}>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="mr-2">
                   <Share2 className="h-4 w-4 mr-2" />
-                  Compartilhar WhatsApp
-                </Button>
-                <Button variant="outline" size="sm" onClick={copyLink}>
-                  Copiar Link
+                  Compartilhar
                 </Button>
               </CardFooter>
             </Card>

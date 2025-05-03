@@ -1,12 +1,9 @@
 'use client'
 
-// Essencialmente a mesma página que a de eventos normais, mas com foco em guest list
-// Reutilizamos o mesmo código com pequenas adaptações
-
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { CalendarIcon, Clock, MapPin, Share2, UserCheck, Users } from 'lucide-react'
+import { CalendarIcon, Clock, MapPin, Share2, UserCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,18 +56,16 @@ interface Event {
   type?: string
   is_active: boolean
   organization_id: string
-  guest_list_settings?: any
 }
 
 // Componente que contém a lógica da página
-function GuestListPageContent({ eventId }: { eventId: string }) {
+function EventPageContent({ eventId }: { eventId: string }) {
   const router = useRouter()
   const [event, setEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
-  const [guestCount, setGuestCount] = useState<number>(0)
   
   // Configuração do formulário
   const form = useForm<GuestFormValues>({
@@ -81,7 +76,7 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     },
   })
   
-  // Buscar dados do evento e contagem de convidados
+  // Buscar dados do evento
   useEffect(() => {
     async function loadEvent() {
       try {
@@ -93,32 +88,21 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
           .select('*')
           .eq('id', eventId)
           .eq('is_active', true)
-          .eq('type', 'guest-list')
           .single()
           
         if (error) {
-          throw new Error('Guest list não encontrada ou não está ativa')
+          throw new Error('Evento não encontrado ou não está ativo')
         }
         
         if (!data) {
-          throw new Error('Guest list não encontrada')
+          throw new Error('Evento não encontrado')
         }
         
-        console.log("Dados da guest list carregados:", data)
+        console.log("Dados do evento carregados:", data)
         setEvent(data)
-        
-        // Buscar contagem de convidados
-        const { count, error: countError } = await supabase
-          .from('guests')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_id', eventId)
-        
-        if (!countError) {
-          setGuestCount(count || 0)
-        }
       } catch (err) {
-        console.error("Erro ao carregar guest list:", err)
-        setError(err instanceof Error ? err.message : 'Erro ao carregar guest list')
+        console.error("Erro ao carregar evento:", err)
+        setError(err instanceof Error ? err.message : 'Erro ao carregar evento')
       } finally {
         setLoading(false)
       }
@@ -154,51 +138,13 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
   
-  // Função para compartilhar no WhatsApp
-  const shareViaWhatsApp = () => {
-    if (!event) return;
-    
-    const eventURL = window.location.href;
-    const message = `${event.title} - ${formatDate(event.date)} às ${formatTime(event.time)}. ${event.location}. Inscreva-se aqui: ${eventURL}`;
-    
-    // Encode a mensagem para URL
-    const encodedMessage = encodeURIComponent(message);
-    
-    // Criar URL do WhatsApp
-    const whatsappURL = `https://wa.me/?text=${encodedMessage}`;
-    
-    // Abrir em nova janela
-    window.open(whatsappURL, '_blank');
-  };
-  
-  // Função para copiar link
-  const copyLink = () => {
-    const eventURL = window.location.href;
-    
-    navigator.clipboard.writeText(eventURL)
-      .then(() => {
-        toast({ 
-          title: "Link copiado!", 
-          description: "O link do evento foi copiado para a área de transferência." 
-        });
-      })
-      .catch((err) => {
-        console.error("Erro ao copiar link:", err);
-        toast({ 
-          title: "Erro", 
-          description: "Não foi possível copiar o link", 
-          variant: "destructive" 
-        });
-      });
-  };
-  
   // Função para registrar convidado
   const onSubmit = async (data: GuestFormValues) => {
     if (!event) return
     
     setSubmitting(true)
     try {
-      console.log("Registrando convidado na guest list:", data)
+      console.log("Registrando convidado:", data)
       
       // Gerar código QR único (simplificado, na prática você provavelmente usaria uma biblioteca)
       const qrCode = `${event.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -222,9 +168,6 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
       
       console.log("Convidado registrado:", guest)
       setRegistrationSuccess(true)
-      
-      // Atualizar a contagem de convidados
-      setGuestCount(prevCount => prevCount + 1)
       
       toast({
         title: "Registro confirmado!",
@@ -268,9 +211,9 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
       <div className="container max-w-4xl mx-auto px-4 py-8">
         <Card>
           <CardHeader>
-            <CardTitle>Guest List não encontrada</CardTitle>
+            <CardTitle>Evento não encontrado</CardTitle>
             <CardDescription>
-              {error || 'Não foi possível carregar os detalhes desta guest list.'}
+              {error || 'Não foi possível carregar os detalhes deste evento.'}
             </CardDescription>
           </CardHeader>
           <CardFooter>
@@ -284,29 +227,35 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header do evento com imagem */}
-      <div className="relative w-full h-[30vh] md:h-[40vh] bg-gray-900 overflow-hidden">
+      <div className="relative w-full h-[30vh] md:h-[40vh] bg-gray-900">
         {event.flyer_url ? (
           <Image
             src={event.flyer_url}
             alt={event.title}
             fill
-            className="object-cover opacity-80"
+            style={{ objectFit: 'cover' }}
+            className="opacity-70"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center bg-gray-700">
-             <p className="text-gray-400">Sem imagem</p> 
-          </div>
+          <div className="w-full h-full bg-gradient-to-r from-blue-600 to-purple-600"></div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end justify-center pb-8">
-           <h1 className="text-4xl md:text-6xl font-bold text-white text-center px-4 drop-shadow-lg">{event.title}</h1>
+        
+        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
+          <div className="container max-w-4xl mx-auto px-4 pb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{event.title}</h1>
+            {event.type === 'guest-list' && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-600 text-white">
+                Guest List
+              </span>
+            )}
+          </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-50 via-gray-50/80 to-transparent backdrop-blur-md"></div>
       </div>
       
-      {/* Conteúdo da guest list */}
+      {/* Conteúdo do evento */}
       <div className="container max-w-4xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Coluna principal - Detalhes do evento */}
+          {/* Coluna principal */}
           <div className="md:col-span-2 space-y-6">
             <Card>
               <CardHeader>
@@ -331,24 +280,14 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 text-gray-700">
-                  <Users className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <p className="font-medium">{guestCount} pessoas confirmadas</p>
-                  </div>
-                </div>
-                
                 <div className="pt-4 border-t">
                   <p className="text-gray-600 whitespace-pre-wrap">{event.description}</p>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={shareViaWhatsApp}>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="mr-2">
                   <Share2 className="h-4 w-4 mr-2" />
-                  Compartilhar WhatsApp
-                </Button>
-                <Button variant="outline" size="sm" onClick={copyLink}>
-                  Copiar Link
+                  Compartilhar
                 </Button>
               </CardFooter>
             </Card>
@@ -442,8 +381,8 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
 }
 
 // Componente principal que lida com os parâmetros
-export default function GuestListPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EventPage({ params }: { params: Promise<{ id: string }> }) {
   // Desembrulhar o params usando React.use()
   const resolvedParams = use(params);
-  return <GuestListPageContent eventId={resolvedParams.id} />;
+  return <EventPageContent eventId={resolvedParams.id} />;
 } 

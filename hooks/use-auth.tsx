@@ -141,11 +141,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isIdentifiedAsLeader = false; // Flag local para rastrear
     let currentUserRole: string | null = null;
 
+    // Verificação de segurança para userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.error("[checkIfTeamLeader] userId inválido ou vazio:", userId);
+      setIsTeamLeader(false);
+      return false;
+    }
+
     try {
       console.log("[checkIfTeamLeader] Verificando se o usuário é líder de equipe:", userId);
       
       // Criar cliente Supabase para uso nesta função
       const supabase = createClient();
+      if (!supabase) {
+        console.error("[checkIfTeamLeader] Erro ao criar cliente Supabase");
+        setIsTeamLeader(false);
+        return false;
+      }
       
       // Primeiro verificar se o usuário já tem metadados que o identificam como líder
       // E obter o role atual
@@ -191,19 +203,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Método mais seguro: verificar se é criador de equipe
       try {
-        // Criar cliente Supabase para esta verificação
-        // const supabase = createClient(); // Reutilizar cliente já criado
+        console.log("[checkIfTeamLeader] Verificando se o usuário criou alguma equipe. userId:", userId);
         
+        // Remover verificação de esquema que causa erro
+        // Verificar diretamente se o usuário é criador de alguma equipe
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
           .select('id, name, team_code')
           .eq('created_by', userId)
-          .maybeSingle();
+          .limit(1); // Usar limit(1) em vez de maybeSingle para evitar erro PGRST116
         
         if (teamError) {
-            console.error("[checkIfTeamLeader] Erro ao consultar teams por created_by:", teamError);
-        } else if (teamData) {
-          console.log("[checkIfTeamLeader] Usuário é criador de equipe (detectado):", teamData.id);
+          console.error("[checkIfTeamLeader] Erro ao consultar teams por created_by:", teamError);
+          // Adicione informações adicionais para depuração
+          console.error("[checkIfTeamLeader] Detalhes: userId=", userId, "message=", teamError?.message, "code=", teamError?.code);
+        } else if (teamData && teamData.length > 0) { // Verificar se há pelo menos um resultado
+          console.log("[checkIfTeamLeader] Usuário é criador de equipe (detectado):", teamData[0].id);
           setIsTeamLeader(true); // <<< OK: Definir estado local
           
           // *** LÓGICA CONDICIONAL DE ATUALIZAÇÃO ***
@@ -213,9 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { error: updateError } = await supabase.auth.updateUser({
               data: {
                 role: 'chefe-equipe', // <<< Promover para chefe
-                team_id: teamData.id,
-                team_code: teamData.team_code,
-                team_name: teamData.name,
+                team_id: teamData[0].id,
+                team_code: teamData[0].team_code,
+                team_name: teamData[0].name,
                 is_team_leader: true
               }
             });
@@ -241,19 +256,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Verificar como membro com papel de líder (método menos preferido)
       // ... (restante da lógica para verificar team_members)
 
-    // Se nenhuma condição acima identificou como líder
-    if (!isIdentifiedAsLeader) {
-        console.log("[checkIfTeamLeader] Após todas as verificações, usuário NÃO é identificado como líder de equipe.");
-        setIsTeamLeader(false);
-    }
-    return isIdentifiedAsLeader; // Retorna o estado final da verificação
+      // Se nenhuma condição acima identificou como líder
+      if (!isIdentifiedAsLeader) {
+          console.log("[checkIfTeamLeader] Após todas as verificações, usuário NÃO é identificado como líder de equipe.");
+          setIsTeamLeader(false);
+      }
+      return isIdentifiedAsLeader; // Retorna o estado final da verificação
 
-  } catch (error) {
-      console.error('[checkIfTeamLeader] Erro GERAL ao verificar se é líder de equipe:', error);
-      setIsTeamLeader(false); // Garantir estado falso em caso de erro
-      return false;
-  }
-};
+    } catch (error) {
+        console.error('[checkIfTeamLeader] Erro GERAL ao verificar se é líder de equipe:', error);
+        setIsTeamLeader(false); // Garantir estado falso em caso de erro
+        return false;
+    }
+  };
   
   // Atualizar papel do usuário - versão robusta com normalização
   const updateUserRole = async (newRole: string) => {
@@ -349,12 +364,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (currentUser.user_metadata?.role === 'chefe-equipe' || currentUser.user_metadata?.role === 'team-leader') {
           console.log("Usuário identificado como líder de equipe pelos metadados (role=chefe-equipe)");
           setIsTeamLeader(true);
-        } else {
+        } else if (currentUser.id) {
           // Se não estiver nos metadados, fazer verificação completa
-          checkIfTeamLeader(currentUser.id);
+          console.log("Chamando checkIfTeamLeader com userId:", currentUser.id);
+          checkIfTeamLeader(currentUser.id).catch(error => {
+            console.error("Erro ao verificar se usuário é líder:", error);
+          });
+        } else {
+          console.error("Usuário logado, mas sem ID válido:", currentUser);
         }
       }
       
+      setIsLoading(false);
+    }).catch(error => {
+      console.error("Erro ao obter sessão:", error);
       setIsLoading(false);
     })
 
