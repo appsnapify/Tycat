@@ -1,38 +1,52 @@
+'use client'
+
 import { createReadOnlyClient } from '@/lib/supabase-server'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { loginWithEmailPassword, checkPhone, logout } from '@/app/auth/actions'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Este componente demonstra o padrão correto para autenticação no Next.js com Supabase
 // 1. Usa `createReadOnlyClient` para verificar a sessão (somente leitura)
 // 2. Usa Server Actions para operações de autenticação que modificam cookies
 
-export default async function LoginForm({ redirectPath = '/' }: { redirectPath?: string }) {
-  // Use o cliente SOMENTE LEITURA para verificar a sessão atual
-  // Este cliente não pode modificar cookies, apenas lê-los
-  const supabase = await createReadOnlyClient()
-  const { data: { session } } = await supabase.auth.getSession()
+export default function LoginForm({ redirectPath = '/' }: { redirectPath?: string }) {
+  const [phoneValue, setPhoneValue] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const [isChecking, setIsChecking] = useState(false)
+  const [session, setSession] = useState<any>(null)
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false)
+  
+  // Verificar a sessão ao carregar o componente
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Usar fetch para chamar API que verifica a sessão
+        const res = await fetch('/api/auth/session')
+        if (res.ok) {
+          const data = await res.json()
+          setSession(data.session)
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error)
+      } finally {
+        setIsSessionLoaded(true)
+      }
+    }
+    
+    checkSession()
+  }, [])
+  
+  // Se estiver carregando, não mostrar nada ainda
+  if (!isSessionLoaded) {
+    return <div>Carregando...</div>
+  }
   
   // Se já estiver logado, mostrar um componente diferente
   if (session) {
     return <LoggedInUser session={session} />
   }
-  
-  // Se não estiver logado, mostrar o formulário de login
-  // O formulário usa Server Actions para autenticação
-  return <ClientLoginForm redirectPath={redirectPath} />
-}
-
-// Componente do lado do cliente para o formulário
-// Obrigatório usar 'use client' pois usamos hooks de estado
-'use client'
-
-function ClientLoginForm({ redirectPath = '/' }: { redirectPath?: string }) {
-  const [phoneValue, setPhoneValue] = useState('')
-  const [phoneError, setPhoneError] = useState('')
-  const [isChecking, setIsChecking] = useState(false)
   
   // Esta função é executada no cliente, mas chama um Server Action
   const handlePhoneCheck = async () => {

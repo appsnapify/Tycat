@@ -52,7 +52,7 @@ export async function createReadOnlyClient() {
  * 
  * Use em:
  * - Server Actions ('use server')
- * - Route Handlers (app/api/*/route.ts)
+ * - Route Handlers (como app/api/rota/route.ts)
  * 
  * Exemplo:
  * ```tsx
