@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executar Migração da Tabela Guests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Migração da Tabela Guests</h1>
+    <p>Esta página executa a migração para adicionar a coluna <code>qr_code_url</code> à tabela <code>guests</code>.</p>
+
+    <button id="runMigration">Executar Migração</button>
+    
+    <h2>Resultado:</h2>
+    <pre id="result">Aguardando execução...</pre>
+
+    <script>
+        document.getElementById('runMigration').addEventListener('click', async () => {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = 'Executando migração...';
+
+            try {
+                const response = await fetch('/api/migrations/apply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        migration_name: 'add_qr_code_url_column'
+                    })
+                });
+
+                const data = await response.json();
+                resultElement.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.success) {
+                    alert('Migração executada com sucesso!');
+                } else {
+                    alert('Erro na migração: ' + data.error);
+                }
+            } catch (error) {
+                resultElement.textContent = 'Erro: ' + error.message;
+                alert('Erro ao executar migração: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -31,7 +31,7 @@ import {
 import Image from 'next/image'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useToast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import NextLink from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -91,6 +91,7 @@ function isEventPast(event: Event): boolean {
 // Função para duplicar um evento
 async function duplicateEvent(event: Event) {
   try {
+    const supabase = createClient();
     // Clonar o objeto do evento e modificar os campos necessários
     const newEvent = {
       ...event,
@@ -149,6 +150,7 @@ export default function EventosPage() {
   const updateEventStatus = async () => {
     try {
       setLoading(true);
+      const supabase = createClient();
       
       // Simular chamada à API de atualização de status
       // Em produção, substituir por fetch('/api/cron/update-event-status')
@@ -216,6 +218,7 @@ export default function EventosPage() {
       setLoading(true);
       
       try {
+        const supabase = createClient();
         console.log(`Buscando eventos para organização: ${currentOrganization.id}`);
         const { data, error } = await supabase
           .from('events')
@@ -280,7 +283,7 @@ export default function EventosPage() {
       <div className="p-4 border border-amber-300 bg-amber-50 rounded-md text-amber-800">
         <h2 className="text-lg font-medium">Nenhuma organização selecionada</h2>
         <p className="mt-2">Você precisa selecionar ou criar uma organização para ver os eventos.</p>
-        <Button onClick={() => router.push('/app/organizador/organizacoes')} className="mt-4">
+        <Button onClick={() => router.push('/app/organizador/organizacoes')} className="mt-4 bg-lime-500 hover:bg-lime-600 text-white">
           Gerenciar Organizações
         </Button>
       </div>
@@ -290,7 +293,7 @@ export default function EventosPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>
         <span className="ml-2">Carregando eventos...</span>
       </div>
     )
@@ -300,7 +303,7 @@ export default function EventosPage() {
     return (
       <div className="p-4 border border-red-300 bg-red-50 rounded-md text-red-800">
         <p>{error}</p>
-        <Button onClick={() => window.location.reload()} variant="outline" className="mt-2">
+        <Button onClick={() => window.location.reload()} variant="outline" className="mt-2 border-fuchsia-500 hover:bg-fuchsia-50 text-fuchsia-600">
           Tentar novamente
         </Button>
       </div>
@@ -415,13 +418,13 @@ export default function EventosPage() {
         </div>
         <div className="flex gap-2">
             {/* Temporarily disable Create Event button */}
-           <Button onClick={() => router.push('/app/organizador/evento/criar')} disabled>
+           <Button onClick={() => router.push('/app/organizador/evento/criar')} disabled className="bg-lime-500 hover:bg-lime-600 text-white">
              <Plus className="mr-2 h-4 w-4" />
              Criar Evento
            </Button>
             {/* Restore Create Guest List button */}
            <NextLink href="/app/organizador/evento/criar/guest-list">
-              <Button>
+              <Button className="bg-fuchsia-500 hover:bg-fuchsia-600 text-white">
                 <ListPlus className="mr-2 h-4 w-4" />
                 Criar Guest List
               </Button>
@@ -430,20 +433,20 @@ export default function EventosPage() {
       </div>
 
       {/* Tabs de status de eventos */}
-      <div className="w-full">
+      <div className="mb-6">
         <Tabs defaultValue="all" className="w-full" onValueChange={setStatusTab}>
           <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="all">
-              Todos {eventList.length > 0 && <span className="ml-1 px-1.5 py-0.5 bg-gray-200 text-gray-800 text-xs rounded-full">{eventList.length}</span>}
+            <TabsTrigger value="all" className="data-[state=active]:bg-lime-500 data-[state=active]:text-white">
+              Todos {eventList.length > 0 && `(${eventList.length})`}
             </TabsTrigger>
-            <TabsTrigger value="scheduled">
-              Próximos {scheduledCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">{scheduledCount}</span>}
+            <TabsTrigger value="scheduled" className="data-[state=active]:bg-lime-500 data-[state=active]:text-white">
+              Próximos {scheduledCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-800 text-xs rounded-full">{scheduledCount}</span>}
             </TabsTrigger>
-            <TabsTrigger value="active">
-              Em Andamento {activeCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">{activeCount}</span>}
+            <TabsTrigger value="active" className="data-[state=active]:bg-lime-500 data-[state=active]:text-white">
+              Em Andamento {activeCount > 0 && `(${activeCount})`}
             </TabsTrigger>
-            <TabsTrigger value="completed">
-              Realizados {completedCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-800 text-xs rounded-full">{completedCount}</span>}
+            <TabsTrigger value="completed" className="data-[state=active]:bg-lime-500 data-[state=active]:text-white">
+              Realizados {completedCount > 0 && `(${completedCount})`}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -460,7 +463,7 @@ export default function EventosPage() {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" onClick={updateEventStatus} disabled={loading}>
+        <Button variant="outline" onClick={updateEventStatus} disabled={loading} className="hover:border-lime-500 hover:text-lime-600">
           <RefreshCw className="h-4 w-4 mr-2" />
           Atualizar Status
         </Button>
@@ -473,7 +476,7 @@ export default function EventosPage() {
           <p className="mt-2 text-sm text-gray-500">
             Você ainda não criou nenhum evento. Comece criando seu primeiro evento.
           </p>
-          <Button onClick={() => router.push('/app/organizador/eventos/criar')} className="mt-4">
+          <Button onClick={() => router.push('/app/organizador/eventos/criar')} className="mt-4 bg-lime-500 hover:bg-lime-600 text-white">
             Criar Evento
           </Button>
         </div>
@@ -484,7 +487,7 @@ export default function EventosPage() {
           <p className="mt-2 text-sm text-gray-500">
             Tente ajustar seus critérios de busca ou filtros.
           </p>
-          <Button onClick={() => { setSearchQuery(''); setStatusTab('all'); }} className="mt-4">
+          <Button onClick={() => { setSearchQuery(''); setStatusTab('all'); }} className="mt-4 bg-fuchsia-500 hover:bg-fuchsia-600 text-white">
             Limpar Filtros
           </Button>
         </div>
@@ -514,8 +517,8 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
   
   // Definir cor do badge de status
   const statusConfig = {
-    scheduled: { label: "Próximo", color: "bg-blue-500" },
-    active: { label: "Em Andamento", color: "bg-green-500" },
+    scheduled: { label: "Próximo", color: "bg-fuchsia-500" },
+    active: { label: "Em Andamento", color: "bg-lime-500" },
     completed: { label: "Realizado", color: "bg-gray-500" }
   };
   
@@ -607,7 +610,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
         // Fallback: tentar buscar diretamente no Supabase como plano B
         try {
           console.log(`EventCard [${event.id}] - Tentando fallback direto`);
-          const { data, error } = await supabase
+          const { data, error } = await createClient()
             .from('guests')
             .select('id')
             .eq('event_id', event.id);
@@ -643,7 +646,12 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
   }, [event.id, event.type]);
 
   return (
-    <Card className={`overflow-hidden ${isPast ? 'opacity-80 border-gray-300' : ''} ${!isPublished ? 'border-dashed border-orange-400' : ''}`}>
+    <Card className={`overflow-hidden 
+      ${isPast ? 'opacity-80 border-gray-300' : ''} 
+      ${!isPublished ? 'border-dashed border-orange-400' : ''} 
+      ${!isPast && isPublished && status === 'scheduled' ? 'border-l-4 border-l-fuchsia-500' : ''}
+      ${!isPast && isPublished && status === 'active' ? 'border-l-4 border-l-lime-500' : ''}
+    `}>
       <CardHeader className="p-0">
         <div className="relative h-40">
           <Image 
@@ -664,7 +672,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
             {/* Badge Tipo & Publicação (lado esquerdo) */}
             <div className="flex flex-col gap-1 items-start">
               {event.type === 'guest-list' && (
-                <Badge variant="outline" className="bg-blue-600/80 border-blue-700 text-white text-xs backdrop-blur-sm">
+                <Badge variant="outline" className="bg-fuchsia-600/80 border-fuchsia-700 text-white text-xs backdrop-blur-sm">
                   Guest List
                 </Badge>
               )}
@@ -718,7 +726,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
                   e.stopPropagation();
                   refreshGuestCount();
                 }}
-                className="text-xs text-blue-500 hover:text-blue-700"
+                className="text-xs text-fuchsia-500 hover:text-fuchsia-700"
                 disabled={isLoading}
               >
                 {isLoading ? '...' : 'Atualizar'}
@@ -738,7 +746,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex-1"
+          className="flex-1 hover:border-fuchsia-500 hover:text-fuchsia-600"
           onClick={handleCopyLink}
           disabled={!isPublished || isPast}
           title={!isPublished ? "Evento inativo" : isPast ? "Evento realizado" : "Copiar Link Público"}
@@ -750,7 +758,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
         <Button 
           variant={isPast ? "ghost" : "outline"}
           size="sm" 
-          className="flex-1"
+          className="flex-1 hover:border-fuchsia-500 hover:text-fuchsia-600"
           onClick={handleCheckinClick}
           disabled={!isPublished || isPast}
           title={!isPublished ? "Evento inativo" : isPast ? "Evento realizado" : "Ver Detalhes"}
@@ -762,7 +770,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
         <Button 
           variant="outline"
           size="sm" 
-          className="flex-1"
+          className="flex-1 hover:border-lime-500 hover:text-lime-600"
           onClick={handleEditClick}
           disabled={isPast}
           title={isPast ? "Evento realizado" : "Editar Evento"}
@@ -775,7 +783,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           <Button 
             variant="outline"
             size="sm" 
-            className="flex-1"
+            className="flex-1 hover:border-lime-500 hover:text-lime-600"
             onClick={handleDuplicateClick}
             title="Duplicar Evento"
           >

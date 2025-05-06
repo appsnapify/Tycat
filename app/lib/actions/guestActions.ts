@@ -37,7 +37,7 @@ export async function getGuestsForEvent(
     const supabase = createServerActionClient<Database>({ cookies });
 
     try {
-        // --- Construir Query Base ---
+        // Consulta para buscar convidados com informações básicas
         let query = supabase
             .from('guests')
             .select(`
@@ -47,48 +47,76 @@ export async function getGuestsForEvent(
                 checked_in,
                 check_in_time,
                 created_at,
-                promoter:profiles ( first_name, last_name ),
-                team:teams ( name )
-            `, { count: 'exact' }) // Pedir contagem total com os mesmos filtros
-            .eq('event_id', eventId)
-
-        // --- Aplicar Filtros ---
+                team_id,
+                promoter:profiles ( first_name, last_name )
+            `, { count: 'exact' })
+            .eq('event_id', eventId);
+        
+        // Aplicar filtros de pesquisa
         if (searchTerm) {
-            // Pesquisar por nome OU telefone (ajustar conforme necessário)
             query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
         }
         if (filterCheckedIn !== null && filterCheckedIn !== undefined) {
             query = query.eq('checked_in', filterCheckedIn);
         }
-
-        // --- Aplicar Ordenação (Ex: mais recentes primeiro) ---
+        
+        // Aplicar ordenação e paginação
         query = query.order('created_at', { ascending: false });
-
-        // --- Aplicar Paginação ---
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize - 1;
         query = query.range(startIndex, endIndex);
-
-        // --- Executar Query ---
-        const { data, error, count } = await query;
-
-        if (error) {
-            console.error("Erro ao buscar convidados:", error);
-            throw new Error(`Erro ao buscar convidados: ${error.message}`);
+        
+        // Executar consulta principal
+        const { data: guestsData, error: guestsError, count } = await query;
+        
+        if (guestsError) {
+            console.error("Erro ao buscar convidados:", guestsError);
+            throw new Error(`Erro ao buscar convidados: ${guestsError.message}`);
         }
-
-        // --- Transformar Dados e Retornar ---
-        const transformedGuests = data?.map(guest => ({
+        
+        // Extrair IDs de equipes para busca posterior
+        const teamIds = guestsData
+            ?.filter(guest => guest.team_id)
+            .map(guest => guest.team_id) || [];
+        
+        // Mapa para armazenar nomes de equipes por ID
+        const teamNames: Record<string, string> = {};
+        
+        // Se temos IDs de equipes, buscar nomes usando a função RPC personalizada
+        if (teamIds.length > 0) {
+            const { data: teamsData, error: teamsError } = await supabase
+                .rpc('get_team_names_for_guests', { 
+                    guest_team_ids: teamIds 
+                });
+                
+            if (!teamsError && teamsData) {
+                // Preencher o mapa de IDs para nomes
+                teamsData.forEach((team: { id: string, name: string }) => {
+                    teamNames[team.id] = team.name;
+                });
+            } else if (teamsError) {
+                console.warn("Aviso: Não foi possível buscar nomes de equipes:", teamsError);
+                // Mostrar detalhes do erro para debug
+                console.debug("Detalhes do erro de equipes:", {
+                    message: teamsError.message,
+                    details: teamsError.details,
+                    hint: teamsError.hint
+                });
+            }
+        }
+        
+        // Transformar e combinar dados
+        const transformedGuests = guestsData?.map(guest => ({
             id: guest.id,
             name: guest.name,
-            phone: guest.phone, // Retorna, mas pode ser omitido no cliente
+            phone: guest.phone,
             checked_in: guest.checked_in,
             check_in_time: guest.check_in_time,
             created_at: guest.created_at,
             promoter_name: guest.promoter ? `${guest.promoter.first_name || ''} ${guest.promoter.last_name || ''}`.trim() : null,
-            team_name: guest.team ? guest.team.name : null,
+            team_name: guest.team_id ? teamNames[guest.team_id] || '-' : null,
         })) || [];
-
+        
         return {
             guests: transformedGuests,
             totalCount: count ?? 0,

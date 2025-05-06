@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/hooks/use-auth'
 import Link from 'next/link'
+import { DashboardContent } from '@/components/dashboard/dashboard-content'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { 
   ArrowRight, 
   Users, 
@@ -40,7 +42,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { User } from '@supabase/supabase-js'
 import { useAuthContext } from '@/contexts/auth-context'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
+
+// Cores para o tema do dashboard
+const dashboardColors = {
+  card: {
+    bg: "bg-white",
+    border: "border-gray-200",
+    hoverBorder: "hover:border-gray-300"
+  },
+  text: {
+    primary: "text-gray-900",
+    secondary: "text-gray-500",
+    muted: "text-gray-400",
+    accent: "text-lime-500"
+  },
+  badge: {
+    red: "bg-red-100 text-red-800",
+    green: "bg-green-100 text-green-800",
+    fuchsia: "bg-fuchsia-100 text-fuchsia-800",
+    yellow: "bg-amber-100 text-amber-800",
+    gray: "bg-gray-100 text-gray-800",
+    purple: "bg-purple-100 text-purple-800"
+  },
+  button: {
+    primary: "bg-lime-500 hover:bg-lime-600 text-white",
+    secondary: "bg-white border border-gray-300 hover:bg-gray-50 text-gray-700",
+    accent: "bg-fuchsia-500 hover:bg-fuchsia-600 text-white"
+  }
+}
 
 interface Team {
   id: string
@@ -743,545 +773,19 @@ export default function OrganizadorDashboardPage() {
     }
   };
   
-  // Loading state com skeletons melhorados
-  if (loading) {
+  // Renderização do novo dashboard com o componente DashboardContent
     return (
-      <div className="container py-8">
-        <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          
-          <div className="flex flex-col sm:flex-row gap-2 opacity-50">
-            <div className="w-[200px] h-10 bg-muted rounded animate-pulse"></div>
-            <div className="w-[150px] h-10 bg-muted rounded animate-pulse"></div>
-          </div>
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
-          {[1, 2, 3, 4, 5].map((item) => (
-            <Card key={item}>
-              <CardHeader className="pb-2">
-                <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div className="h-8 w-16 bg-muted animate-pulse rounded"></div>
-                  <div className="h-8 w-8 bg-muted animate-pulse rounded-full"></div>
-                </div>
-                <div className="h-3 w-32 bg-muted animate-pulse rounded mt-2"></div>
-                <div className="h-9 w-full bg-muted animate-pulse rounded mt-4"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="h-6 w-24 bg-muted animate-pulse rounded"></div>
-              <div className="h-4 w-48 bg-muted animate-pulse rounded mt-2"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="flex gap-4 h-16 items-center">
-                    <div className="h-10 w-10 bg-muted animate-pulse rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
-                      <div className="h-3 w-24 bg-muted animate-pulse rounded mt-2"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="h-6 w-32 bg-muted animate-pulse rounded"></div>
-              <div className="h-4 w-40 bg-muted animate-pulse rounded mt-2"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="flex gap-4 h-16 items-center">
-                    <div className="h-10 w-10 bg-muted animate-pulse rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 w-36 bg-muted animate-pulse rounded"></div>
-                      <div className="h-3 w-28 bg-muted animate-pulse rounded mt-2"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-  
-  if (!kpis && !loading) {
-    // Se não estiver carregando e não tiver dados, mostrar dashboard vazio com cards zerados
-    const emptyKpis = {
-      totalEvents: 0,
-      upcomingEvents: 0,
-      teamsCount: 0,
-      totalTickets: 0,
-      pendingCommissions: 0,
-      teamsWithCommissions: 0
-    }
-    
-    return (
-      <div className="container py-8">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-        
-        {/* Cards principais vazios */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Equipas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex justify-between items-center">
-                <span>0</span>
-                <Link href="/app/organizador/equipes">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                0 com comissões pendentes
-              </p>
-              <div className="mt-4">
-                <Link href="/app/organizador/equipes/adicionar">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Adicionar Equipa
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Bilhetes Vendidos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center">
-                <span>0</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total de bilhetes
-              </p>
-              <div className="mt-4">
-                <Link href="/app/organizador/vendas">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <TicketCheck className="mr-2 h-4 w-4" />
-                    Ver Vendas
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Comissões Pendentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex justify-between items-center">
-                <span>{formatCurrency(0)}</span>
-                <Link href="/app/organizador/comissoes">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total a pagar
-              </p>
-              <div className="mt-4">
-                <Link href="/app/organizador/comissoes">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Pagar Comissões
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-  
-  if (!kpis) {
-    return (
-      <div className="container py-8">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Building className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Não tem nenhuma organização</h2>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Para aceder ao dashboard de organizador, crie a sua organização primeiro.
-            </p>
-            <Link href="/app/organizador/criar-organizacao">
-              <Button>
-                <Building className="mr-2 h-4 w-4" />
-                Criar Organização
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-  
-  // Filtrar eventos conforme o filtro selecionado
-  const filteredEvents = events.filter(event => {
-    if (eventFilter === 'all') return true
-    return event.status === eventFilter
-  }).filter(event => {
-    if (!searchTerm) return true
-    return event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           event.location.toLowerCase().includes(searchTerm.toLowerCase())
-  })
-  
-  return (
-    <div className="container py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Visão geral da sua organização
-          </p>
-        </div>
-      </div>
-      
-      {/* Cards de KPIs simplificados - apenas eventos e equipes */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mb-8">
-        {/* Eventos */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Eventos
-            </CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.totalEvents}</div>
-            <p className="text-xs text-muted-foreground">
-              {kpis.upcomingEvents} eventos próximos
-            </p>
-          </CardContent>
-        </Card>
-        
-        {/* Equipas */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Equipas
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.teamsCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Gerenciar vendas e comissões
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Conteúdo principal */}
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
-        {/* Equipas */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Equipas</CardTitle>
-              <Link href="/app/organizador/equipes">
-                <Button variant="ghost" size="sm">
-                  Ver todas
-                </Button>
-              </Link>
-            </div>
-            <CardDescription>
-              Equipas vinculadas à sua organização
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingTeams ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="flex gap-4 h-16 items-center">
-                    <div className="h-10 w-10 bg-muted animate-pulse rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
-                      <div className="h-3 w-24 bg-muted animate-pulse rounded mt-2"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : teams.length === 0 ? (
-              <div className="text-center py-6">
-                <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                <h3 className="font-medium mb-1">Sem equipas vinculadas</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Adicione equipas para gerir comissões e vincular a eventos.
-                </p>
-                <Link href="/app/organizador/equipes/adicionar">
-                  <Button>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Adicionar Equipa
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {teams.map((team) => (
-                  <div key={team.id} className="flex justify-between items-center border-b pb-3 last:border-0">
-                    <div className="flex items-center">
-                      <Users className="h-6 w-6 text-muted-foreground/60 mr-3" />
-                      <div>
-                        <h4 className="font-medium">{team.name}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {team.eventCount} eventos vinculados
-                        </p>
-                      </div>
-                    </div>
-                      <Badge variant="outline">Sem pendências</Badge>
-                  </div>
-                ))}
-                
-                {teams.length > 0 && kpis.teamsCount > teams.length && (
-                  <div className="pt-2 text-center">
-                    <Link href="/app/organizador/equipes">
-                      <Button variant="ghost" size="sm">
-                        Ver todas ({kpis.teamsCount})
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        {/* Eventos com filtros rápidos */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Próximos Eventos</CardTitle>
-              <Link href="/app/organizador/eventos">
-                <Button variant="ghost" size="sm">
-                  Ver todos
-                </Button>
-              </Link>
-            </div>
-            <CardDescription>
-              Eventos agendados
-            </CardDescription>
-            
-            {/* Filtros rápidos para eventos */}
-            <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
-              <Button 
-                variant={eventFilter === 'all' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setEventFilter('all')}
-              >
-                Todos
-              </Button>
-              <Button 
-                variant={eventFilter === 'active' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setEventFilter('active')}
-              >
-                Próximos
-              </Button>
-              <Button 
-                variant={eventFilter === 'past' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setEventFilter('past')}
-              >
-                Passados
-              </Button>
-              <Button 
-                variant={eventFilter === 'draft' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setEventFilter('draft')}
-              >
-                Rascunhos
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingEvents ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="flex gap-4 h-16 items-center">
-                    <div className="h-10 w-10 bg-muted animate-pulse rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
-                      <div className="h-3 w-24 bg-muted animate-pulse rounded mt-2"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : filterEvents(events, eventFilter).length === 0 ? (
-              <div className="text-center py-6">
-                <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                <h3 className="font-medium mb-1">Sem eventos {getFilterLabel(eventFilter)}</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Adicione eventos para sua organização.
-                </p>
-                <Link href="/app/organizador/eventos/novo">
-                  <Button>
-                    <CalendarPlus className="mr-2 h-4 w-4" />
-                    Criar Evento
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filterEvents(events, eventFilter).map((event) => (
-                  <Link key={event.id} href={`/app/organizador/eventos/${event.id}`}>
-                    <div className="flex justify-between items-center border-b pb-3 last:border-0 hover:bg-muted/30 p-2 rounded cursor-pointer">
-                    <div className="flex items-center">
-                        <CalendarDays className="h-6 w-6 text-muted-foreground/60 mr-3" />
-                      <div>
-                        <h4 className="font-medium">{event.name}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(event.date)} • {event.location}
-                        </p>
-                      </div>
-                    </div>
-                      <Badge variant={getStatusBadgeVariant(event.status)}>
-                        {getStatusLabel(event.status)}
-                      </Badge>
-                    </div>
-                    </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Atividades recentes */}
-      <div className="mb-8">
-      <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Atividades Recentes</CardTitle>
-          <CardDescription>
-              Últimas ações realizadas na plataforma
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-            {activities.length === 0 ? (
-              <div className="text-center py-6">
-                <ArrowRight className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                <h3 className="font-medium mb-1">Nenhuma atividade recente</h3>
-                <p className="text-sm text-muted-foreground">
-                  As atividades aparecerão aqui conforme o uso da plataforma.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activities.map((activity, index) => {
-                  const Icon = activityIcons[activity.type] || activityIcons.other
-                  
-                  return (
-                    <div key={index} className="flex gap-4">
-                      <div className="flex-shrink-0 mt-1">
-                        <Icon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium">{activity.title}</h4>
-                        <p className="text-xs text-muted-foreground">{activity.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(activity.date)}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Informações de Diagnóstico (apenas em caso de erro) */}
-      {loadingError && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="text-destructive">Informações de Diagnóstico</CardTitle>
-            <CardDescription>Informações para resolver problemas de estrutura do banco de dados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-2 text-sm text-muted-foreground">
-              Foi detectado que a coluna <code>organization_id</code> não existe na tabela <code>teams</code>. 
-              Para resolver este problema, você pode:
-            </p>
-            <ol className="list-decimal pl-5 space-y-2 text-sm">
-              <li>Adicionar a coluna <code>organization_id</code> à tabela <code>teams</code> no Supabase</li>
-              <li>Criar a tabela <code>teams</code> com a estrutura correta se ela não existir</li>
-              <li>Ou continuar usando o dashboard sem a funcionalidade de filtro por organização</li>
-            </ol>
-            
-            <div className="border rounded p-3 mt-4">
-              <h4 className="font-medium mb-2">Consulta SQL para adicionar a coluna:</h4>
-              <pre className="bg-muted p-2 rounded text-xs overflow-auto">
-                ALTER TABLE teams ADD COLUMN organization_id UUID REFERENCES organizations(id);
-              </pre>
-          </div>
-        </CardContent>
-      </Card>
-      )}
-    </div>
+    <DashboardContent
+      kpis={kpis}
+      events={events}
+      teams={teams}
+      loadingKpis={loadingKpis}
+      loadingEvents={loadingEvents}
+      loadingTeams={loadingTeams}
+      loadingError={loadingError} 
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      onRefresh={loadOrganizationAndData}
+    />
   )
-}
-
-// Funções auxiliares para filtrar eventos e obter labels de status
-const filterEvents = (events: Event[], filter: string) => {
-  if (filter === 'all') return events
-  return events.filter(event => event.status === filter)
-}
-
-const getStatusLabel = (status: string) => {
-  switch (status) {
-    case 'upcoming': return 'Próximo'
-    case 'past': return 'Passado'
-    case 'draft': return 'Rascunho'
-    case 'canceled': return 'Cancelado'
-    default: return status
-  }
-}
-
-const getStatusBadgeVariant = (status: string) => {
-  switch (status) {
-    case 'upcoming': return 'default'
-    case 'past': return 'secondary'
-    case 'draft': return 'outline'
-    case 'canceled': return 'destructive'
-    default: return 'outline'
-  }
-}
-
-const getFilterLabel = (filter: string) => {
-  switch (filter) {
-    case 'active': return 'próximos'
-    case 'past': return 'passados'
-    case 'draft': return 'em rascunho'
-    default: return ''
-  }
 } 

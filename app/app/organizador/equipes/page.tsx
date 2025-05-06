@@ -26,6 +26,19 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { Label } from '@/components/ui/label'
 import { associateTeamAction } from '@/app/actions/organizerActions'
+import { Badge } from '@/components/ui/badge'
+
+// Definir cores consistentes com o tema
+const colors = {
+  primary: "bg-lime-500 hover:bg-lime-600 text-white",
+  secondary: "bg-white hover:bg-gray-50 text-gray-700",
+  accent: "bg-fuchsia-500 hover:bg-fuchsia-600 text-white",
+  badge: {
+    green: "bg-green-100 text-green-800",
+    fuchsia: "bg-fuchsia-100 text-fuchsia-800",
+    gray: "bg-gray-100 text-gray-700"
+  }
+}
 
 interface Team {
   id: string
@@ -254,7 +267,7 @@ export default function OrganizadorEquipesPage() {
       <div className="container py-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center space-y-4">
-            <Users className="h-12 w-12 text-muted-foreground/50" />
+            <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>
             <h3 className="text-xl font-medium">Carregando equipes...</h3>
           </div>
         </div>
@@ -275,7 +288,7 @@ export default function OrganizadorEquipesPage() {
         <div className="flex items-center gap-3">
           <Dialog open={showCreateTeamDialog} onOpenChange={setShowCreateTeamDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className={colors.primary}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Criar Equipa
               </Button>
@@ -305,7 +318,7 @@ export default function OrganizadorEquipesPage() {
                 <Button variant="outline" onClick={() => setShowCreateTeamDialog(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleCreateTeam} disabled={creatingTeam}>
+                <Button onClick={handleCreateTeam} disabled={creatingTeam} className={colors.primary}>
                   {creatingTeam ? "Criando..." : "Criar Equipe"}
                 </Button>
               </DialogFooter>
@@ -314,7 +327,7 @@ export default function OrganizadorEquipesPage() {
           
           <Dialog open={showCallTeamDialog} onOpenChange={setShowCallTeamDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="hover:border-fuchsia-500 hover:text-fuchsia-600">
                 <Users className="mr-2 h-4 w-4" />
                 Chamar equipa
               </Button>
@@ -349,6 +362,7 @@ export default function OrganizadorEquipesPage() {
                 <Button 
                   onClick={() => handleAssociateTeamByCode()} 
                   disabled={!associationCode.trim() || associatingTeam}
+                  className={colors.accent}
                 >
                   {associatingTeam ? "Associando..." : "Associar Equipa"}
                 </Button>
@@ -361,7 +375,7 @@ export default function OrganizadorEquipesPage() {
       <div className="mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative md:w-80">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-lime-500" />
             <Input
               placeholder="Buscar equipes..."
               className="pl-10"
@@ -374,7 +388,7 @@ export default function OrganizadorEquipesPage() {
       
       {filteredTeams.length === 0 ? (
         <div className="bg-card border rounded-lg p-12 flex flex-col items-center justify-center">
-          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <Users className="h-12 w-12 text-fuchsia-400 mb-4" />
           {searchQuery ? (
             <>
               <h3 className="text-xl font-medium mb-2">Nenhuma equipe encontrada</h3>
@@ -388,7 +402,7 @@ export default function OrganizadorEquipesPage() {
               <p className="text-muted-foreground text-center mb-6">
                 Você ainda não tem equipes vinculadas à sua organização.
               </p>
-              <Button onClick={() => setShowCreateTeamDialog(true)}>
+              <Button onClick={() => setShowCreateTeamDialog(true)} className={colors.primary}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Criar Primeira Equipe
               </Button>
@@ -398,9 +412,9 @@ export default function OrganizadorEquipesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-primary">
+            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-lime-500">
               <CardHeader className="pb-3 text-center">
-                <CardTitle className="text-primary">{team.name}</CardTitle>
+                <CardTitle className="text-gray-900">{team.name}</CardTitle>
                 <CardDescription className="flex items-center justify-center">
                   <Users className="h-4 w-4 mr-1" />
                   {team.member_count} membro{team.member_count !== 1 ? 's' : ''}
@@ -419,7 +433,7 @@ export default function OrganizadorEquipesPage() {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleTeamSettings(team.id)}
-                  className="w-2/3"
+                  className="w-2/3 hover:border-lime-500 hover:text-lime-600"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Editar

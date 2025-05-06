@@ -6,12 +6,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Mail, Lock, AlertTriangle, Info } from 'lucide-react'
+import { ArrowLeft, Mail, Lock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
-import { resetSession } from '@/lib/auth'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { createClient } from '@supabase/supabase-js'
+
+// Cores modernizadas
+const colors = {
+  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
+  textPrimary: 'text-gray-800',
+  textSecondary: 'text-gray-500',
+  accentLime: 'text-lime-600',
+  accentMagenta: 'text-fuchsia-600',
+  bgAccentLime: 'bg-lime-500',
+  bgAccentMagenta: 'bg-fuchsia-500',
+  borderLime: 'border-lime-400',
+  borderFuchsia: 'border-fuchsia-200',
+}
 
 interface FormData {
   email: string
@@ -23,7 +34,6 @@ export default function LoginPage() {
   const { signIn } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
@@ -47,7 +57,6 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-    setDebugInfo(null)
 
     try {
       await signIn(formData.email, formData.password)
@@ -72,94 +81,69 @@ export default function LoginPage() {
   const resetForm = () => {
     setFormData({ email: '', password: '' })
     setError(null)
-    setDebugInfo(null)
-  }
-
-  // Função para testar a conexão direta com o Supabase
-  const testSupabaseConnection = async () => {
-    setDebugInfo("Testando conexão com Supabase...");
-    try {
-      // Criar um cliente Supabase diretamente
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-      
-      // Tentar obter informação pública para testar a conexão
-      const { data, error } = await supabase.from('profiles').select('count').limit(1)
-      
-      if (error) {
-        setDebugInfo(`Erro na conexão: ${error.message}`);
-        return;
-      }
-      
-      // Verificar se há tokens no localStorage
-      const tokens = Object.keys(localStorage)
-        .filter(key => key.startsWith('sb-') || key.includes('supabase'))
-        .map(key => `${key}: ${localStorage.getItem(key) ? "Existe" : "Vazio"}`)
-        .join('\n');
-      
-      // Mostrar informações de depuração
-      setDebugInfo(`
-Conexão com Supabase: OK
-URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}
-Tokens no localStorage:
-${tokens || "Nenhum token encontrado"}
-      `);
-    } catch (error: any) {
-      setDebugInfo(`Erro ao testar conexão: ${error.message}`);
-    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div
+    <div className={`min-h-screen flex flex-col items-center justify-center ${colors.background} py-12 px-4 sm:px-6 lg:px-8 relative`}>
+      {/* Elementos decorativos no fundo */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute -top-20 -left-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+        <div className="absolute top-0 -right-20 w-96 h-96 bg-fuchsia-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+        <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+      </div>
+
+      {/* Elemento decorativo superior */}
+      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 flex items-center justify-center mb-8">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </div>
+        <div className="ml-3 text-2xl font-bold text-gray-800">SNAP</div>
+      </div>
+
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md z-10 mt-24"
       >
-        <div className="bg-white rounded-lg shadow-xl p-8">
+        <div className="border border-gray-100 rounded-xl shadow-lg p-8 bg-white/80 backdrop-blur-lg relative overflow-hidden">
+          {/* Borda decorativa lateral */}
+          <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-lime-500 to-fuchsia-500"></div>
+          
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-3xl font-bold">Iniciar Sessão</h2>
-              <p className="mt-2 text-sm text-gray-600">
+              <h2 className={`text-3xl font-bold ${colors.textPrimary}`}>Iniciar Sessão</h2>
+              <p className={`mt-2 text-sm ${colors.textSecondary}`}>
                 Não tem uma conta?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-800">
+                <Link href="/register" className={`${colors.accentLime} font-medium`}>
                   Registre-se
                 </Link>
               </p>
             </div>
             <Link href="/">
-              <Button variant="ghost" className="text-gray-600 hover:text-gray-800">
+              <Button variant="ghost" className={colors.textSecondary}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Button>
-          </Link>
+            </Link>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mt-4">
+            <Alert variant="destructive" className="mt-4 border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {debugInfo && (
-            <Alert className="mt-4 bg-blue-50 text-blue-800 border-blue-300">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <pre className="whitespace-pre-wrap text-xs">{debugInfo}</pre>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6 mt-6">
             <div>
-              <Label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <Label htmlFor="email" className={`block text-sm font-medium ${colors.textPrimary}`}>
                 E-mail
               </Label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className={`h-5 w-5 text-lime-500`} />
                 </div>
                 <Input
                   id="email"
@@ -167,58 +151,56 @@ ${tokens || "Nenhum token encontrado"}
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="pl-10"
+                  className={`pl-10 bg-white/70 border-gray-200 text-gray-900 rounded-md focus:ring-1 focus:ring-lime-500 focus:border-lime-500`}
                   placeholder="seu@email.com"
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <Label htmlFor="password" className={`block text-sm font-medium ${colors.textPrimary}`}>
                 Palavra-passe
               </Label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-              </div>
+                  <Lock className={`h-5 w-5 text-fuchsia-500`} />
+                </div>
                 <Input
                   id="password"
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="pl-10"
+                  className={`pl-10 bg-white/70 border-gray-200 text-gray-900 rounded-md focus:ring-1 focus:ring-fuchsia-500 focus:border-fuchsia-500`}
                   placeholder="••••••••"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => testSupabaseConnection()}
-                className="flex items-center"
+            <div className="flex items-center justify-center">
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className={`${colors.bgAccentLime} text-white w-full font-semibold shadow-md`}
               >
-                <Info className="h-4 w-4 mr-2" />
-                Testar Conexão
-              </Button>
-              <Button type="submit" disabled={isLoading}>
                 {isLoading ? 'A iniciar sessão...' : 'Iniciar Sessão'}
               </Button>
             </div>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Ainda não tem uma conta?{" "}
-              <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-                Criar Conta
+            <p className={`text-sm ${colors.textSecondary}`}>
+              Esqueceu sua senha?{" "}
+              <Link href="/forgot-password" className={`font-medium ${colors.accentMagenta}`}>
+                Recuperar Acesso
               </Link>
             </p>
           </div>
-          </div>
-        </motion.div>
+        </div>
+
+        {/* Sombra adicional para profundidade */}
+        <div className="h-2 mx-8 bg-gradient-to-r from-transparent via-gray-200 to-transparent rounded-full opacity-50 mt-1"></div>
+      </motion.div>
     </div>
   )
 }

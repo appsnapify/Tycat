@@ -2,21 +2,81 @@
 // [...params] captura /promo/[eventId]/[promoterId]/[teamId]
 
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-
-// Importar o mesmo Client Component usado em /g/[id]
-import GuestListPageClient from '../../g/[id]/GuestListPageClient';
+import { createReadOnlyClient } from '@/lib/supabase/server';
+import Image from 'next/image';
+import { CalendarIcon, Clock, MapPin, UserCheck } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { GuestRequestCard } from '@/components/promoter/GuestRequestCard';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 
 // Interface para props da página
 interface PageProps {
-  params: Promise<{ params: string[] }>;
+  params: { params: string[] | Promise<string[]> };
+}
+
+// Função para preparar os dados necessários no servidor para evitar uso do createClient no cliente
+async function getPromoAndEventData(eventId: string, promoterId: string, teamId: string) {
+  try {
+    // Usar await explicitamente com createReadOnlyClient
+    const supabase = await createReadOnlyClient();
+    
+    // Obter dados do evento
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select(`
+        id, 
+        title, 
+        description,
+        date,
+        time,
+        location,
+        flyer_url,
+        is_published,
+        guest_list_open_datetime,
+        guest_list_close_datetime
+      `)
+      .eq('id', eventId)
+      .eq('is_published', true)
+      .maybeSingle();
+      
+    if (eventError || !eventData) {
+      console.error('Evento não encontrado ou não publicado:', eventError);
+      return null;
+    }
+    
+    // Obter dados do promotor
+    const { data: promoterData } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('id', promoterId)
+      .maybeSingle();
+      
+    // Checar associação evento-promotor
+    const { data: eventPromoterData } = await supabase
+      .from('event_promoters')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('promoter_id', promoterId)
+      .eq('team_id', teamId)
+      .maybeSingle();
+    
+    return {
+      event: eventData,
+      promoter: promoterData || null,
+      hasAssociation: !!eventPromoterData
+    };
+  } catch (error) {
+    console.error('Erro ao buscar dados:', error);
+    return null;
+  }
 }
 
 // Server Component que captura parâmetros da URL e os passa para o cliente
 export default async function PromoterGuestListPage({ params }: PageProps) {
-  // Extrair os parâmetros da URL - await params antes de acessar params.params
-  const resolvedParams = await params;
-  const urlParams = resolvedParams.params;
+  // Extrair os parâmetros da URL com tratamento seguro para Promises
+  const urlParams = await params.params;
   
   console.log('Promoter Page - Parâmetros recebidos:', urlParams);
   
@@ -36,93 +96,121 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
     notFound();
   }
   
-  // Verificar se existe uma associação válida entre o evento, promotor e equipe
-  try {
-    const supabase = createClient();
+  // Carregar todos os dados necessários no servidor
+  const data = await getPromoAndEventData(eventId, promoterId, teamId);
+  
+  if (!data) {
+    notFound();
+  }
+  
+  const { event: eventData, promoter: promoterData } = data;
     
-    // Verificar se existe uma associação válida na tabela event_promoters
-    const { data: eventPromoterData, error: eventPromoterError } = await supabase
-      .from('event_promoters')
-      .select('id, promoter_id, team_id')
-      .eq('event_id', eventId)
-      .eq('promoter_id', promoterId)
-      .eq('team_id', teamId)
-      .maybeSingle();
+    // Formatar data e hora para exibição
+    const formatDate = (dateString: string | null | undefined) => {
+      if (!dateString) return 'Data não definida';
+      return format(new Date(dateString), 'PPP', { locale: pt });
+    };
     
-    // Registrar dados para debug
-    console.log('Verificação event_promoters:', { 
-      eventId, 
-      promoterId, 
-      teamId, 
-      encontrado: !!eventPromoterData,
-      erro: eventPromoterError ? eventPromoterError.message : null
-    });
+    const formatTime = (timeString: string | null | undefined) => {
+      if (!timeString) return '';
+      // Converte string "HH:MM:SS" para "HH:MM"
+      return timeString.substring(0, 5);
+    };
     
-    // Não bloquear se não encontrar associação exata - apenas registrar
-    if (eventPromoterError) {
-      console.warn('Não foi encontrada associação exata em event_promoters, mas continuando:', eventPromoterError);
-    }
+    // Checar se a guest list está aberta
+    const now = new Date();
+    let isGuestListOpen = true;
+    let statusMessage = "Inscrições abertas";
     
-    // Verificar se o evento existe e está ativo
-    const { data: eventData, error: eventError } = await supabase
-      .from('events')
-      .select('id, title, is_published')
-      .eq('id', eventId)
-      .eq('is_published', true)
-      .maybeSingle();
+    if (eventData.guest_list_open_datetime && eventData.guest_list_close_datetime) {
+      const openTime = new Date(eventData.guest_list_open_datetime);
+      const closeTime = new Date(eventData.guest_list_close_datetime);
       
-    if (eventError || !eventData) {
-      console.error('Evento não encontrado ou não publicado:', eventError);
-      notFound();
+      if (now < openTime) {
+        isGuestListOpen = false;
+        statusMessage = `Inscrições abrem em ${format(openTime, 'Pp', { locale: pt })}`;
+      } else if (now > closeTime) {
+        isGuestListOpen = false;
+        statusMessage = "Inscrições encerradas";
+      }
     }
     
-    // Verificar se promotor existe, mas NÃO bloquear se não existir
-    const { data: promoterData, error: promoterError } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name')
-      .eq('id', promoterId)
-      .maybeSingle();
-      
-    if (promoterError) {
-      console.warn(`Erro ao verificar promotor ${promoterId}:`, promoterError);
-      // Não bloquear - continuar mesmo com erro
-    } else if (!promoterData) {
-      // Registrar apenas um aviso e permitir o acesso
-      console.warn(`Promotor ${promoterId} não encontrado, mas permitindo acesso`);
-    } else {
-      console.log(`Promotor encontrado: ${promoterData.first_name} ${promoterData.last_name}`);
-    }
-    
-    // Chegando aqui, os parâmetros são válidos, mesmo que não haja um registro exato em event_promoters
-    console.log('Parâmetros validados. Renderizando página com:', { eventId, promoterId, teamId });
-    
-    // Renderizar o componente GuestListPageClient com os parâmetros da URL
+    // Renderizar a página com a informação do evento e o botão para solicitar ingresso
     return (
-      <GuestListPageClient
-        eventId={eventId}
-        promoterId={promoterId}
-        teamId={teamId}
-      />
-    );
-    
-  } catch (error) {
-    console.error('Erro ao validar associação entre evento e promotor:', error);
-    
-    // Em vez de notFound(), que mostra uma página 404,
-    // vamos renderizar o componente mesmo assim com uma mensagem de erro
-    return (
-      <div className="container mx-auto p-4 md:p-8 text-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          <h2 className="text-lg font-semibold mb-2">Erro ao carregar detalhes</h2>
-          <p>Ocorreu um problema ao validar os parâmetros, mas você ainda pode se registrar.</p>
-        </div>
-        
-        <GuestListPageClient
-          eventId={eventId}
-          promoterId={promoterId}
-          teamId={teamId}
-        />
+      <div className="container mx-auto p-4 max-w-4xl">
+        <Card className="mb-8 overflow-hidden">
+          {eventData.flyer_url && (
+            <div className="relative w-full aspect-[3/2] overflow-hidden">
+              <Image 
+                src={eventData.flyer_url}
+                alt={eventData.title}
+                fill
+                style={{objectFit: 'cover'}}
+                priority
+              />
+            </div>
+          )}
+          
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-2xl font-bold">{eventData.title}</CardTitle>
+                {promoterData && (
+                  <CardDescription>
+                    Convite de {promoterData.first_name} {promoterData.last_name}
+                  </CardDescription>
+                )}
+              </div>
+              <Badge 
+                variant={isGuestListOpen ? "default" : "secondary"}
+                className="ml-2"
+              >
+                {isGuestListOpen ? "Aberto" : "Fechado"}
+              </Badge>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span>{formatDate(eventData.date)}</span>
+                {eventData.time && (
+                  <>
+                    <Clock className="h-4 w-4 ml-2 text-muted-foreground" />
+                    <span>{formatTime(eventData.time)}</span>
+                  </>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <span>{eventData.location}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
+                <span>{statusMessage}</span>
+              </div>
+            </div>
+            
+            {eventData.description && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                <p>{eventData.description}</p>
+              </div>
+            )}
+            
+            <div className="pt-4">
+            {/* Passa os parâmetros para o componente cliente */}
+              <GuestRequestCard 
+                eventId={eventId}
+                promoterId={promoterId}
+                teamId={teamId}
+                className="w-full"
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
-  }
 } 

@@ -125,35 +125,38 @@ export default function GuestListTable({ eventId }: GuestListTableProps) {
     return (
         <div className="space-y-4">
             {/* Filtros e Pesquisa (já responsivo com md:flex-row) */}
-            <div className="flex flex-col md:flex-row gap-4">
-                <Input
-                    placeholder="Pesquisar por nome ou telefone..."
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    className="max-w-sm"
-                />
+            <div className="flex flex-col md:flex-row gap-4 items-center p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="relative flex-1">
+                    <Input
+                        placeholder="Pesquisar por nome ou telefone..."
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        className="max-w-sm border-gray-200 focus-visible:ring-lime-500"
+                    />
+                </div>
                 <div className="flex items-center space-x-2">
                      <Checkbox 
                         id="filter-checkedin"
                         checked={filterCheckedIn === true} // Só marca se for true
                         onCheckedChange={handleFilterChange}
+                        className="data-[state=checked]:bg-fuchsia-500 data-[state=checked]:border-fuchsia-500"
                     />
-                    <Label htmlFor="filter-checkedin">Mostrar apenas check-in</Label>
+                    <Label htmlFor="filter-checkedin" className="text-gray-700">Mostrar apenas check-in</Label>
                 </div>
             </div>
 
             {/* Tabela de Convidados (adicionar container com overflow) */}
-            <div className="rounded-md border overflow-x-auto">
+            <div className="rounded-md border overflow-x-auto shadow-sm">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-gray-50">
                         <TableRow>
-                            <TableHead>Nome</TableHead>
-                            <TableHead>Check-in</TableHead>
-                            <TableHead>Promotor</TableHead>
+                            <TableHead className="font-medium">Nome</TableHead>
+                            <TableHead className="font-medium">Check-in</TableHead>
+                            <TableHead className="font-medium">Promotor</TableHead>
                             {/* Ocultar em ecrãs < sm */}
-                            <TableHead className="hidden sm:table-cell">Equipa</TableHead>
+                            <TableHead className="hidden sm:table-cell font-medium">Equipa</TableHead>
                             {/* Ocultar em ecrãs < sm */}
-                            <TableHead className="hidden sm:table-cell">Registado em</TableHead>
+                            <TableHead className="hidden sm:table-cell font-medium">Registado em</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -173,20 +176,32 @@ export default function GuestListTable({ eventId }: GuestListTableProps) {
                             </TableRow>
                         ) : guests.length > 0 ? (
                             guests.map((guest) => (
-                                <TableRow key={guest.id}>
+                                <TableRow key={guest.id} className="hover:bg-gray-50">
                                     <TableCell className="font-medium">{guest.name || '-'}</TableCell>
-                                    <TableCell>{guest.checked_in ? `Sim (${formatTimeSimple(guest.check_in_time)})` : 'Não'}</TableCell>
-                                    <TableCell>{guest.promoter_name || '-'}</TableCell>
+                                    <TableCell>
+                                        {guest.checked_in ? (
+                                            <div className="flex items-center">
+                                                <span className="h-2 w-2 rounded-full bg-lime-500 mr-2"></span>
+                                                <span className="text-lime-700 font-medium">{formatTimeSimple(guest.check_in_time)}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center">
+                                                <span className="h-2 w-2 rounded-full bg-gray-300 mr-2"></span>
+                                                <span className="text-gray-500">Pendente</span>
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-gray-700">{guest.promoter_name || '-'}</TableCell>
                                     {/* Ocultar em ecrãs < sm */}
-                                    <TableCell className="hidden sm:table-cell">{guest.team_name || '-'}</TableCell>
+                                    <TableCell className="hidden sm:table-cell text-gray-500">{guest.team_name || '-'}</TableCell>
                                     {/* Ocultar em ecrãs < sm */}
-                                    <TableCell className="hidden sm:table-cell">{formatDateSimple(guest.created_at)}</TableCell>
+                                    <TableCell className="hidden sm:table-cell text-gray-500">{formatDateSimple(guest.created_at)}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
                                  {/* Ajustar colSpan */}
-                                <TableCell colSpan={5} className="text-center">Nenhum convidado encontrado.</TableCell>
+                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">Nenhum convidado encontrado.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -196,7 +211,7 @@ export default function GuestListTable({ eventId }: GuestListTableProps) {
             {/* Paginação (tornar responsiva) */}
             {totalPages > 1 && (
                 <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-4 py-4">
-                     <div className="text-sm text-muted-foreground text-center sm:text-left">
+                     <div className="text-sm text-gray-500 text-center sm:text-left">
                         Página {currentPage} de {totalPages} ({totalCount} convidados)
                     </div>
                     <div className="flex space-x-2">
@@ -205,6 +220,7 @@ export default function GuestListTable({ eventId }: GuestListTableProps) {
                             size="sm"
                             onClick={handlePreviousPage}
                             disabled={currentPage <= 1 || isPending || isLoading}
+                            className="border-gray-200 hover:border-lime-300 hover:text-lime-700"
                         >
                             Anterior
                         </Button>
@@ -213,6 +229,7 @@ export default function GuestListTable({ eventId }: GuestListTableProps) {
                             size="sm"
                             onClick={handleNextPage}
                             disabled={currentPage >= totalPages || isPending || isLoading}
+                            className="border-gray-200 hover:border-fuchsia-300 hover:text-fuchsia-700"
                         >
                             Próxima
                         </Button>

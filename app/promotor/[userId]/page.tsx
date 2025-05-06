@@ -40,8 +40,8 @@ const getInitials = (firstName?: string | null, lastName?: string | null): strin
 
 // Update function signature to access params properly in Next.js 14
 export default async function PromoterPublicPage({ params }: { params: { userId: string } }) {
-  // Access userId safely
-  const userId = params.userId;
+  // Uso dos parâmetros com await - necessário no Next.js 14
+  const { userId } = await params;
 
   // Basic UUID validation
   const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId);
@@ -50,12 +50,14 @@ export default async function PromoterPublicPage({ params }: { params: { userId:
   }
 
   try {
-    // Use the function designed for Server Components
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    // Criar cliente Supabase usando a abordagem recomendada com await
+    const cookieStore = await cookies();
+    const supabase = createServerComponentClient<Database>({ 
+      cookies: () => cookieStore 
+    });
 
     // Call the RPC to get all data in one go
-    const { data: pageData, error: rpcError } = await supabase.rpc(
+    const { data: pageData, error: rpcError } = await (supabase as any).rpc(
       'get_public_promoter_page_data',
       { promoter_user_id: userId }
     );
@@ -140,7 +142,7 @@ export default async function PromoterPublicPage({ params }: { params: { userId:
           <h2 className="text-2xl font-bold text-gray-900 mb-10 font-oswald">Eventos</h2>
           {visibleEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-              {visibleEvents.map((event: PromoterPageDataEntry) => {
+              {visibleEvents.map((event: PromoterPageDataEntry, index: number) => {
                 // Determine correct link based on event type
                 let linkHref: string;
                 if (event.event_type === 'guest-list') {
@@ -162,6 +164,8 @@ export default async function PromoterPublicPage({ params }: { params: { userId:
                             src={event.event_flyer_url}
                             alt={event.event_title || 'Evento'}
                             fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            priority={index === 0} // Priorizar apenas a primeira imagem (LCP)
                             className="object-cover"
                           />
                         ) : (

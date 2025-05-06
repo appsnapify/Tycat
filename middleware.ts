@@ -46,9 +46,28 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
 };
 
 // Middleware de autenticação para controlar acesso a rotas protegidas
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next()
-  const pathname = request.nextUrl.pathname;
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  
+  // Verificar se estamos em ambiente de desenvolvimento e acessando a rota de envio de email
+  if (process.env.NODE_ENV === 'development' && 
+      req.nextUrl.pathname.startsWith('/api/send-welcome-email')) {
+    
+    // Verificar se a API key do Resend está configurada
+    if (!process.env.RESEND_API_KEY) {
+      console.error('⚠️ RESEND_API_KEY não está configurada! Email não será enviado.')
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'API Key do Resend não configurada', 
+          hint: 'Verifique se RESEND_API_KEY está presente no .env.local'
+        },
+        { status: 500 }
+      )
+    }
+  }
+  
+  const pathname = req.nextUrl.pathname;
   
   console.log(`[Middleware] Interceptando requisição para URL: ${pathname}`)
 
@@ -56,20 +75,20 @@ export async function middleware(request: NextRequest) {
   const publicAppRoutes = ['/app/dashboard1']; // Adicione outras rotas se necessário
   if (publicAppRoutes.includes(pathname)) {
     console.log(`[Middleware] Rota pública ${pathname} permitida sem autenticação.`);
-    return response; // Permite o acesso
+    return res; // Permite o acesso
   }
 
   // Verificar se já existe um redirecionamento
-  const requestHeaders = new Headers(request.headers)
+  const requestHeaders = new Headers(req.headers)
   const redirectUrl = requestHeaders.get('x-middleware-rewrite')
   
   if (redirectUrl) {
     console.log(`[Middleware] Redirecionamento já configurado para: ${redirectUrl}`)
-    return NextResponse.next()
+    return res
   }
   
   // Obter a sessão do usuário
-  const supabase = createMiddlewareClient({ req: request, res: response })
+  const supabase = createMiddlewareClient({ req, res })
   const { data: { session } } = await supabase.auth.getSession()
   
   // Verificar se o usuário está autenticado
@@ -77,12 +96,12 @@ export async function middleware(request: NextRequest) {
     console.log(`[Middleware] Usuário não autenticado. Redirecting to /login`)
     
     // Se estiver acessando uma rota protegida, redirecionar para login
-    if (request.nextUrl.pathname.startsWith('/app')) {
-      const redirectUrl = new URL('/login', request.url)
+    if (req.nextUrl.pathname.startsWith('/app')) {
+      const redirectUrl = new URL('/login', req.url)
       return NextResponse.redirect(redirectUrl)
     }
     
-    return NextResponse.next()
+    return res
   }
   
   // Log para depuração
@@ -118,16 +137,16 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set('x-user-id', session.user.id || '')
   
   // Controle de acesso baseado em papel
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/app/')
+  const isProtectedRoute = req.nextUrl.pathname.startsWith('/app/')
   
   if (isProtectedRoute) {
-    console.log(`[Middleware] Verificando acesso para rota protegida: ${request.nextUrl.pathname}`)
+    console.log(`[Middleware] Verificando acesso para rota protegida: ${req.nextUrl.pathname}`)
     
     // Caso especial: Se for promotor tentando acessar o dashboard, verificar se tem equipe
-    if (userRole === 'promotor' && request.nextUrl.pathname === '/app/promotor/dashboard') {
+    if (userRole === 'promotor' && req.nextUrl.pathname === '/app/promotor/dashboard') {
       if (!session.user.user_metadata?.team_id) {
         console.log('[Middleware] Promotor sem equipe tentando acessar dashboard, redirecionando para página de equipes')
-        const redirectUrl = new URL('/app/promotor/equipes', request.url)
+        const redirectUrl = new URL('/app/promotor/equipes', req.url)
         return NextResponse.redirect(redirectUrl)
       }
     }
@@ -152,40 +171,40 @@ export async function middleware(request: NextRequest) {
     
     // Verificar exceções primeiro
     const isExceptionRoute = anyRoleAllowedRoutes.some(route => 
-      request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(`${route}/`)
+      req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(`${route}/`)
     )
     
     if (isExceptionRoute) {
-      console.log(`[Middleware] Rota de exceção permitida para qualquer papel: ${request.nextUrl.pathname}`)
-      return NextResponse.next()
+      console.log(`[Middleware] Rota de exceção permitida para qualquer papel: ${req.nextUrl.pathname}`)
+      return res
     }
     
     // Obter rotas permitidas para o papel do usuário
     const allowedRoutes = roleToRoutes[userRole] || []
     
     // Verificar se o usuário pode acessar a rota atual
-    const canAccess = allowedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+    const canAccess = allowedRoutes.some(route => req.nextUrl.pathname.startsWith(route))
     
-    console.log(`[Middleware] Papel: ${userRole}, Rota: ${request.nextUrl.pathname}, Acesso permitido: ${canAccess}`)
+    console.log(`[Middleware] Papel: ${userRole}, Rota: ${req.nextUrl.pathname}, Acesso permitido: ${canAccess}`)
     
     if (!canAccess) {
       // Se não puder acessar, redirecionar para o dashboard apropriado
       const redirectTo = getDashboardUrlByRole(userRole, session.user.user_metadata)
       
       console.log(`[Middleware] Redirecionando para: ${redirectTo}`)
-      const redirectUrl = new URL(redirectTo, request.url)
+      const redirectUrl = new URL(redirectTo, req.url)
       return NextResponse.redirect(redirectUrl)
     }
   }
   
   // Atualizar headers da resposta para debugging
-  const res = NextResponse.next({
+  const responseWithHeaders = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   })
   
-  return res
+  return responseWithHeaders
 }
 
 // Configurar quais caminhos este middleware deve ser executado

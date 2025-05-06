@@ -310,10 +310,14 @@ export default function OrganizacaoPage() {
             <Skeleton className="h-4 w-64 mt-2" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-10 w-full mb-4" /> 
-            <Skeleton className="h-10 w-full mb-4" />
-            <Skeleton className="h-10 w-full mb-4" />
-            <Skeleton className="h-64 w-full" /> 
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" /> 
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <div className="flex justify-center py-10">
+                <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -324,12 +328,12 @@ export default function OrganizacaoPage() {
     return (
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-6">Organização</h1>
-        <Card className="border-destructive">
+        <Card className="border-fuchsia-300 bg-fuchsia-50">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
+            <CardTitle className="text-fuchsia-700 flex items-center gap-2">
               <AlertCircle className="h-5 w-5" /> Erro ao Carregar Dados
             </CardTitle>
-            <CardDescription className="text-destructive">
+            <CardDescription className="text-fuchsia-600">
               {error}
             </CardDescription>
           </CardHeader>
@@ -342,9 +346,11 @@ export default function OrganizacaoPage() {
        return (
          <div className="container py-8">
            <h1 className="text-3xl font-bold mb-6">Organização</h1>
-           <Card>
+           <Card className="bg-gray-50 border-dashed border-2 border-gray-200">
              <CardHeader>
-               <CardTitle>Nenhuma Organização Encontrada</CardTitle>
+               <CardTitle className="flex items-center gap-2">
+                 <AlertCircle className="h-5 w-5 text-fuchsia-500" /> Nenhuma Organização Encontrada
+               </CardTitle>
                <CardDescription>
                  Este utilizador não parece estar associado a nenhuma organização.
                </CardDescription>
@@ -358,7 +364,12 @@ export default function OrganizacaoPage() {
     return (
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-6">Organização</h1>
-        <p className="text-muted-foreground">Inicializando formulário...</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>
+            <h3 className="text-xl font-medium">Carregando dados da organização...</h3>
+          </div>
+        </div>
       </div>
     )
   }
@@ -370,10 +381,12 @@ export default function OrganizacaoPage() {
       {/* Use grid layout for form and preview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          {/* Form Card (takes 2 columns on large screens) */}
-         <Card className="lg:col-span-2">
+         <Card className="lg:col-span-2 border-l-4 border-l-lime-500">
           <CardHeader>
             {/* Display name from state if available, otherwise from fetched data */}
-            <CardTitle>{editFormData?.name || organizationData?.name || 'Organização'}</CardTitle>
+            <CardTitle>
+              <span className="text-gray-900">{editFormData?.name || organizationData?.name || 'Organização'}</span>
+            </CardTitle>
             <CardDescription>
               Aqui pode editar os detalhes da sua organização.
             </CardDescription>
@@ -437,7 +450,7 @@ export default function OrganizacaoPage() {
    
               {/* Redes Sociais */}
               <div className="space-y-4 pt-4 border-t">
-                <Label className="font-semibold">Redes Sociais</Label>
+                <Label className="font-semibold text-fuchsia-600">Redes Sociais</Label>
                 <div>
                   <Label htmlFor="instagram">Instagram (URL Completo)</Label>
                   <Input
@@ -486,7 +499,7 @@ export default function OrganizacaoPage() {
    
               {/* Upload de Imagens */}
               <div className="space-y-6 pt-4 border-t">
-                <Label className="font-semibold">Imagens</Label>
+                <Label className="font-semibold text-lime-600">Imagens</Label>
                 {/* Logo */}
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4 items-start'>
                   <div>
@@ -512,7 +525,7 @@ export default function OrganizacaoPage() {
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('logo')?.click()}
-                      className="w-full"
+                      className="w-full hover:border-fuchsia-500 hover:text-fuchsia-600"
                       disabled={isSaving}
                     >
                       <Upload className="mr-2 h-4 w-4" />
@@ -547,7 +560,7 @@ export default function OrganizacaoPage() {
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('banner')?.click()}
-                      className="w-full"
+                      className="w-full hover:border-fuchsia-500 hover:text-fuchsia-600"
                       disabled={isSaving}
                     >
                       <Upload className="mr-2 h-4 w-4" />
@@ -562,7 +575,7 @@ export default function OrganizacaoPage() {
               
               {/* Botão de Guardar */}
               <div className="flex justify-end pt-4 border-t">
-                <Button type="submit" disabled={isSaving || showLoading}>
+                <Button type="submit" disabled={isSaving || showLoading} className="bg-lime-500 hover:bg-lime-600 text-white">
                   {isSaving ? 'Guardando...' : 'Guardar Alterações'}
                   <Save className="ml-2 h-4 w-4" />
                 </Button>
@@ -574,7 +587,7 @@ export default function OrganizacaoPage() {
         {/* Preview Column (takes 1 column on large screens) */}
         <div className="lg:col-span-1 space-y-6">
           {/* Preview Card */}
-          <Card className="sticky top-8">
+          <Card className="sticky top-8 border-l-4 border-l-fuchsia-500">
              <CardHeader>
                 <CardTitle>Pré-visualização</CardTitle>
                 <CardDescription>Como a sua organização aparecerá.</CardDescription>
@@ -610,8 +623,8 @@ export default function OrganizacaoPage() {
                   value={`${window.location.origin}/organizacao/${organizationData.slug}`}
                   className="text-xs flex-1"
                 />
-                <Button type="button" size="icon" variant="outline" onClick={handleCopyLink}>
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                <Button type="button" size="icon" variant="outline" onClick={handleCopyLink} className="hover:text-fuchsia-600 hover:border-fuchsia-500">
+                  {copied ? <Check className="h-4 w-4 text-lime-600" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </CardContent>
             </Card>

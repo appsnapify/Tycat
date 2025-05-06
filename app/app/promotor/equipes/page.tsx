@@ -175,7 +175,7 @@ export default function EquipesPage() {
     }
     // Considerar 'chefe-equipe' também como líder
     if (role === 'leader' || role === 'chefe-equipe') {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Líder</Badge>
+      return <Badge variant="outline" className="bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200">Líder</Badge>
     }
     return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Membro</Badge>
   }
@@ -184,7 +184,7 @@ export default function EquipesPage() {
   if (loading || isTeamLeader === undefined || isTeamLeader === null || isTeamLeader === true) {
     return (
       <div className="flex items-center justify-center h-screen">
-           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+           <Loader2 className="h-8 w-8 animate-spin text-fuchsia-500" />
            <span className="ml-2">
                {isTeamLeader === true ? "Redirecionando..." : "A carregar dados..."}
            </span>

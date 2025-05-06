@@ -1,3 +1,5 @@
+@import 'react-phone-number-input/style.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,5 +59,103 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Estilos personalizados para PhoneInput */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  border-radius: 0.5rem;
+  width: 100%;
+}
+
+.PhoneInputCountry {
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.PhoneInputCountryIcon {
+  width: 1.5rem;
+  height: 1rem;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.PhoneInputCountrySelectArrow {
+  margin-left: 0.25rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-style: solid;
+  border-color: currentColor transparent transparent;
+  border-width: 0.25rem 0.25rem 0;
+  opacity: 0.6;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0.5rem;
+  outline: none;
+  background: transparent;
+}
+
+.PhoneInputInput:focus {
+  outline: none;
+}
+
+/* Melhorias para o seletor dropdown */
+.PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.PhoneInputCountry {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-right: 0.5rem;
+}
+
+/* Estilo personalizado para o componente PhoneInput */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.PhoneInputCountry {
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font-size: 1rem;
+  width: 100%;
+}
+
+/* Estilos para o diálogo de autenticação */
+.auth-dialog .PhoneInput {
+  margin-bottom: 1rem;
+}
+
+.auth-dialog .button-container {
+  padding-top: 1rem;
+  padding-bottom: 0.5rem;
 }
 

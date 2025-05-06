@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -26,12 +26,6 @@ import {
 } from '@/components/ui/form'
 import { Badge } from '@/components/ui/badge'
 import { use } from 'react'
-
-// Inicializar cliente do Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 // Schema de validação para o formulário de registro
 const guestFormSchema = z.object({
@@ -86,6 +80,9 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     async function loadEvent() {
       try {
         setLoading(true)
+        
+        // Inicializar cliente Supabase localmente
+        const supabase = createClient()
         
         // Buscar evento do Supabase
         const { data, error } = await supabase
@@ -199,6 +196,9 @@ function GuestListPageContent({ eventId }: { eventId: string }) {
     setSubmitting(true)
     try {
       console.log("Registrando convidado na guest list:", data)
+      
+      // Inicializar cliente Supabase localmente
+      const supabase = createClient()
       
       // Gerar código QR único (simplificado, na prática você provavelmente usaria uma biblioteca)
       const qrCode = `${event.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`

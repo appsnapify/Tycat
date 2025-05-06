@@ -156,6 +156,27 @@ export interface Database {
           p_team_description: string
         }
         Returns: Json
+      },
+      get_public_promoter_page_data: {
+        Args: {
+          promoter_user_id: string
+        }
+        Returns: {
+          promoter_first_name: string | null
+          promoter_last_name: string | null
+          promoter_avatar_url: string | null
+          event_id: string
+          event_title: string | null
+          event_flyer_url: string | null
+          event_type: string | null
+          event_date: string | null
+          event_time: string | null
+          org_id: string | null
+          org_name: string | null
+          org_logo_url: string | null
+          tracking_promoter_id: string
+          tracking_team_id: string
+        }[]
       }
     }
     Enums: {

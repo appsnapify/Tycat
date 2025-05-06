@@ -157,3 +157,117 @@ Se encontrar problemas ao aplicar essas correções, entre em contato com a equi
 ---
 
 *Este documento e as correções foram atualizados em 08/04/2025.*
+
+# Resolução do Erro: "Cookies can only be modified in a Server Action or Route Handler"
+
+## O Problema
+
+Em aplicativos Next.js 13+ com Supabase, você pode encontrar o seguinte erro:
+
+```
+Error: Cookies can only be modified in a Server Action or Route Handler
+```
+
+Este erro ocorre porque o Next.js impõe restrições sobre onde os cookies podem ser modificados:
+
+- ✅ **Server Actions**: Podem ler e modificar cookies
+- ✅ **Route Handlers**: Podem ler e modificar cookies  
+- ❌ **Server Components**: Podem apenas ler cookies, não modificá-los
+
+## A Solução
+
+Foram criados dois clientes Supabase especializados em `lib/supabase-server.ts`:
+
+1. **`createReadOnlyClient()`** - Para uso em Server Components (páginas, layouts)
+   - Só pode ler cookies, não modificá-los
+   - Ideal para componentes que apenas leem dados
+
+2. **`createClient()`** - Para uso em Server Actions e Route Handlers
+   - Pode ler e modificar cookies
+   - Use para autenticação e operações que precisam alterar estado
+
+## Como Migrar Código Existente
+
+Se você estiver enfrentando este erro, siga estas etapas:
+
+### 1. Identifique o Contexto
+
+Determine se o código está em:
+- Um Server Component (`.tsx` sem `'use client'` no topo)
+- Um Server Action (arquivo ou função com `'use server'`)
+- Um Route Handler (`app/api/*/route.ts`)
+
+### 2. Use o Cliente Apropriado
+
+#### Em Server Components:
+
+```typescript
+// ❌ ERRADO
+import { createClient } from '@/lib/supabase-server';
+// ...
+const supabase = await createClient();
+
+// ✅ CORRETO
+import { createReadOnlyClient } from '@/lib/supabase-server';
+// ...
+const supabase = await createReadOnlyClient();
+```
+
+#### Em Server Actions:
+
+```typescript
+// ✅ CORRETO
+'use server'
+import { createClient } from '@/lib/supabase-server';
+
+export async function minhaAction() {
+  const supabase = await createClient();
+  // Operações de autenticação funcionarão aqui
+}
+```
+
+### 3. Reestruture se Necessário
+
+Se você precisar modificar cookies em um Server Component:
+
+1. Crie um Server Action separado para manipulação de cookies
+2. Chame o Server Action do seu Server Component
+
+```typescript
+// auth-actions.ts
+'use server'
+import { createClient } from '@/lib/supabase-server';
+
+export async function fazerLogin(email: string, senha: string) {
+  const supabase = await createClient();
+  return supabase.auth.signInWithPassword({
+    email,
+    password: senha
+  });
+}
+
+// MeuComponente.tsx (Server Component)
+import { createReadOnlyClient } from '@/lib/supabase-server';
+import { fazerLogin } from './auth-actions';
+
+export default async function MeuComponente() {
+  // Para leitura de dados
+  const supabase = await createReadOnlyClient();
+  const { data } = await supabase.from('produtos').select();
+  
+  // Login será gerenciado pela action
+  return (
+    <form action={fazerLogin}>
+      {/* ... */}
+    </form>
+  );
+}
+```
+
+## Resumo
+
+- Use `createReadOnlyClient()` em **Server Components**
+- Use `createClient()` em **Server Actions** e **Route Handlers**
+- Reestruture seu código para mover manipulações de cookies para Server Actions
+
+Esta abordagem resolve o erro sem exigir mudanças arquitetônicas significativas em seu aplicativo.

@@ -154,6 +154,68 @@ async function fetchTopPromotersStats(eventId: string, supabaseClient: any) {
   return data; // Retorna diretamente os dados da função RPC
 }
 
+// Nova Função para buscar estatísticas de gênero
+async function fetchGenderStats(eventId: string, supabaseClient: any) {
+  console.log(`[Stats] Buscando estatísticas de gênero para evento: ${eventId}`);
+  
+  // Corrigindo a consulta para buscar todos os gêneros, não apenas M e F
+  const { data: allGuests, error: allError } = await supabaseClient
+    .from('guests')
+    .select('gender')
+    .eq('event_id', eventId)
+    .not('gender', 'is', null);
+    
+  if (allError) {
+    console.error("[Stats] Erro ao buscar todos os dados de gênero:", allError);
+    return { 
+      genderData: [] 
+    };
+  }
+  
+  if (!allGuests || allGuests.length === 0) {
+    console.log("[Stats] Nenhum dado de gênero encontrado.");
+    return { 
+      genderData: [] 
+    };
+  }
+  
+  // Calcular contagens para todos os gêneros presentes nos dados
+  const genderCounts = {};
+  allGuests.forEach(guest => {
+    const gender = guest.gender;
+    genderCounts[gender] = (genderCounts[gender] || 0) + 1;
+  });
+  
+  // Calcular o total
+  const total = allGuests.length;
+  
+  // Transformar em array com percentuais
+  const genderData = Object.entries(genderCounts).map(([gender, count]) => {
+    const percentage = total > 0 ? Math.round((count as number / total) * 100) : 0;
+    
+    // Converter códigos de gênero para nomes descritivos
+    let genderName = 'Outro';
+    if (gender === 'M') genderName = 'Masculino';
+    else if (gender === 'F') genderName = 'Feminino';
+    
+    return {
+      gender,
+      genderName,
+      count,
+      percentage
+    };
+  });
+  
+  // Ordenar por contagem (maior para menor)
+  genderData.sort((a, b) => b.count as number - a.count as number);
+  
+  console.log(`[Stats] Dados de gênero: ${JSON.stringify(genderData)}`);
+  
+  return {
+    genderData
+  };
+}
+
 // Removido fetchOrganizationTeams
 // Removido fetchCurrentAssociations
 
@@ -180,13 +242,16 @@ export default async function EventoDetalhesPage({ params }: PageProps) {
   let guestStats = { totalGuests: 0, totalCheckedIn: 0 }; // Valores padrão
   let topTeamsStats: any[] = []; // Valor padrão
   let topPromotersStats: any[] = []; // Valor padrão
+  let genderStats = { genderData: [] }; // Novo formato para estatísticas de gênero
+  
   try {
     // Buscar evento e estatísticas em paralelo
-    [eventData, guestStats, topTeamsStats, topPromotersStats] = await Promise.all([
+    [eventData, guestStats, topTeamsStats, topPromotersStats, genderStats] = await Promise.all([
       fetchEvent(eventId, supabase),
       fetchGuestStats(eventId, supabase),
       fetchTopTeamsStats(eventId, supabase),
-      fetchTopPromotersStats(eventId, supabase)
+      fetchTopPromotersStats(eventId, supabase),
+      fetchGenderStats(eventId, supabase)
     ]);
 
   } catch (error: any) {
@@ -204,9 +269,9 @@ export default async function EventoDetalhesPage({ params }: PageProps) {
     <div className="space-y-6 p-4 md:p-6">
       <div className="mb-4">
         <a href="/app/organizador/eventos">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="text-gray-500 hover:text-gray-700">
                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            Voltar para Eventos
+                Voltar para Eventos
               </Button>
             </a>
       </div>
@@ -218,6 +283,7 @@ export default async function EventoDetalhesPage({ params }: PageProps) {
          totalCheckedIn={guestStats.totalCheckedIn}
          topTeamsStats={topTeamsStats}
          topPromotersStats={topPromotersStats}
+         genderStats={genderStats}
       />
 
       {/* REMOVIDO: Ferramenta de diagnóstico */}
