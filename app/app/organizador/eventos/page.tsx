@@ -31,7 +31,7 @@ import {
 import Image from 'next/image'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useToast } from '@/components/ui/use-toast'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/singleton-client'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import NextLink from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -92,6 +92,23 @@ function isEventPast(event: Event): boolean {
 async function duplicateEvent(event: Event) {
   try {
     const supabase = createClient();
+    
+    // Verificar se a sessão está ativa
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('Sessão expirada, redirecionando para login');
+      // Armazenar intenção de duplicar para retomar após login
+      sessionStorage.setItem('pendingAction', JSON.stringify({
+        type: 'duplicate_event',
+        eventId: event.id
+      }));
+      
+      // Redirecionar para login com parâmetro de retorno
+      window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+    
     // Clonar o objeto do evento e modificar os campos necessários
     const newEvent = {
       ...event,
@@ -102,7 +119,6 @@ async function duplicateEvent(event: Event) {
     };
     
     // Remover o campo status se ele ainda não existir no banco de dados
-    // Este campo será adicionado quando o SQL for executado no Supabase
     if ('status' in newEvent) {
       delete newEvent.status;
     }
@@ -118,6 +134,12 @@ async function duplicateEvent(event: Event) {
     
     if (error) {
       console.error('Erro ao duplicar evento:', error);
+      
+      // Tratamento específico para erro de RLS
+      if (error.code === '42501') {
+        throw new Error('Você não tem permissão para duplicar este evento. Verifique se você ainda está na mesma organização.');
+      }
+      
       throw new Error(error.message);
     }
     
@@ -367,11 +389,27 @@ export default function EventosPage() {
               forceRefresh();
             })
             .catch(err => {
-              toast({
-                title: "Erro ao duplicar evento",
-                description: err.message || "Não foi possível duplicar o evento",
-                variant: "destructive"
-              });
+              // Mensagens de erro específicas
+              if (err.message.includes('Sessão expirada')) {
+                toast({
+                  title: "Sessão expirada",
+                  description: "Sua sessão expirou. Você será redirecionado para fazer login novamente.",
+                  variant: "destructive"
+                });
+                // O redirecionamento já é feito na função duplicateEvent
+              } else if (err.message.includes('permissão')) {
+                toast({
+                  title: "Erro de permissão",
+                  description: err.message,
+                  variant: "destructive"
+                });
+              } else {
+                toast({
+                  title: "Erro ao duplicar evento",
+                  description: err.message || "Não foi possível duplicar o evento",
+                  variant: "destructive"
+                });
+              }
             })
             .finally(() => {
               setLoading(false);
@@ -760,8 +798,8 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
           size="sm" 
           className="flex-1 hover:border-fuchsia-500 hover:text-fuchsia-600"
           onClick={handleCheckinClick}
-          disabled={!isPublished || isPast}
-          title={!isPublished ? "Evento inativo" : isPast ? "Evento realizado" : "Ver Detalhes"}
+          disabled={!isPublished}
+          title={!isPublished ? "Evento inativo" : "Ver Detalhes"}
         >
           <ExternalLink className="w-4 h-4 mr-1" />
           Detalhes

@@ -51,6 +51,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, isLoading: isLoadingAuth } = useAuth()
   const router = useRouter()
   
+  // Importar o custom hook para verificar ações pendentes
+  const { usePendingActions } = require('@/hooks/use-pending-actions');
+  usePendingActions();
+  
   console.log("DEBUG - AppLayoutContent iniciando:", { 
     userAutenticado: !!user, 
     isLoadingAuth
