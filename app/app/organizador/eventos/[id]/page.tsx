@@ -7,6 +7,24 @@ import EventDetailsClient from './EventDetailsClient';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers'; // Importar cookies
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'; // Importar server client
+import Link from 'next/link'; // Importar Link para navegação
+import BackButton from './BackButton'; // Importar o componente cliente separado
+
+// Client Component para o botão de voltar
+const BackButton = () => {
+  return (
+    <Link href="/app/organizador/eventos" className="inline-block">
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="flex items-center space-x-2"
+      >
+        <ArrowLeftIcon className="h-4 w-4" />
+        <span>Voltar</span>
+      </Button>
+    </Link>
+  );
+}
 
 interface PageProps {
   params: { id: string };
@@ -253,40 +271,33 @@ export default async function EventoDetalhesPage({ params }: PageProps) {
       fetchTopPromotersStats(eventId, supabase),
       fetchGenderStats(eventId, supabase)
     ]);
-
-  } catch (error: any) {
-    console.error("Erro ao buscar dados da página de detalhes do evento:", error);
-    if (error.message.includes("não encontrado") || error.message.includes("sem permissão")) {
-        notFound();
-    }
-    // Ainda tentar renderizar com stats padrão se o evento falhar?
-    // Ou mostrar erro como antes? Por agora, mostrar erro.
-    return <div className="p-6 text-red-500">Erro ao carregar dados do evento: {error.message}</div>;
+    
+  } catch (error) {
+    console.error("Erro ao carregar dados do evento:", error);
+    // Para evitar mostrar erros específicos ao usuário, redirecionamos para 404
+    notFound();
   }
 
-  // Renderiza o Client Component (com props de stats)
+  const event = eventData;
+  
+  // No server component, já extraímos e passamos o ID diretamente como string
+  // para evitar que o params seja acessado no client component
+  const eventIdString = String(eventId);
+
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="mb-4">
-        <a href="/app/organizador/eventos">
-              <Button variant="outline" size="sm" className="text-gray-500 hover:text-gray-700">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Voltar para Eventos
-              </Button>
-            </a>
+    <div className="container mx-auto p-4 space-y-8">
+      <div className="flex justify-between items-center mb-6">
+        <BackButton />
       </div>
 
-      <EventDetailsClient
-         key={eventData.id} 
-         event={eventData}
-         totalGuests={guestStats.totalGuests}
-         totalCheckedIn={guestStats.totalCheckedIn}
-         topTeamsStats={topTeamsStats}
-         topPromotersStats={topPromotersStats}
-         genderStats={genderStats}
+      <EventDetailsClient 
+        event={event} 
+        totalGuests={guestStats.totalGuests}
+        totalCheckedIn={guestStats.totalCheckedIn}
+        topTeamsStats={topTeamsStats}
+        topPromotersStats={topPromotersStats}
+        genderStats={genderStats}
       />
-
-      {/* REMOVIDO: Ferramenta de diagnóstico */}
     </div>
   );
 }

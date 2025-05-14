@@ -23,6 +23,7 @@ import { Database } from '@/types/supabase'
  * ```
  */
 export async function createReadOnlyClient() {
+  // Captura a referência do cookieStore uma única vez para evitar chamadas múltiplas a cookies()
   const cookieStore = cookies()
 
   return createServerClient<Database>(
@@ -69,6 +70,7 @@ export async function createReadOnlyClient() {
  * ```
  */
 export async function createClient() {
+  // Captura a referência do cookieStore uma única vez para evitar chamadas múltiplas a cookies()
   const cookieStore = cookies()
 
   return createServerClient<Database>(
@@ -89,13 +91,15 @@ export async function createClient() {
             cookieStore.set({ name, value, ...options })
           } catch (e) {
             console.error(`Erro ao definir cookie ${name}:`, e)
+            // Não lançar erro para permitir operações sem falha
           }
         },
         remove(name: string, options: any) {
           try {
-            cookieStore.delete({ name, ...options })
+            cookieStore.set({ name, value: '', ...options, maxAge: 0 })
           } catch (e) {
             console.error(`Erro ao remover cookie ${name}:`, e)
+            // Não lançar erro para permitir operações sem falha
           }
         }
       }

@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/accordion"
 // Importar novo componente da lista de convidados
 import GuestListTable from './GuestListTable'
+// Importar o componente de estatísticas avançadas
+import { AdvancedStatsSection } from './StatsComponents';
 
 // Importar ApexCharts com carregamento dinâmico para evitar erros de SSR
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -563,6 +565,9 @@ export default function EventDetailsClient({
                         </Card>
                     </CardContent>
                 </Card>
+
+                {/* Seção de estatísticas avançadas */}
+                <AdvancedStatsSection eventId={String(event.id)} />
 
                 {/* ACCORDION para Top Stats */}
                 <Accordion type="multiple" className="w-full mt-4 space-y-4">

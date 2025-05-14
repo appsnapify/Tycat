@@ -39,3 +39,48 @@ export function formatTime(dateString: string): string {
     minute: '2-digit'
   })
 }
+
+/**
+ * Normaliza um número de telefone, mantendo o formato internacional com o +
+ * 
+ * Exemplos:
+ * "(11) 98765-4321" -> "+5511987654321" (com defaultCountryCode=55)
+ * "+351 912 345 678" -> "+351912345678"
+ * "00351912345678" -> "+351912345678"
+ */
+export function normalizePhoneNumber(phone: string, defaultCountryCode: string = ''): string {
+  // Se o telefone estiver vazio, retornar vazio
+  if (!phone || phone.trim() === '') {
+    return '';
+  }
+  
+  // Verificar se o telefone já está no formato internacional
+  const hasPlus = phone.includes('+');
+  
+  // Remover todos os caracteres não numéricos, exceto o "+"
+  let normalized = phone.replace(/[^\d+]/g, '');
+  
+  // Se começar com 00 (formato internacional), substituir por +
+  if (normalized.startsWith('00')) {
+    normalized = '+' + normalized.substring(2);
+  }
+  
+  // Se não começar com +, adicionar o + e código do país se necessário
+  if (!normalized.startsWith('+')) {
+    // Se tiver um código de país padrão e o número não parecer ter um
+    if (defaultCountryCode && normalized.length <= 11) {
+      normalized = '+' + defaultCountryCode + normalized;
+    } else {
+      // Se o número parecer ter o código do país sem o +, adicionar apenas o +
+      normalized = '+' + normalized;
+    }
+  }
+  
+  // Garantir que não haja múltiplos sinais de +
+  if (normalized.indexOf('+', 1) > 0) {
+    // Se há mais de um +, manter apenas o primeiro
+    normalized = '+' + normalized.substring(1).replace(/\+/g, '');
+  }
+  
+  return normalized;
+}
