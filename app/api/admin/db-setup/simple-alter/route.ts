@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 // Usar o caminho relativo exato para evitar problemas com alias no build
-import { createAdminClient } from '../../../../lib/supabase/adminClient';
+import { createAdminClient } from '../../../../../lib/supabase/adminClient';
 
 // Endpoint para adicionar coluna status de maneira simples e direta
 export async function GET(request: NextRequest) {
