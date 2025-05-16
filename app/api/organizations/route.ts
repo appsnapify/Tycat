@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createAdminClient } from '../../../../lib/supabase/adminClient'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
+  const supabaseAdmin = createAdminClient();
   try {
     // Processar o FormData
     const formData = await request.formData()
