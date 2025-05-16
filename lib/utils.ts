@@ -54,33 +54,42 @@ export function normalizePhoneNumber(phone: string, defaultCountryCode: string =
     return '';
   }
   
-  // Verificar se o telefone já está no formato internacional
-  const hasPlus = phone.includes('+');
-  
-  // Remover todos os caracteres não numéricos, exceto o "+"
-  let normalized = phone.replace(/[^\d+]/g, '');
-  
-  // Se começar com 00 (formato internacional), substituir por +
-  if (normalized.startsWith('00')) {
-    normalized = '+' + normalized.substring(2);
-  }
-  
-  // Se não começar com +, adicionar o + e código do país se necessário
-  if (!normalized.startsWith('+')) {
-    // Se tiver um código de país padrão e o número não parecer ter um
-    if (defaultCountryCode && normalized.length <= 11) {
-      normalized = '+' + defaultCountryCode + normalized;
-    } else {
-      // Se o número parecer ter o código do país sem o +, adicionar apenas o +
-      normalized = '+' + normalized;
+  // Verificar se o telefone já está no formato internacional com prefixo
+  if (phone.startsWith('+')) {
+    // Remover todos os caracteres não numéricos, exceto o "+"
+    let normalized = phone.replace(/[^\d+]/g, '');
+    
+    // Garantir que não haja múltiplos sinais de +
+    if (normalized.indexOf('+', 1) > 0) {
+      normalized = '+' + normalized.substring(1).replace(/\+/g, '');
     }
+    return normalized;
   }
   
-  // Garantir que não haja múltiplos sinais de +
-  if (normalized.indexOf('+', 1) > 0) {
-    // Se há mais de um +, manter apenas o primeiro
-    normalized = '+' + normalized.substring(1).replace(/\+/g, '');
+  // Se começa com 00 (formato internacional), substituir por +
+  if (phone.startsWith('00')) {
+    return '+' + phone.substring(2).replace(/[^\d]/g, '');
   }
   
-  return normalized;
+  // Remover caracteres não numéricos para o restante da lógica
+  const cleanedPhone = phone.replace(/[^\d]/g, '');
+  
+  // Se o número já contém o código do país sem o +
+  // Ex: 351919999999 -> +351919999999
+  if (defaultCountryCode && cleanedPhone.startsWith(defaultCountryCode)) {
+    return '+' + cleanedPhone;
+  }
+  
+  // Caso especial para Portugal: números começando com 9 e tendo 9 dígitos
+  if (defaultCountryCode === '351' && /^9\d{8}$/.test(cleanedPhone)) {
+    return '+351' + cleanedPhone;
+  }
+  
+  // Se não começa com +, adicionar o + e código do país
+  if (defaultCountryCode) {
+    return '+' + defaultCountryCode + cleanedPhone;
+  } else {
+    // Quando não temos código do país, apenas adicionar o +
+    return '+' + cleanedPhone;
+  }
 }

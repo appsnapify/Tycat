@@ -81,6 +81,15 @@ interface TeamDetails {
   created_at: string
 }
 
+// Nova interface para membros detalhados
+interface DetailedMember {
+  user_id: string;
+  member_role: string; // Corresponde ao output da RPC
+  first_name: string | null; // Corresponde ao output da RPC
+  last_name: string | null; // Corresponde ao output da RPC
+  phone: string | null; // Mantemos para o futuro
+}
+
 export default function EquipePage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -90,15 +99,20 @@ export default function EquipePage() {
   const [team, setTeam] = useState<TeamDetails | null>(null)
   const [copied, setCopied] = useState(false)
   const [memberCount, setMemberCount] = useState<number | null>(null)
+  const [detailedMembers, setDetailedMembers] = useState<DetailedMember[]>([])
+  const [showMembersSection, setShowMembersSection] = useState(false)
+  const [loadingMembers, setLoadingMembers] = useState(false)
   
   // useEffect Simplificado
   useEffect(() => {
-    const loadTeamData = async () => {
+    const loadInitialPageData = async () => {
       if (!user) return;
 
       setLoading(true);
       setTeam(null);
       setMemberCount(null);
+      setDetailedMembers([]);
+      setShowMembersSection(false);
       
       try {
         const teamIdToLoad = user.user_metadata?.team_id;
@@ -140,8 +154,6 @@ export default function EquipePage() {
 
         if (countError) {
             console.error("EquipePage: Erro ao chamar RPC get_team_member_count:", countError);
-            // Toast comentado para evitar erro React
-            // setTimeout(() => {toast.warning("Não foi possível carregar a contagem de membros.");}, 0);
             setMemberCount(null);
         } else {
             console.log("EquipePage: Contagem de membros (via RPC):", countData);
@@ -150,14 +162,12 @@ export default function EquipePage() {
 
       } catch (error) {
         console.error("EquipePage: Erro GERAL ao carregar dados da equipa:", error);
-        // Toast comentado para evitar erro React
-        // toast.error("Ocorreu um erro ao carregar as informações da equipa.");
       } finally {
         setLoading(false);
       }
     };
 
-    loadTeamData();
+    loadInitialPageData();
   }, [user, supabase]);
   
   // copyTeamCode (mantido de minha-equipe)
@@ -178,6 +188,40 @@ export default function EquipePage() {
           })
       } catch { return 'Data inválida' }
   }
+  
+  // Nova função para carregar membros detalhados sob demanda
+  const loadDetailedMembersOnClick = async () => {
+    if (!team?.id) return; 
+
+    setLoadingMembers(true);
+    setDetailedMembers([]); 
+
+    try {
+      console.log(`EquipePage: Carregando membros detalhados via RPC (on-demand) para team_id: ${team.id}`);
+      const { data: rpcMembersData, error: rpcMembersError } = await supabase
+        .rpc('get_team_members_with_details', { p_team_id: team.id });
+
+      if (rpcMembersError) {
+        console.error(`EquipePage: Erro ao carregar membros via RPC (on-demand) para team ${team.id}:`, rpcMembersError);
+        toast.error("Erro ao carregar lista de membros.");
+      } else if (rpcMembersData) {
+        console.log("EquipePage: Membros detalhados (via RPC, on-demand) carregados:", rpcMembersData);
+        const formattedMembers = rpcMembersData.map(member => ({
+          user_id: member.user_id,
+          member_role: member.member_role,
+          first_name: member.first_name,
+          last_name: member.last_name,
+          phone: null 
+        }));
+        setDetailedMembers(formattedMembers as DetailedMember[]);
+      }
+    } catch (error) {
+      console.error("EquipePage: Erro GERAL ao carregar membros detalhados (on-demand):", error);
+      toast.error("Ocorreu um erro ao buscar os membros.");
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
   
   // JSX Refatorado para consistência
   if (loading) {
@@ -216,7 +260,7 @@ export default function EquipePage() {
               Parece que você não está associado a nenhuma equipe como líder ou criador.
             </p>
             <Link href="/app/chefe-equipe/criar-equipe">
-              <Button>Criar Minha Equipe</Button>
+              <Button className="bg-lime-500 hover:bg-lime-600 text-white">Criar Minha Equipe</Button>
             </Link>
           </CardContent>
         </Card>
@@ -237,7 +281,7 @@ export default function EquipePage() {
          {/* Botão Configurações (Corrigido/Reintroduzido) */}
          <div className="flex items-center space-x-2">
              <Link href={`/app/chefe-equipe/configuracoes`}>
-                 <Button variant="outline" size="sm">
+                 <Button variant="outline" size="sm" className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600">
                     <Settings className="mr-2 h-4 w-4"/> Configurações
                  </Button>
              </Link>
@@ -251,13 +295,13 @@ export default function EquipePage() {
           {/* Card Código da Equipe (Restaurado) */}
           <Card>
              <CardHeader>
-               <CardTitle className="text-lg">Código da Equipa</CardTitle>
+               <CardTitle className="text-lg text-lime-500 font-semibold">Código da Equipa</CardTitle>
                <CardDescription>Partilhe para adicionar promotores.</CardDescription>
              </CardHeader>
              <CardContent>
                <div className="flex space-x-2">
                  <Input readOnly value={team?.team_code || 'N/A'} className="font-mono text-center" />
-                 <Button size="icon" variant="outline" onClick={copyTeamCode} disabled={!team?.team_code}>
+                 <Button size="icon" variant="outline" onClick={copyTeamCode} disabled={!team?.team_code} className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600">
                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                  </Button>
                </div>
@@ -267,12 +311,12 @@ export default function EquipePage() {
           {/* Card Contagem de Membros (Restaurado) */}
           <Card>
              <CardHeader>
-                 <CardTitle className="text-lg">Membros</CardTitle>
+                 <CardTitle className="text-lg text-lime-500 font-semibold">Membros</CardTitle>
                  <CardDescription>Total de elementos na equipa.</CardDescription>
              </CardHeader>
              <CardContent>
                  <div className="flex items-center gap-4">
-                     <Users className="h-8 w-8 text-primary" />
+                     <Users className="h-8 w-8 text-lime-500" />
                      <div>
                         <p className="text-2xl font-bold">{memberCount !== null ? memberCount : '-'}</p> 
                         <p className="text-sm text-muted-foreground">Total de elementos</p>
@@ -283,6 +327,68 @@ export default function EquipePage() {
       </div>
       {/* --- FIM DA SECÇÃO REINTRODUZIDA --- */}
 
+      {/* Card/Secção para Membros da Equipa (Carregamento On-Demand) */}
+      <Card>
+        <CardHeader 
+          className="flex flex-row items-center justify-between cursor-pointer" 
+          onClick={() => {
+            // Se a secção não estiver aberta, carrega os dados e abre
+            if (!showMembersSection) {
+              loadDetailedMembersOnClick();
+              setShowMembersSection(true);
+            } else {
+              // Se estiver aberta, apenas fecha
+              setShowMembersSection(false);
+            }
+          }}
+        >
+          <div>
+            <CardTitle className="text-lime-500">Membros da Equipa</CardTitle>
+            <CardDescription>
+              {showMembersSection ? "Clique para esconder" : "Clique para ver a lista de promotores e o líder."}
+            </CardDescription>
+          </div>
+          {loadingMembers ? <Loader2 className="h-5 w-5 animate-spin" /> : (showMembersSection ? <ChevronDown className="h-5 w-5 rotate-180 transition-transform" /> : <ChevronDown className="h-5 w-5 transition-transform" />) }
+        </CardHeader>
+
+        {showMembersSection && !loadingMembers && detailedMembers.length > 0 && (
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Papel</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailedMembers.map((member) => (
+                  <TableRow key={member.user_id}>
+                    <TableCell className="font-medium">
+                      {member.first_name || 'N/A'} {member.last_name || ''}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={member.member_role === 'leader' ? 'default' : 'secondary'} className={member.member_role === 'leader' ? 'bg-lime-500 text-white' : ''}>
+                        {member.member_role === 'leader' ? 'Líder' : member.member_role === 'member' ? 'Promotor' : member.member_role}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        )}
+        {showMembersSection && loadingMembers && (
+          <CardContent className="flex justify-center items-center py-4">
+            <Loader2 className="h-8 w-8 animate-spin text-lime-500" /> 
+            <p className="ml-2">A carregar membros...</p>
+          </CardContent>
+        )}
+        {showMembersSection && !loadingMembers && detailedMembers.length === 0 && (
+           <CardContent>
+             <p className="text-muted-foreground py-4">Nenhum membro encontrado ou ainda não foram carregados. Clique novamente para tentar carregar.</p>
+           </CardContent>
+        )}
+      </Card>
     </div>
   )
 }

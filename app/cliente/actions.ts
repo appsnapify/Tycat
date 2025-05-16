@@ -12,7 +12,24 @@ import { normalizePhoneNumber } from '@/lib/utils'
 export async function checkClientPhone(phone: string) {
   // Log detalhado para debugging
   console.log('======= VERIFICAÇÃO DE TELEFONE ========')
-  console.log('Telefone recebido:', phone)
+  console.log('Telefone recebido na server action:', phone)
+  
+  // Verificar se a server action está sendo chamada corretamente
+  if (!phone) {
+    console.error('ERRO: checkClientPhone chamado sem telefone!');
+    return {
+      success: false,
+      error: 'Parâmetro de telefone ausente'
+    };
+  }
+  
+  if (!phone || phone.length < 8) {
+    console.log('Telefone recebido é muito curto ou inválido')
+    return { 
+      success: false, 
+      error: 'Número de telemóvel inválido' 
+    }
+  }
   
   const supabase = await createClient()
   
@@ -22,94 +39,263 @@ export async function checkClientPhone(phone: string) {
   
   // Só realizar normalização adicional se o telefone não parecer já normalizado
   if (!phone.startsWith('+') || phone === '+' || phone.length < 8) {
+    console.log('Telefone precisa de normalização adicional')
     normalizedPhone = normalizePhoneNumber(phone)
   }
   
-  console.log('Telefone normalizado:', normalizedPhone)
+  console.log('Telefone normalizado para consulta:', normalizedPhone)
   
   if (!normalizedPhone || normalizedPhone === '+' || normalizedPhone.length < 8) {
-    console.log('Telefone inválido - muito curto ou formato incorreto')
+    console.log('Telefone inválido após normalização - muito curto ou formato incorreto')
     return { 
       success: false, 
-      error: 'Número de telefone inválido' 
+      error: 'Número de telemóvel inválido' 
     }
   }
   
+  // Extrair apenas os dígitos do telefone para comparação numérica
+  const digitsOnly = normalizedPhone.replace(/\D/g, '');
+  console.log('Dígitos do telefone para comparação:', digitsOnly);
+  
+  // Mostrar os últimos 9 dígitos (formato mais comum em Portugal)
+  const last9digits = digitsOnly.slice(-9);
+  console.log('Últimos 9 dígitos do telefone:', last9digits);
+  
   // Consulta SQL para encontrar o cliente pelo telefone
   try {
-    console.log('Executando consulta SQL...')
+    console.log('Executando consulta SQL com telefone:', normalizedPhone)
     
-    // Lidar com variações possíveis do número (com/sem prefixo internacional)
+    // Lidar com mais variações possíveis do número
     let phoneVariations = [normalizedPhone];
     
-    // Se o telefone parece ter prefixo internacional (mais de 10 dígitos)
-    if (normalizedPhone.length > 10) {
-      // Tenta encontrar versões sem prefixo internacional (para Portugal e Brasil)
-      const potentialWithoutPrefix = normalizedPhone.substring(Math.min(3, normalizedPhone.length - 9));
-      if (potentialWithoutPrefix.length >= 9) {
-        phoneVariations.push(potentialWithoutPrefix);
+    // Se o número começa com +351 (Portugal)
+    if (normalizedPhone.startsWith('+351')) {
+      // Adicionar versão sem prefixo
+      const withoutPrefix = normalizedPhone.substring(4);
+      phoneVariations.push(withoutPrefix);
+      console.log('Adicionando variação sem prefixo +351:', withoutPrefix);
+      
+      // Adicionar versão com 9 iniciando (se não começar com 9)
+      if (!withoutPrefix.startsWith('9')) {
+        phoneVariations.push('9' + withoutPrefix);
+        console.log('Adicionando variação iniciando com 9:', '9' + withoutPrefix);
       }
       
-      // Para Portugal (351)
-      if (normalizedPhone.startsWith('351') && normalizedPhone.length >= 12) {
-        phoneVariations.push(normalizedPhone.substring(3)); // Sem 351
-      }
+      // Variações com espaço e formatação
+      phoneVariations.push('+351 ' + withoutPrefix);
+      phoneVariations.push('(+351) ' + withoutPrefix);
       
-      // Para Brasil (55)
-      if (normalizedPhone.startsWith('55') && normalizedPhone.length >= 12) {
-        phoneVariations.push(normalizedPhone.substring(2)); // Sem 55
+      // Últimos 9 dígitos
+      const last9 = normalizedPhone.slice(-9);
+      if (last9.length === 9) {
+        phoneVariations.push(last9);
+        console.log('Adicionando últimos 9 dígitos:', last9);
+      }
+    } 
+    // Verificar apenas os 9 últimos dígitos para qualquer número
+    else {
+      const digitsOnly = normalizedPhone.replace(/\D/g, '');
+      const last9 = digitsOnly.slice(-9);
+      if (last9.length === 9) {
+        phoneVariations.push(last9);
+        phoneVariations.push('+351' + last9);
+        console.log('Adicionando variações com últimos 9 dígitos:', last9, '+351' + last9);
       }
     }
     
     console.log('Variações de telefone a verificar:', phoneVariations);
     
-    // Consulta usando operador IN para verificar todas as variações de uma vez
-    const queryResult = await supabase
+    // ESTRATÉGIA 1: Tentar usando equações simples para cada variação
+    for (const phoneVar of phoneVariations) {
+      console.log('Verificando variação:', phoneVar);
+      
+      const { data, error } = await supabase
       .from('client_users')
       .select('id, phone')
-      .or(`phone.in.(${phoneVariations.map(p => `"${p}"`).join(',')})`)
+        .eq('phone', phoneVar)
       .limit(1);
     
-    console.log('Resultado completo da consulta:', queryResult)
-    
-    if (queryResult.error) {
-      console.error('Erro ao verificar telefone:', queryResult.error)
+      if (error) {
+        console.error('Erro ao verificar variação:', error);
+        continue;
+      }
+      
+      if (data && data.length > 0) {
+        console.log('Telefone encontrado com variação:', phoneVar);
+        console.log('Dados encontrados:', data[0]);
+        
       return { 
-        success: false, 
-        error: queryResult.error.message 
+          success: true, 
+          exists: true,
+          userId: data[0].id,
+          matchedPhone: phoneVar
+        };
       }
     }
     
-    // Verificar se encontrou algum registro
-    const found = queryResult.data && queryResult.data.length > 0
-    console.log('Registros encontrados:', queryResult.data?.length || 0)
-    if (found) {
-      console.log('Telefone encontrado:', queryResult.data[0])
-    } else {
-      console.log('Nenhum usuário encontrado com este telefone')
+    // ESTRATÉGIA 2: Usar ILIKE para busca parcial por últimos dígitos
+    const last8 = digitsOnly.slice(-8);
+    
+    if (last8.length === 8) {
+      console.log('Verificando pelos últimos 8 dígitos:', last8);
       
-      // Log de telefones existentes para debug
-      const allUsers = await supabase
+      const { data, error } = await supabase
         .from('client_users')
         .select('id, phone')
-        .limit(10)
-      
-      console.log('Primeiros 10 telefones na base:', allUsers.data?.map(u => u.phone))
+        .filter('phone', 'ilike', `%${last8}`)
+        .limit(1);
+        
+      if (!error && data && data.length > 0) {
+        console.log('Telefone encontrado pelos últimos 8 dígitos');
+        console.log('Dados encontrados:', data[0]);
+        
+        return { 
+          success: true, 
+          exists: true,
+          userId: data[0].id,
+          matchedPhone: data[0].phone
+        };
+      }
     }
     
-    console.log('======= FIM VERIFICAÇÃO ========')
+    // ESTRATÉGIA 3 (DIAGNÓSTICO): Buscar todos os telefones e comparar dígitos
+    console.log('ESTRATÉGIA DE DIAGNÓSTICO: Buscando todos os clientes');
+    
+    // Buscar um número maior de registros para análise completa
+    const { data: allClients, error: allClientsError } = await supabase
+      .from('client_users')
+      .select('id, phone, first_name, last_name')
+      .limit(50); // Aumentar o limite para ter mais chances de encontrar
+    
+    if (allClientsError) {
+      console.error('Erro ao buscar todos os clientes:', allClientsError);
+    } else if (allClients && allClients.length > 0) {
+      console.log(`Encontrados ${allClients.length} clientes no banco:`);
+      
+      // Comparar telefones ignorando formatação (apenas dígitos)
+      const matches = [];
+      let bestMatch = null;
+      let bestMatchScore = 0;
+      
+      for (const client of allClients) {
+        if (!client.phone) continue;
+        
+        console.log(`Cliente: ${client.first_name} ${client.last_name || ''}, Telefone: ${client.phone}`);
+        
+        // Remover toda formatação do telefone armazenado
+        const clientDigits = client.phone.replace(/\D/g, '');
+        
+        // Se os últimos 9 dígitos são iguais - alta probabilidade de match
+        if (clientDigits.slice(-9) === last9digits) {
+          console.log(`🎯 CORRESPONDÊNCIA EXATA nos últimos 9 dígitos: ${client.phone}`);
+          matches.push({
+            id: client.id,
+            phone: client.phone,
+            matchType: 'exact-9-digits'
+          });
+          
+          // Se também tem o mesmo comprimento, é um match perfeito
+          if (clientDigits.length === digitsOnly.length) {
+            bestMatch = {
+              id: client.id,
+              phone: client.phone,
+              matchType: 'perfect'
+            };
+            bestMatchScore = 100;
+          } else if (!bestMatch || bestMatchScore < 90) {
+            bestMatch = {
+              id: client.id,
+              phone: client.phone,
+              matchType: 'exact-9-digits'
+            };
+            bestMatchScore = 90;
+          }
+        }
+        // Se os últimos 8 dígitos são iguais - possível match
+        else if (clientDigits.slice(-8) === digitsOnly.slice(-8)) {
+          console.log(`🔍 Possível correspondência nos últimos 8 dígitos: ${client.phone}`);
+          matches.push({
+            id: client.id,
+            phone: client.phone,
+            matchType: 'last-8-digits'
+          });
+          
+          if (!bestMatch || bestMatchScore < 80) {
+            bestMatch = {
+              id: client.id,
+              phone: client.phone,
+              matchType: 'last-8-digits'
+            };
+            bestMatchScore = 80;
+          }
+        }
+        // Se contém os últimos 7 dígitos
+        else if (clientDigits.indexOf(digitsOnly.slice(-7)) >= 0) {
+          console.log(`👀 Correspondência parcial nos últimos 7 dígitos: ${client.phone}`);
+          matches.push({
+            id: client.id,
+            phone: client.phone,
+            matchType: 'partial-7-digits'
+          });
+          
+          if (!bestMatch || bestMatchScore < 70) {
+            bestMatch = {
+              id: client.id,
+              phone: client.phone,
+              matchType: 'partial-7-digits'
+            };
+            bestMatchScore = 70;
+          }
+        }
+      }
+      
+      if (matches.length > 0) {
+        console.log('Matches encontrados por análise de dígitos:', matches);
+        console.log('Melhor match:', bestMatch);
+        
+        if (bestMatch) {
+          return { 
+            success: true, 
+            exists: true,
+            userId: bestMatch.id,
+            matchedPhone: bestMatch.phone,
+            matchType: bestMatch.matchType
+          };
+        }
+      } else {
+        console.log('Nenhum match encontrado após análise detalhada de dígitos');
+        console.log('Telefones na base:', allClients.map(c => c.phone));
+      }
+    } else {
+      console.log('Nenhum cliente encontrado na base de dados');
+    }
+    
+    // Se chegou aqui, não encontrou o telefone
+    console.log('Nenhum usuário encontrado com este telefone após todas as verificações');
     
     return { 
       success: true, 
-      exists: found,
-      userId: found ? queryResult.data[0].id : null
-    }
+      exists: false,
+      userId: null
+    };
+    
   } catch (error) {
-    console.error('Erro inesperado ao verificar telefone:', error)
+    console.error('Erro inesperado ao verificar telefone:', error);
+    
+    // Tentar extrair detalhes mais úteis do erro
+    let errorMessage = 'Erro interno ao verificar telefone';
+    if (error instanceof Error) {
+      errorMessage = error.message || errorMessage;
+      console.error('Mensagem de erro detalhada:', error.message);
+      console.error('Stack trace:', error.stack);
+    }
+    
     return { 
       success: false, 
-      error: 'Erro interno ao verificar telefone' 
-    }
+      error: errorMessage
+    };
+  } finally {
+    console.log('======= FIM VERIFICAÇÃO ========');
   }
 }
 
@@ -148,12 +334,30 @@ export async function loginClient(formData: FormData) {
   
   const supabase = await createClient()
   
-  // 1. Verificar se o cliente existe
+  // Primeiro verificar se o cliente existe usando a função checkClientPhone
+  // Esta função já implementa diversas estratégias para encontrar o telefone
+  const checkResult = await checkClientPhone(normalizedPhone)
+  
+  if (!checkResult.success) {
+    return {
+      success: false,
+      error: checkResult.error || 'Erro ao verificar telefone'
+    }
+  }
+  
+  if (!checkResult.exists || !checkResult.userId) {
+    return {
+      success: false,
+      error: 'Cliente não encontrado'
+    }
+  }
+  
+  // 1. Buscar dados do cliente pelo ID (mais confiável do que pelo telefone)
   const { data: clientData, error: clientError } = await supabase
     .from('client_users')
-    .select('id, email, auth_id')
-    .eq('phone', normalizedPhone)
-    .maybeSingle()
+    .select('id, email, auth_id, phone')
+    .eq('id', checkResult.userId)
+    .single()
   
   if (clientError || !clientData) {
     console.error('Erro ou cliente não encontrado:', clientError)
@@ -166,7 +370,7 @@ export async function loginClient(formData: FormData) {
   console.log('Cliente encontrado:', clientData)
   
   // 2. Se o cliente não tiver email/auth_id, usar o telefone como email
-  const loginEmail = clientData.email || `${normalizedPhone}@cliente.snapify.app`
+  const loginEmail = clientData.email || `${clientData.phone}@cliente.snapify.app`
   console.log('Email para login:', loginEmail)
   
   // 3. Fazer login no Supabase Auth

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs' // REVERTIDO
+// import { createServerClient, type CookieOptions } from '@supabase/ssr' // REMOVIDO
 
 // Definir função de normalização para consistência entre banco e frontend
 const normalizeRole = (role: string | null | undefined): string => {
@@ -10,14 +11,13 @@ const normalizeRole = (role: string | null | undefined): string => {
   
   // Versão mais robusta do mapeamento
   if (roleLower === 'promoter') return 'promotor';
-  if (roleLower === 'promotor') return 'promotor';
   if (roleLower === 'team-leader') return 'chefe-equipe';
   if (roleLower === 'chefe-equipe') return 'chefe-equipe';
   if (roleLower === 'organizador') return 'organizador';
   if (roleLower === 'organizer') return 'organizador';
   
   console.log(`[Middleware:normalizeRole] Papel não reconhecido: ${role}, usando valor original`);
-  return role; // Se não mapeado, retorna o original
+  return typeof role === 'string' ? role : 'desconhecido'; // CORRIGIDO: retornar string ou 'desconhecido'
 };
 
 // Função para obter URL do dashboard com base no papel
@@ -47,7 +47,7 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
 
 // Middleware de autenticação para controlar acesso a rotas protegidas
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+  const res = NextResponse.next() // REVERTIDO para a forma original de criar res
   
   // Verificar se estamos em ambiente de desenvolvimento e acessando a rota de envio de email
   if (process.env.NODE_ENV === 'development' && 
@@ -80,15 +80,16 @@ export async function middleware(req: NextRequest) {
 
   // Verificar se já existe um redirecionamento
   const requestHeaders = new Headers(req.headers)
-  const redirectUrl = requestHeaders.get('x-middleware-rewrite')
+  const redirectUrlHeader = requestHeaders.get('x-middleware-rewrite')
   
-  if (redirectUrl) {
-    console.log(`[Middleware] Redirecionamento já configurado para: ${redirectUrl}`)
+  if (redirectUrlHeader) {
+    console.log(`[Middleware] Redirecionamento já configurado para: ${redirectUrlHeader}`)
     return res
   }
   
-  // Obter a sessão do usuário
+  // Obter a sessão do usuário usando @supabase/auth-helpers-nextjs (REVERTIDO)
   const supabase = createMiddlewareClient({ req, res })
+  
   const { data: { session } } = await supabase.auth.getSession()
   
   // Verificar se o usuário está autenticado
@@ -106,7 +107,7 @@ export async function middleware(req: NextRequest) {
   
   // Log para depuração
   console.log(`[Middleware] Usuário autenticado: ${session.user.email}`)
-  console.log('[Middleware] Metadados do usuário:', JSON.stringify(session.user.user_me))
+  console.log('[Middleware] Metadados do usuário:', JSON.stringify(session.user.user_metadata)) // CORRIGIDO user_metadata
   
   // Definir papel base do usuário e normalizar
   let userRole = normalizeRole(session.user.user_metadata?.role || 'desconhecido')
@@ -131,7 +132,7 @@ export async function middleware(req: NextRequest) {
     }
   }
   
-  // Configurar headers com informações do usuário para logging e debugging
+  // Configurar headers com informações do usuário para logging e debugging (REVERTIDO para usar requestHeaders)
   requestHeaders.set('x-user-role', userRole)
   requestHeaders.set('x-user-email', session.user.email || '')
   requestHeaders.set('x-user-id', session.user.id || '')
@@ -197,7 +198,7 @@ export async function middleware(req: NextRequest) {
     }
   }
   
-  // Atualizar headers da resposta para debugging
+  // Atualizar headers da resposta para debugging (REVERTIDO)
   const responseWithHeaders = NextResponse.next({
     request: {
       headers: requestHeaders,
@@ -210,7 +211,7 @@ export async function middleware(req: NextRequest) {
 // Configurar quais caminhos este middleware deve ser executado
 export const config = {
   matcher: [
-    // Restaurar matcher original para garantir que o middleware execute em /app/*
+    // Matcher original que estava a funcionar
     '/app/:path*',
     '/login',
     '/register',

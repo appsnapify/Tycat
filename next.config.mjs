@@ -1,9 +1,9 @@
-let userConfig = undefined
-try {
-  userConfig = await import('./v0-user-next.config')
-} catch (e) {
-  // ignore error
-}
+// let userConfig = undefined // Comentado
+// try {
+//   userConfig = await import('./v0-user-next.config') // Comentado
+// } catch (e) {
+//   // ignore error
+// }
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -17,9 +17,9 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
+    // webpackBuildWorker: true, // Comentado
+    // parallelServerBuildTraces: true, // Comentado
+    // parallelServerCompiles: true, // Comentado
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://xejpwdpumzalewamttjv.supabase.co',
@@ -27,7 +27,7 @@ const nextConfig = {
   }
 }
 
-mergeConfig(nextConfig, userConfig)
+// mergeConfig(nextConfig, userConfig) // Comentado
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {

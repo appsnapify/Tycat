@@ -1,10 +1,15 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase'
 
-// Valores padrão em caso de variáveis de ambiente não definidas
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xejpwdpumzalewamttjv.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlanB3ZHB1bXphbGV3YW10dGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzNjc2ODQsImV4cCI6MjA1ODk0MzY4NH0.8HWAgcSoPL70uJ8OJXu3m7GD6NB-MhZTuBjurWXU7eI';
+// Configuração do Supabase com chave anônima (segura para uso cliente e servidor)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Validar configuração
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('ERRO CRÍTICO: Variáveis de ambiente do Supabase não configuradas corretamente.');
+}
 
 // Singleton para o cliente Supabase no navegador
 let browserClient: SupabaseClient | null = null;
@@ -20,7 +25,7 @@ const isBrowser = typeof window !== 'undefined';
 export const createBrowserClient = () => {
   // No SSR, retorna um cliente vazio para evitar erros
   if (!isBrowser) {
-    return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey);
+    return createSupabaseJsClient(supabaseUrl, supabaseAnonKey);
   }
 
   // Se já temos um cliente, reutilizar (padrão singleton)
@@ -32,7 +37,7 @@ export const createBrowserClient = () => {
   console.log('Initializing new browser Supabase client with localStorage-only session');
 
   // Criar um novo cliente com persistência APENAS em localStorage
-  browserClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+  browserClient = createSupabaseJsClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -74,7 +79,10 @@ export const createBrowserClient = () => {
       }
     },
     global: {
-      fetch: (...args) => fetch(...args)
+      fetch: (...args) => fetch(...args),
+      headers: { 
+        'X-Client-Info': 'supabase-js/2.38.4'
+      }
     }
   });
 
@@ -83,9 +91,14 @@ export const createBrowserClient = () => {
 
 // Função para criar um cliente sem persistência para operações temporárias
 export const createBrowserClientWithoutPersistence = () => {
-  return createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createSupabaseJsClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false
+    },
+    global: {
+      headers: { 
+        'X-Client-Info': 'supabase-js/2.38.4'
+      }
     }
   });
 }
@@ -101,8 +114,8 @@ const initializeClient = () => {
   // Adicionar log para rastrear inicializações
   console.log('Inicializando novo cliente Supabase');
   
-  // Importante: usar createSupabaseClient (da importação) não createClient (nossa função)
-  const instance = createSupabaseClient<Database>(
+  // Importante: usar createSupabaseJsClient (da importação) não createClient (nossa função)
+  const instance = createSupabaseJsClient(
     supabaseUrl, 
     supabaseAnonKey,
     {
@@ -120,7 +133,10 @@ const initializeClient = () => {
       },
       // Configurações para evitar conflitos
       global: {
-        fetch: (...args) => fetch(...args)
+        fetch: (...args) => fetch(...args),
+        headers: { 
+          'X-Client-Info': 'supabase-js/2.38.4'
+        }
       }
     }
   );
@@ -133,16 +149,15 @@ const initializeClient = () => {
  * Esta função é uma wrapper para garantir que sempre retornamos um cliente válido
  * e evitar erros de inicialização
  */
-export const createClient = (): SupabaseClient => {
+export const createSupabaseClient = (): SupabaseClient => {
   try {
     // No cliente, retorna a instância existente ou cria uma nova
     return createBrowserClient();
   } catch (error) {
     console.error('Erro ao criar cliente Supabase:', error);
-    
     // Se houver erro na inicialização, tenta criar um cliente básico
     // sem configurações avançadas que podem causar problemas
-    return createSupabaseClient(
+    return createSupabaseJsClient(
       supabaseUrl,
       supabaseAnonKey,
       {
@@ -155,6 +170,11 @@ export const createClient = (): SupabaseClient => {
             removeItem: (key: string) => { if (isBrowser) localStorage.removeItem(key); }
           }
         },
+        global: {
+          headers: { 
+            'X-Client-Info': 'supabase-js/2.38.4'
+          }
+        }
       }
     );
   }

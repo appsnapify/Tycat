@@ -91,58 +91,59 @@ function isEventPast(event: Event): boolean {
 // Função para duplicar um evento
 async function duplicateEvent(event: Event) {
   try {
-    // Em vez de usar o cliente Supabase diretamente, vamos usar fetch para APIs
-    // Esta abordagem evita problemas com a sessão Supabase no navegador
-    console.log('Preparando duplicação do evento via API:', event.id);
+    const supabase = createClient();
     
-    // Remover campos que não queremos duplicar
-    const newEvent = {
-      title: `${event.title} - Cópia`,
-      description: event.description,
-      date: event.date,
-      time: event.time,
-      end_date: event.end_date,
-      end_time: event.end_time,
-      location: event.location,
-      organization_id: event.organization_id,
-      is_active: event.is_active,
-      type: event.type,
-      flyer_url: event.flyer_url,
-      is_published: event.is_published,
-      original_event_id: event.id // Armazenar o ID do evento original para referência
-    };
+    // Verificar se a sessão está ativa
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    // Enviar para a API interna que lidará com a duplicação
-    const response = await fetch('/api/events/duplicate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newEvent),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Resposta da API não foi ok:', response.status, errorData);
+    if (sessionError || !session) {
+      console.error('Sessão expirada, redirecionando para login');
+      // Armazenar intenção de duplicar para retomar após login
+      sessionStorage.setItem('pendingAction', JSON.stringify({
+        type: 'duplicate_event',
+        eventId: event.id
+      }));
       
-      if (response.status === 401) {
-        console.log('Erro de autenticação, salvando ação pendente e redirecionando para login');
-        // Armazenar a intenção de duplicar para retomar após login
-        sessionStorage.setItem('pendingAction', JSON.stringify({
-          type: 'duplicate_event',
-          eventId: event.id
-        }));
-        
-        // Redirecionar para login com parâmetro de retorno
-        window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
-        throw new Error('Sessão expirada. Por favor, faça login novamente.');
-      }
-      
-      throw new Error(errorData.message || `Erro ${response.status} ao duplicar evento`);
+      // Redirecionar para login com parâmetro de retorno
+      window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
     }
     
-    const data = await response.json();
-    console.log('Evento duplicado com sucesso via API:', data);
+    // Clonar o objeto do evento e modificar os campos necessários
+    const newEvent = {
+      ...event,
+      title: `${event.title} - Cópia`,
+      id: undefined, // Remover ID para criar um novo registro
+      created_at: undefined, // Limpar campos de data de criação
+      updated_at: undefined
+    };
+    
+    // Remover o campo status se ele ainda não existir no banco de dados
+    if ('status' in newEvent) {
+      delete newEvent.status;
+    }
+    
+    console.log('Duplicando evento:', newEvent);
+    
+    // Inserir o novo evento no banco de dados
+    const { data, error } = await supabase
+      .from('events')
+      .insert(newEvent)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Erro ao duplicar evento:', error);
+      
+      // Tratamento específico para erro de RLS
+      if (error.code === '42501') {
+        throw new Error('Você não tem permissão para duplicar este evento. Verifique se você ainda está na mesma organização.');
+      }
+      
+      throw new Error(error.message);
+    }
+    
+    console.log('Evento duplicado com sucesso:', data);
     return data;
   } catch (err) {
     console.error('Erro ao duplicar evento:', err);

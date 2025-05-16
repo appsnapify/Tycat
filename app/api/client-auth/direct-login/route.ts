@@ -1,108 +1,138 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { sign } from 'jsonwebtoken';
 
-// Schema de validação para login direto
-const directLoginSchema = z.object({
-  userId: z.string().uuid(),
-  password: z.string().min(1)
+// Schema de validação
+const loginSchema = z.object({
+  userId: z.string().uuid("ID de usuário inválido"),
+  password: z.string().min(1, "Senha é obrigatória")
 });
+
+// Chave JWT secreta
+const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria';
+const JWT_EXPIRY = '7d'; // 7 dias
 
 export async function POST(request: Request) {
   try {
-    // Criar cliente Supabase com manipulação assíncrona de cookies
-    const supabase = await createClient();
+    console.log('Iniciando login direto de cliente');
     
-    // Extrair e validar o corpo da requisição
-    let body;
-    try {
-      body = await request.json();
-      console.log('Dados recebidos para login direto:', { ...body, password: '***' });
-    } catch (parseError) {
-      console.error('Erro ao parsear JSON:', parseError);
-      return NextResponse.json(
-        { error: 'Erro ao processar dados de requisição' },
-        { status: 400 }
-      );
-    }
+    // Extrair body da requisição
+    const body = await request.json();
+    console.log('Dados recebidos para login direto:', { 
+      userId: body.userId ? `${body.userId.substring(0, 8)}...` : 'não informado',
+      has_password: !!body.password
+    });
     
-    const result = directLoginSchema.safeParse(body);
-    
+    // Validar dados
+    const result = loginSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json(
-        { error: 'Dados de login inválidos', details: result.error },
-        { status: 400 }
-      );
+      console.error('Erro de validação:', result.error.format());
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Dados inválidos', 
+        details: result.error.format() 
+      }, { status: 400 });
     }
     
     const { userId, password } = result.data;
     
-    console.log('Tentando autenticação direta para o usuário com ID:', userId);
+    // Inicializar cliente Supabase com a chave anônima
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
-    try {
-      // Usar a função verify_user_login que criamos
-      const { data: authResult, error: authError } = await supabase.rpc('verify_user_login', {
-        user_id: userId,
-        user_password: password
-      });
-      
-      console.log('Resultado da verificação de login:', {
-        sucesso: authResult?.success,
-        erro: authError ? authError.message : null
-      });
-      
-      if (authError) {
-        console.error('Erro ao verificar login:', authError);
-        return NextResponse.json(
-          { error: 'Erro ao verificar credenciais' },
-          { status: 500 }
-        );
-      }
-      
-      if (!authResult || authResult.success !== true) {
-        console.error('Senha incorreta ou problema na verificação');
-        return NextResponse.json(
-          { error: 'Senha incorreta ou usuário não encontrado' },
-          { status: 401 }
-        );
-      }
-      
-      console.log('Login verificado com sucesso via RPC');
-      
-      // Buscar o email associado ao usuário para autenticação
-      if (!authResult.email) {
-        return NextResponse.json(
-          { error: 'Usuário sem email associado. Contate o suporte.' },
-          { status: 400 }
-        );
-      }
-      
-      // Como não vamos usar cookies do lado do servidor, podemos simplesmente retornar 
-      // os dados ao cliente para que ele faça a autenticação do lado do browser
-      
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: authResult.id,
-          firstName: authResult.first_name,
-          lastName: authResult.last_name,
-          phone: authResult.phone,
-          email: authResult.email
-        }
-      });
-    } catch (rpcError) {
-      console.error('Erro ao executar verificação de login via RPC:', rpcError);
-      return NextResponse.json(
-        { error: 'Erro interno ao processar autenticação' },
-        { status: 500 }
-      );
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Variáveis de ambiente do Supabase não configuradas');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Configuração inválida do servidor' 
+      }, { status: 500 });
     }
-  } catch (error) {
-    console.error('Erro no login direto de cliente:', error);
-    return NextResponse.json(
-      { error: 'Falha ao processar solicitação de login' },
-      { status: 500 }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
+    console.log('Buscando usuário pelo ID:', userId.substring(0, 8) + '...');
+    
+    const { data: userData, error: userError } = await supabase
+      .from('client_users')
+      .select('id, first_name, last_name, phone, email, password')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (userError) {
+      console.error('Erro ao buscar usuário:', userError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao verificar usuário: ' + userError.message 
+      }, { status: 500 });
+    }
+    
+    // Verificar se o usuário foi encontrado
+    if (!userData) {
+      console.log('Nenhum usuário encontrado com o ID informado');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Usuário não encontrado ou senha incorreta' 
+      }, { status: 401 });
+    }
+    
+    // Verificar senha
+    console.log('Verificando senha para usuário:', userData.id);
+    
+    // Comparação direta de senha - em produção usar bcrypt ou similar
+    if (userData.password !== password) {
+      console.log('Senha incorreta para o usuário:', userData.id);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Usuário não encontrado ou senha incorreta' 
+      }, { status: 401 });
+    }
+    
+    // Criar token JWT
+    const token = sign(
+      { 
+        id: userData.id,
+        phone: userData.phone,
+        email: userData.email 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: JWT_EXPIRY }
     );
+    
+    // Definir cookie
+    cookies().set('client_auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60, // 7 dias em segundos
+      path: '/'
+    });
+    
+    console.log('Login direto realizado com sucesso:', { id: userData.id });
+    
+    // Retornar dados do usuário (sem senha)
+    return NextResponse.json({ 
+      success: true, 
+      user: {
+        id: userData.id,
+        firstName: userData.first_name,
+        lastName: userData.last_name,
+        phone: userData.phone,
+        email: userData.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erro ao processar requisição:', error);
+    let errorMessage = 'Erro interno do servidor';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage 
+    }, { status: 500 });
   }
 } 

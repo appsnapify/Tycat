@@ -396,17 +396,21 @@ export default function TeamLeaderDashboard() {
       {dashboardInfo?.organization_id && dashboardInfo.organization_name ? (
           <Card key={dashboardInfo.organization_id} className="max-w-xs border rounded-lg">
               <CardHeader className="pb-3 text-center">
-                  <CardTitle className="text-primary text-xl">
+                  <CardTitle className="text-lime-500 text-xl font-semibold">
                       {dashboardInfo.organization_name}
                   </CardTitle>
-                  <CardDescription className="flex items-center justify-center pt-1">
+                  <CardDescription className="flex items-center justify-center pt-1 text-muted-foreground">
                       <Calendar className="h-4 w-4 mr-1" />
                       {dashboardInfo.active_event_count ?? 0} evento{dashboardInfo.active_event_count !== 1 ? 's' : ''} ativo{dashboardInfo.active_event_count !== 1 ? 's' : ''}
                   </CardDescription>
             </CardHeader>
               <CardFooter className="flex justify-center border-t pt-4">
                   <Link href={`/app/chefe-equipe/eventos?orgId=${dashboardInfo.organization_id}`} className="w-2/3 flex justify-center">
-                      <Button variant="outline" size="sm" className="w-full">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
+                      > 
                           <Calendar className="h-4 w-4 mr-2" />
                           Ver eventos
                       </Button>

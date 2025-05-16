@@ -1,22 +1,29 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase';
+import { createClient } from '@supabase/supabase-js';
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL');
-}
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('Missing env.SUPABASE_SERVICE_ROLE_KEY, falling back to anon key');
+// Configuração do Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+// Validar configuração
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error('ERRO CRÍTICO: Variáveis de ambiente do Supabase não configuradas corretamente.');
 }
 
-// Cria um cliente Supabase com credenciais de service role para operações administrativas
-export const createAdminClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  
-  return createSupabaseClient<Database>(supabaseUrl, supabaseKey, {
+/**
+ * Cria um cliente Supabase com permissões administrativas (service role)
+ * Use apenas em funções de API ou server actions seguras, nunca em código cliente
+ */
+export function createAdminClient() {
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    // Versão global explícita para evitar conflitos
+    global: {
+      headers: { 
+        'X-Client-Info': 'supabase-js/2.38.4'
+      }
     }
   });
-}; 
+} 

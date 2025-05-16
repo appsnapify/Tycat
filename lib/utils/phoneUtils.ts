@@ -7,11 +7,23 @@
  * e lidando com prefixos internacionais
  */
 export function normalizePhone(phone: string): string {
+  // Se o telefone estiver vazio, retornar vazio
+  if (!phone || phone.trim() === '') {
+    return '';
+  }
+  
   // Remover espaços, traços, parênteses e outros caracteres não numéricos
   let normalizedPhone = phone.replace(/[\s\-()]/g, '');
   
   // Se já começa com +, considerar como formato completo
   if (normalizedPhone.startsWith('+')) {
+    // Remover todos os caracteres não numéricos, exceto o "+"
+    normalizedPhone = normalizedPhone.replace(/[^\d+]/g, '');
+    
+    // Garantir que não haja múltiplos sinais de +
+    if (normalizedPhone.indexOf('+', 1) > 0) {
+      normalizedPhone = '+' + normalizedPhone.substring(1).replace(/\+/g, '');
+    }
     return normalizedPhone;
   }
   

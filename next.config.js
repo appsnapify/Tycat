@@ -27,7 +27,7 @@ const nextConfig = {
   },
   experimental: {
     optimizeCss: true,    // Otimização de CSS
-    optimizeServerReact: true, // Otimização do React no servidor
+    // optimizeServerReact: true, // Otimização do React no servidor
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {

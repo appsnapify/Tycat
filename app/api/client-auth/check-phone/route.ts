@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
-import { normalizePhone } from '@/lib/utils/phoneUtils';
+import { createClient } from '@supabase/supabase-js';
 
 // Cache simples em memória para armazenar verificações recentes
 // Formato: {número: {exists: boolean, userId: string | null, timestamp: number}}
@@ -12,105 +11,81 @@ const CACHE_EXPIRY = 10 * 60 * 1000;
 
 // Schema de validação para o telefone
 const phoneSchema = z.object({
-  phone: z.string().min(6).trim()
-    .refine(val => /^\+?[0-9\s\-()]+$/.test(val), {
-      message: 'Formato de telefone inválido. Deve incluir código do país (ex: +351)'
-    })
+  phone: z.string().min(8, "Telefone inválido")
 });
 
 export async function POST(request: Request) {
-  console.log('Iniciando verificação de telefone...');
   try {
-    // Criar cliente Supabase
-    const supabase = await createClient();
-    console.log('Cliente Supabase criado com sucesso');
+    console.log('Iniciando verificação de telefone');
     
-    // Extrair e validar o corpo da requisição
+    // Extrair body da requisição
     const body = await request.json();
+    console.log('Dados recebidos:', { 
+      phone: body.phone ? `${body.phone.substring(0, 3)}****` : 'não informado' 
+    });
     
-    // Validar o telefone com zod
+    // Validar dados
     const result = phoneSchema.safeParse(body);
     if (!result.success) {
-      console.error('Telefone inválido:', result.error.format());
-      return NextResponse.json(
-        { error: 'Telefone inválido', details: result.error.format() },
-        { status: 400 }
-      );
+      console.error('Erro de validação:', result.error.format());
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Dados inválidos', 
+        details: result.error.format() 
+      }, { status: 400 });
     }
     
     const { phone } = result.data;
-    console.log('Telefone recebido:', phone);
     
-    // Normalizar o telefone
-    const normalizedPhone = normalizePhone(phone);
-    console.log('Telefone normalizado:', normalizedPhone);
+    // Inicializar cliente Supabase com chave anônima
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     
-    // Verificar no cache se o telefone já foi verificado recentemente
-    const now = Date.now();
-    const cachedResult = phoneCache.get(normalizedPhone);
-    if (cachedResult && (now - cachedResult.timestamp < CACHE_EXPIRY)) {
-      console.log('Resultado encontrado no cache:', cachedResult);
-      return NextResponse.json({
-        exists: cachedResult.exists,
-        userId: cachedResult.userId
-      });
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Erro: Variáveis de ambiente do Supabase não configuradas');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Configuração inválida do servidor' 
+      }, { status: 500 });
     }
     
-    try {
-      // MÉTODO OTIMIZADO: Usar função SQL para verificação rápida
-      console.log('Verificando telefone com função otimizada');
-      const { data, error } = await supabase.rpc(
-        'check_phone_exists',
-        { phone_to_check: normalizedPhone }
-      );
-        
-      if (error) {
-        console.error('Erro ao verificar telefone com função otimizada:', error);
-        throw error;
-      }
-      
-      console.log('Resultado da verificação otimizada:', data);
-      
-      if (data && data.length > 0) {
-        const checkResult = data[0];
-        
-        // Criar resultado para retorno e cache
-      const result = {
-          exists: checkResult.found, 
-          userId: checkResult.found ? checkResult.user_id : null,
-        timestamp: now
-      };
-      
-        // Armazenar no cache
-        phoneCache.set(normalizedPhone, result);
-      
-        // Retornar resultado
-      return NextResponse.json({
-        exists: result.exists,
-        userId: result.userId
-      });
-      } else {
-        // Nenhum resultado retornado é considerado como não encontrado
-        const result = { exists: false, userId: null, timestamp: now };
-        phoneCache.set(normalizedPhone, result);
-      
-        return NextResponse.json({
-          exists: false,
-          userId: null
-        });
-      }
-    } catch (dbError) {
-      console.error('Erro ao consultar banco de dados:', dbError);
-      return NextResponse.json(
-        { error: 'Erro ao verificar telefone no banco de dados' },
-        { status: 500 }
-      );
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Usar consulta SQL direta
+    const { data, error } = await supabase
+      .from('client_users')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Erro ao verificar telefone:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro ao verificar telefone: ' + error.message
+      }, { status: 500 });
     }
+    
+    // Retornar resultado
+    console.log(`Telefone ${data ? 'já existe' : 'não encontrado'} no sistema`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      exists: !!data,
+      userId: data?.id || null
+    });
+    
   } catch (error) {
-    console.error('Erro na verificação de telefone:', error);
-    return NextResponse.json(
-      { error: 'Falha ao processar solicitação de verificação de telefone' },
-      { status: 500 }
-    );
+    console.error('Erro ao processar requisição:', error);
+    let errorMessage = 'Erro interno do servidor';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage
+    }, { status: 500 });
   }
 } 

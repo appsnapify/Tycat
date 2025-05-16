@@ -33,6 +33,7 @@ import {
 import GuestListTable from './GuestListTable'
 // Importar o componente de estatísticas avançadas
 import { AdvancedStatsSection } from './StatsComponents';
+import { ApexOptions } from 'apexcharts';
 
 // Importar ApexCharts com carregamento dinâmico para evitar erros de SSR
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -62,6 +63,7 @@ interface TeamStat {
     name: string;
     total_guests: number;
     total_checked_in: number;
+    team_name?: string;
 }
 
 // Interface para Stats de Promotor
@@ -74,9 +76,12 @@ interface PromoterStat {
     team_name?: string;
 }
 
+// Tipo para os códigos de gênero esperados
+type GenderCode = 'M' | 'F' | 'O';
+
 // Interface para Estatísticas de Gênero
 interface GenderStat {
-    gender: string;
+    gender: GenderCode;
     genderName: string;
     count: number;
     percentage: number;
@@ -84,6 +89,13 @@ interface GenderStat {
 
 interface GenderStats {
     genderData: GenderStat[];
+}
+
+// Interface para o retorno da RPC get_top_locations_for_event
+interface RpcLocationStat {
+    postal_code: string; 
+    location_name: string;
+    count: number;
 }
 
 interface EventDetailsClientProps {
@@ -110,7 +122,7 @@ export default function EventDetailsClient({
     const [loadingLocations, setLoadingLocations] = useState(false);
     
     // Estado para o gráfico de localidades
-    const [locationChartOptions, setLocationChartOptions] = useState({
+    const [locationChartOptions, setLocationChartOptions] = useState<ApexOptions>({
         labels: ['Carregando...'],
         colors: ['#818cf8', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#6366f1'],
         legend: {
@@ -164,10 +176,10 @@ export default function EventDetailsClient({
             }
         }]
     });
-    const [locationChartSeries, setLocationChartSeries] = useState([100]);
+    const [locationChartSeries, setLocationChartSeries] = useState<number[]>([100]);
     
     // Estado para o gráfico de gênero
-    const [genderChartOptions, setGenderChartOptions] = useState({
+    const [genderChartOptions, setGenderChartOptions] = useState<ApexOptions>({
         labels: ['Carregando...'],
         colors: ['#3b82f6', '#ec4899', '#8b5cf6'], // Azul, Rosa, Roxo
         legend: {
@@ -178,7 +190,8 @@ export default function EventDetailsClient({
             formatter: function(seriesName: string, opts: any) {
                 const value = opts.w.globals.series[opts.seriesIndex];
                 const label = opts.w.globals.labels[opts.seriesIndex];
-                const count = genderStats.genderData[opts.seriesIndex]?.count || 0;
+                const genderItem = genderStats.genderData.find(g => g.genderName === label);
+                const count = genderItem?.count || 0;
                 return `${seriesName}: ${value}% (${count})`;
             }
         },
@@ -226,36 +239,44 @@ export default function EventDetailsClient({
             }
         }]
     });
-    const [genderChartSeries, setGenderChartSeries] = useState([100]);
-    const [genderChartLabels, setGenderChartLabels] = useState(['Carregando...']);
+    const [genderChartSeries, setGenderChartSeries] = useState<number[]>([100]);
+    const [genderChartLabels, setGenderChartLabels] = useState<string[]>(['Carregando...']);
 
     const eventId = event.id;
 
     // Efeito para atualizar os dados do gráfico de gênero quando a prop mudar
     useEffect(() => {
         if (genderStats && genderStats.genderData && genderStats.genderData.length > 0) {
-            // Extrair dados de gênero
             const percentages = genderStats.genderData.map(item => item.percentage);
             const labels = genderStats.genderData.map(item => item.genderName);
             
-            // Definir paleta de cores baseada no gênero
-            const colorMap = {
-                'M': '#3b82f6', // Azul para masculino
-                'F': '#ec4899', // Rosa para feminino
-                'O': '#8b5cf6'  // Roxo para outros
+            const colorMap: { [key in GenderCode]?: string } = {
+                'M': '#3b82f6',
+                'F': '#ec4899',
+                'O': '#8b5cf6'
             };
             
             const colors = genderStats.genderData.map(item => 
-                colorMap[item.gender] || '#8b5cf6' // Fallback para roxo
+                colorMap[item.gender] || '#8b5cf6'
             );
             
-            // Atualizar estados do gráfico
             setGenderChartSeries(percentages);
             setGenderChartLabels(labels);
             setGenderChartOptions(prev => ({
                 ...prev,
                 labels: labels,
-                colors: colors
+                colors: colors,
+                legend: {
+                    ...prev.legend,
+                    position: prev.legend?.position || 'bottom',
+                    formatter: function(seriesName: string, opts: any) {
+                        const value = opts.w.globals.series[opts.seriesIndex];
+                        const label = opts.w.globals.labels[opts.seriesIndex];
+                        const genderItem = genderStats.genderData.find(g => g.genderName === label);
+                        const count = genderItem?.count || 0;
+                        return `${label}: ${value}% (${count})`;
+                    }
+                }
             }));
         }
     }, [genderStats]);
@@ -330,59 +351,37 @@ export default function EventDetailsClient({
                 
                 if (error) throw error;
                 
-                if (data && data.length > 0) {
-                    // Transformar os dados para o formato esperado
-                    const locationData = data.map(item => ({
+                const typedData = data as RpcLocationStat[] | null;
+
+                if (typedData && typedData.length > 0) {
+                    const locationData = typedData.map((item: RpcLocationStat) => ({
                         code: item.postal_code,
                         name: item.location_name,
                         count: item.count
                     }));
                     
-                    setTopLocations(locationData);
-                    
-                    // Preparar dados para o gráfico
-                    const MAX_SLICES = 5; // Limite de fatias visíveis
-                    let chartData = [...locationData];
-                    
-                    // Se tiver mais que MAX_SLICES localidades, agrupar as menores como "Outras"
-                    if (chartData.length > MAX_SLICES) {
-                        // Ordenar por contagem (maior para menor)
-                        chartData.sort((a, b) => b.count - a.count);
-                        
-                        // Pegar as principais localidades
-                        const mainLocations = chartData.slice(0, MAX_SLICES - 1);
-                        
-                        // Agrupar o restante
-                        const othersCount = chartData
-                            .slice(MAX_SLICES - 1)
-                            .reduce((sum, loc) => sum + loc.count, 0);
-                        
-                        // Adicionar a categoria "Outras"
-                        if (othersCount > 0) {
-                            mainLocations.push({
-                                code: 'others',
-                                name: 'Outras',
-                                count: othersCount
-                            });
-                        }
-                        
-                        chartData = mainLocations;
-                    }
-                    
-                    // Atualizar o estado do gráfico
-                    setLocationChartOptions({
-                        ...locationChartOptions,
-                        labels: chartData.map(loc => loc.name),
-                    });
-                    setLocationChartSeries(chartData.map(loc => loc.count));
+                    const labels = locationData.map(loc => `${loc.name} (${loc.code})`);
+                    const series = locationData.map(loc => loc.count);
+
+                    setLocationChartSeries(series);
+                    setLocationChartOptions(prev => ({
+                        ...prev,
+                        labels: labels,
+                    }));
+                } else {
+                    setLocationChartSeries([0]);
+                    setLocationChartOptions(prev => ({
+                        ...prev,
+                        labels: ["Sem dados de localização"],
+                    }));
                 }
             } catch (error) {
-                console.error('Erro ao buscar localidades principais:', error);
-                toast({
-                    title: "Erro",
-                    description: "Não foi possível carregar as localidades dos convidados.",
-                    variant: "destructive"
-                });
+                console.error('Erro ao buscar localidades:', error);
+                setLocationChartSeries([0]);
+                setLocationChartOptions(prev => ({
+                    ...prev,
+                    labels: ["Erro ao carregar dados"],
+                }));
             } finally {
                 setLoadingLocations(false);
             }
@@ -487,11 +486,8 @@ export default function EventDetailsClient({
                                     <div className="h-48">
                                         {typeof window !== 'undefined' && (
                                             <Chart
-                                                options={{
-                                                    ...genderChartOptions,
-                                                    labels: genderChartLabels
-                                                }}
-                                                series={genderChartSeries}
+                                                options={{...genderChartOptions}}
+                                                series={[...genderChartSeries]}
                                                 type="donut"
                                                 height="100%"
                                             />
@@ -547,9 +543,9 @@ export default function EventDetailsClient({
                                             <div className="h-48">
                                                 {typeof window !== 'undefined' && (
                                                     <Chart
-                                                        options={locationChartOptions}
-                                                        series={locationChartSeries}
-                                                        type="donut"
+                                                        options={{...locationChartOptions}}
+                                                        series={[...locationChartSeries]}
+                                                        type="pie"
                                                         height="100%"
                                                     />
                                                 )}

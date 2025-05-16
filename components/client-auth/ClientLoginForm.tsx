@@ -53,7 +53,7 @@ export default function ClientLoginForm({
       let requestBody;
       let endpoint = '';
       
-      // Se temos um userId, usar o endpoint de login direto que é mais simples e confiável
+      // Se temos um userId, usar o endpoint de login direto
       if (userId) {
         console.log('Usando login direto com ID:', userId);
         requestBody = {
@@ -61,23 +61,6 @@ export default function ClientLoginForm({
           password: data.password
         };
         endpoint = '/api/client-auth/direct-login';
-        
-        console.log(`Enviando requisição para ${endpoint}`);
-        try {
-          response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody),
-            // Adicionar timeout para evitar espera indefinida
-            signal: AbortSignal.timeout(15000) // 15 segundos timeout
-          });
-          console.log(`Resposta de ${endpoint} recebida com status:`, response.status);
-        } catch (fetchError) {
-          console.error(`Erro ao fazer fetch para ${endpoint}:`, fetchError);
-          throw new Error(`Falha na conexão com ${endpoint}: ${fetchError.message}`);
-        }
       } else {
         // Login normal por telefone
         console.log('Usando login por telefone:', data.phone);
@@ -86,80 +69,68 @@ export default function ClientLoginForm({
           password: data.password
         };
         endpoint = '/api/client-auth/login';
-        
-        console.log(`Enviando requisição para ${endpoint}`);
-        try {
-          response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody),
-            // Adicionar timeout para evitar espera indefinida
-            signal: AbortSignal.timeout(15000) // 15 segundos timeout
-          });
-          console.log(`Resposta de ${endpoint} recebida com status:`, response.status);
-        } catch (fetchError) {
-          console.error(`Erro ao fazer fetch para ${endpoint}:`, fetchError);
-          throw new Error(`Falha na conexão com ${endpoint}: ${fetchError.message}`);
-        }
       }
       
-      console.log('Status da resposta:', response.status);
+      console.log(`Enviando requisição para ${endpoint}`);
       
-      // Tentar parsear a resposta com tratamento de erro
-      let result;
-      let responseText = '';
+      // Tente fazer a requisição com um timeout para evitar esperas indefinidas
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+      
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        console.log(`Resposta de ${endpoint} recebida com status:`, response.status);
+      } catch (fetchError: any) {
+        console.error(`Erro ao fazer fetch para ${endpoint}:`, fetchError);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('A requisição demorou muito tempo. Tente novamente.');
+        }
+        throw new Error(`Falha na conexão: ${fetchError.message}`);
+      }
+      
+      // Tentar obter o texto da resposta
+      let responseText;
       try {
         responseText = await response.text();
-        console.log('Resposta em texto completa:', responseText.substring(0, 200) + (responseText.length > 200 ? '...' : ''));
-        
-        if (!responseText || responseText.trim() === '') {
-          console.error('Resposta vazia do servidor');
-          throw new Error('O servidor retornou uma resposta vazia');
-        }
-        
-        try {
-          result = JSON.parse(responseText);
-          console.log('Resposta parseada com sucesso:', result);
-        } catch (jsonError) {
-          console.error('Erro ao parsear JSON da resposta:', jsonError);
-          console.error('Texto da resposta que causou erro:', responseText);
-          
-          // Tentativa de recuperação para JSON parcial
-          try {
-            // Tentar encontrar e extrair um objeto JSON válido na resposta
-            const jsonMatch = responseText.match(/\{.*\}/);
-            if (jsonMatch) {
-              console.log('Tentando recuperar JSON parcial:', jsonMatch[0]);
-              result = JSON.parse(jsonMatch[0]);
-              console.log('Recuperação de JSON parcial bem-sucedida:', result);
-            } else {
-              throw new Error('Não foi possível recuperar JSON da resposta');
-            }
-          } catch (recoveryError) {
-            console.error('Falha na recuperação de JSON parcial:', recoveryError);
-            throw new Error(`Erro ao processar resposta do servidor: formato inválido`);
-          }
-        }
       } catch (textError) {
         console.error('Erro ao obter texto da resposta:', textError);
-        throw new Error(`Erro ao ler resposta do servidor: ${textError.message}`);
+        throw new Error('Não foi possível ler a resposta do servidor');
       }
       
+      // Tentar parsear o JSON
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('Erro ao parsear JSON:', jsonError);
+        console.error('Texto recebido:', responseText);
+        throw new Error('Resposta inválida do servidor');
+      }
+      
+      // Verificar se a resposta foi bem-sucedida
       if (!response.ok) {
-        const errorMsg = result?.error || `Erro ao iniciar sessão (${response.status})`;
-        console.error('Resposta de erro:', errorMsg, result);
-        throw new Error(errorMsg);
+        console.error('Resposta com erro:', result);
+        throw new Error(result.error || `Erro ao iniciar sessão (${response.status})`);
       }
       
+      // Verificar se temos os dados do usuário
       if (!result.user) {
-        console.error('Resposta não contém dados do usuário:', result);
+        console.error('Resposta sem dados do usuário:', result);
         throw new Error('Resposta incompleta do servidor');
       }
       
-      console.log('Login bem-sucedido com usuário:', result.user);
+      console.log('Login bem-sucedido:', result.user);
       onSuccess(result.user);
+      
     } catch (err: any) {
       console.error('Erro durante login:', err);
       setError(err.message || 'Ocorreu um erro ao iniciar sessão');

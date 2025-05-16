@@ -9,8 +9,7 @@ const isBrowser = typeof window !== 'undefined'
 // Helper para uso seguro de cookies
 const getCookieSafe = async (name: string) => {
   try {
-    const cookieStore = cookies();
-    // Certifique-se de que qualquer operação em cookieStore seja awaited
+    const cookieStore = await cookies();
     const cookie = cookieStore.get(name);
     return cookie?.value;
   } catch (e) {
@@ -19,15 +18,15 @@ const getCookieSafe = async (name: string) => {
   }
 };
 
-const setCookieSafe = (name: string, value: string, options: any = {}) => {
+const setCookieSafe = async (name: string, value: string, options: any = {}) => {
   try {
-    cookies().set({ 
+    const cookieStore = await cookies();
+    cookieStore.set({ 
       name, 
       value, 
       ...options, 
-      // Garantir valores padrão para evitar problemas
       path: options.path || '/',
-      maxAge: options.maxAge || 60 * 60 * 24 * 7 // 1 semana 
+      maxAge: options.maxAge || 60 * 60 * 24 * 7
     });
     return true;
   } catch (e) {
@@ -36,9 +35,10 @@ const setCookieSafe = (name: string, value: string, options: any = {}) => {
   }
 };
 
-const deleteCookieSafe = (name: string, options: any = {}) => {
+const deleteCookieSafe = async (name: string, options: any = {}) => {
   try {
-    cookies().delete({ 
+    const cookieStore = await cookies();
+    cookieStore.delete({ 
       name, 
       ...options,
       path: options.path || '/'

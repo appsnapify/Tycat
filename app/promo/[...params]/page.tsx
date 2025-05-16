@@ -75,35 +75,36 @@ async function getPromoAndEventData(eventId: string, promoterId: string, teamId:
 
 // Server Component que captura parâmetros da URL e os passa para o cliente
 export default async function PromoterGuestListPage({ params }: PageProps) {
-  // Extrair os parâmetros da URL com tratamento seguro para Promises
-  const urlParams = await params.params;
-  
-  console.log('Promoter Page - Parâmetros recebidos:', urlParams);
-  
-  // Verificar se temos todos os 3 parâmetros necessários
-  if (!urlParams || urlParams.length !== 3) {
-    console.error('URL inválida, esperados 3 parâmetros: /promo/[eventId]/[promoterId]/[teamId]');
-    notFound();
-  }
-
-  const [eventId, promoterId, teamId] = urlParams;
-
-  // Validação básica dos IDs (formato UUID)
-  const isValidUUID = (id: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-  
-  if (!isValidUUID(eventId) || !isValidUUID(promoterId) || !isValidUUID(teamId)) {
-    console.error('ID(s) inválido(s) na URL');
-    notFound();
-  }
-  
-  // Carregar todos os dados necessários no servidor
-  const data = await getPromoAndEventData(eventId, promoterId, teamId);
-  
-  if (!data) {
-    notFound();
-  }
-  
-  const { event: eventData, promoter: promoterData } = data;
+  console.log('DEBUG: Dentro da PromoterGuestListPage - Inicio');
+  try {
+    const urlParams = await params.params;
+    console.log('DEBUG: urlParams recebidos:', urlParams);
+    
+    if (!urlParams || urlParams.length !== 3) {
+      return <div>Parâmetros inválidos (quantidade)</div>;
+    }
+    
+    const [eventId, promoterId, teamId] = urlParams;
+    console.log('DEBUG: eventId:', eventId);
+    console.log('DEBUG: promoterId:', promoterId);
+    console.log('DEBUG: teamId:', teamId);
+    
+    // Validação básica dos IDs (formato UUID)
+    const isValidUUID = (id: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    
+    if (!isValidUUID(eventId) || !isValidUUID(promoterId) || !isValidUUID(teamId)) {
+      console.error('ID(s) inválido(s) na URL');
+      notFound();
+    }
+    
+    // Carregar todos os dados necessários no servidor
+    const data = await getPromoAndEventData(eventId, promoterId, teamId);
+    
+    if (!data) {
+      notFound();
+    }
+    
+    const { event: eventData, promoter: promoterData } = data;
     
     // Formatar data e hora para exibição
     const formatDate = (dateString: string | null | undefined) => {
@@ -202,15 +203,25 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
             
             <div className="pt-4">
             {/* Passa os parâmetros para o componente cliente */}
+            {isGuestListOpen ? (
               <GuestRequestCard 
                 eventId={eventId}
                 promoterId={promoterId}
                 teamId={teamId}
                 className="w-full"
               />
+            ) : (
+              <div className="text-center p-4 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <p>{statusMessage}</p>
+              </div>
+            )}
             </div>
           </CardContent>
         </Card>
       </div>
     );
+  } catch (error) {
+    console.error('DEBUG: Erro ao processar params:', error);
+    return <div>Erro ao processar parâmetros.</div>;
+  }
 } 

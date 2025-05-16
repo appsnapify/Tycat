@@ -1,39 +1,45 @@
 'use client';
 
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { ClientSessionProvider } from './ClientSessionProvider';
 
-export default function RequireClientAuth({ 
-  children, 
-  redirectTo = '/client/auth' 
-}: { 
-  children: React.ReactNode;
-  redirectTo?: string;
-}) {
-  const router = useRouter();
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+export function ClientProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isLoading } = useClientAuth();
-  
+  const router = useRouter();
+
   useEffect(() => {
-    // Redirecionar apenas após o carregamento inicial e se não houver usuário
+    // Se não estiver carregando e o usuário não existir, redirecionar para login
     if (!isLoading && !user) {
-      const queryParam = new URLSearchParams({ redirect: window.location.pathname }).toString();
-      router.push(`${redirectTo}?${queryParam}`);
+      router.push('/client/auth');
     }
-  }, [user, isLoading, redirectTo, router]);
-  
-  // Não mostrar nada enquanto está carregando ou se não há usuário
-  if (isLoading || !user) {
-    return null; // ou um componente de loading
+  }, [user, isLoading, router]);
+
+  // Mostrar nada enquanto verifica autenticação
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
-  
-  // Mostrar o conteúdo protegido quando autenticado
-  return <>{children}</>;
+
+  // Se o usuário estiver autenticado, mostrar o conteúdo protegido
+  if (user) {
+    return <>{children}</>;
+  }
+
+  // Se não estiver autenticado, não mostrar nada (o efeito vai redirecionar)
+  return null;
 }
 
 // Componente de wrapper com o provedor de sessão
-export function ClientProtectedRoute({ 
+export function ClientProtectedRouteWrapper({ 
   children, 
   redirectTo = '/client/auth' 
 }: { 
@@ -42,9 +48,9 @@ export function ClientProtectedRoute({
 }) {
   return (
     <ClientSessionProvider>
-      <RequireClientAuth redirectTo={redirectTo}>
+      <ClientProtectedRoute>
         {children}
-      </RequireClientAuth>
+      </ClientProtectedRoute>
     </ClientSessionProvider>
   );
 } 

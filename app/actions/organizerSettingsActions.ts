@@ -1,0 +1,163 @@
+'use server';
+
+import { createClient } from '@/lib/supabase-server';
+import { unstable_noStore as noStore } from 'next/cache';
+import { cookies } from 'next/headers';
+
+// Nota: A estrutura exata da tabela organizer_business_details (especialmente a FK para users)
+// precisa ser confirmada. Assumindo uma coluna 'user_id' ou 'organizer_id' por agora.
+
+export async function getOrganizerBusinessDetails() {
+  console.log("[Action:getOrganizerBusinessDetails] Iniciando action.");
+  noStore();
+
+  // Logar cookies recebidos pela Server Action
+  try {
+    const cookieStore = cookies();
+    const allCookies = cookieStore.getAll();
+    console.log("[Action:getOrganizerBusinessDetails] Cookies recebidos:", JSON.stringify(allCookies));
+  } catch (e) {
+    console.error("[Action:getOrganizerBusinessDetails] Erro ao tentar ler cookies:", e);
+  }
+
+  let supabase;
+  try {
+    supabase = await createClient();
+    console.log("[Action:getOrganizerBusinessDetails] Cliente Supabase criado:", supabase ? 'Objeto Cliente OK' : 'Cliente UNDEFINED');
+    if (!supabase) {
+      return { success: false, error: 'Falha ao criar cliente Supabase na action.', data: null };
+    }
+  } catch (error: any) {
+    console.error("[Action:getOrganizerBusinessDetails] Erro ao criar cliente Supabase:", error);
+    return { success: false, error: `Falha ao criar cliente Supabase na action: ${error.message}`, data: null };
+  }
+
+  try {
+    console.log("[Action:getOrganizerBusinessDetails] Tentando obter usuário...");
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("[Action:getOrganizerBusinessDetails] Erro ao obter usuário:", userError);
+      return { success: false, error: `Erro ao obter usuário: ${userError.message}`, data: null };
+    }
+    if (!user) {
+      console.log("[Action:getOrganizerBusinessDetails] Nenhum usuário autenticado encontrado.");
+      return { success: false, error: 'Nenhum usuário autenticado.', data: null };
+    }
+    console.log("[Action:getOrganizerBusinessDetails] Usuário obtido:", user.id);
+
+    console.log(`[Action:getOrganizerBusinessDetails] Buscando detalhes para o usuário: ${user.id}`);
+    const { data, error } = await supabase
+      .from('organizer_business_details')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116: single row not found (normal if no details yet)
+      console.error("[Action:getOrganizerBusinessDetails] Erro ao buscar detalhes da empresa:", error);
+      return { success: false, error: `Erro ao buscar detalhes: ${error.message}`, data: null };
+    }
+
+    if (!data) {
+      console.log("[Action:getOrganizerBusinessDetails] Nenhum detalhe da empresa encontrado para o usuário (isso pode ser normal).");
+      return { success: true, data: null }; // Retorna sucesso com dados nulos se não encontrado
+    }
+
+    console.log("[Action:getOrganizerBusinessDetails] Detalhes da empresa encontrados:", data);
+    return { success: true, data };
+
+  } catch (e: any) {
+    console.error("[Action:getOrganizerBusinessDetails] Erro inesperado na action:", e);
+    return { success: false, error: `Erro inesperado na action: ${e.message}`, data: null };
+  }
+}
+
+// A action upsertOrganizerBusinessDetails será adicionada abaixo nesta mesma Fase 3. 
+
+// Nota: O schema Zod para validação dos dados do formulário está definido em
+// /app/organizador/configuracao/page.tsx. Idealmente, para Server Actions,
+// a validação também ocorreria aqui no backend antes de interagir com o DB.
+// Por simplicidade neste passo, assumiremos que os dados chegam já validados pelo frontend.
+// Numa implementação de produção, adicionaríamos validação Zod aqui também.
+
+interface BusinessDetailsData {
+  business_name: string;
+  vat_number: string;
+  admin_contact_email: string;
+  admin_contact_phone?: string | null;
+  billing_address_line1: string;
+  billing_address_line2?: string | null;
+  billing_postal_code: string;
+  billing_city: string;
+  billing_country: string;
+  iban: string;
+  iban_proof_url?: string | null; 
+}
+
+export async function upsertOrganizerBusinessDetails(details: BusinessDetailsData) {
+  console.log("[Action:upsertOrganizerBusinessDetails] Iniciando action com detalhes:", details);
+  noStore();
+  
+  // Logar cookies recebidos pela Server Action
+  try {
+    const cookieStore = cookies();
+    const allCookies = cookieStore.getAll();
+    console.log("[Action:upsertOrganizerBusinessDetails] Cookies recebidos:", JSON.stringify(allCookies));
+  } catch (e) {
+    console.error("[Action:upsertOrganizerBusinessDetails] Erro ao tentar ler cookies:", e);
+  }
+
+  let supabase;
+  try {
+    supabase = await createClient();
+    console.log("[Action:upsertOrganizerBusinessDetails] Cliente Supabase criado:", supabase ? 'Objeto Cliente OK' : 'Cliente UNDEFINED');
+    if (!supabase) {
+      return { success: false, error: 'Falha ao criar cliente Supabase na action upsert.', data: null };
+    }
+  } catch (error: any) {
+    console.error("[Action:upsertOrganizerBusinessDetails] Erro ao criar cliente Supabase:", error);
+    return { success: false, error: `Falha ao criar cliente Supabase na action upsert: ${error.message}`, data: null };
+  }
+
+  try {
+    console.log("[Action:upsertOrganizerBusinessDetails] Tentando obter usuário...");
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("[Action:upsertOrganizerBusinessDetails] Erro ao obter usuário:", userError);
+      return { success: false, error: `Erro ao obter usuário no upsert: ${userError.message}`, data: null };
+    }
+    if (!user) {
+      console.log("[Action:upsertOrganizerBusinessDetails] Nenhum usuário autenticado encontrado para upsert.");
+      return { success: false, error: 'Nenhum usuário autenticado para upsert.', data: null };
+    }
+    console.log("[Action:upsertOrganizerBusinessDetails] Usuário obtido para upsert:", user.id);
+
+    const dataToUpsert = {
+      ...details,
+      user_id: user.id,
+      admin_contact_phone: details.admin_contact_phone || null,
+      billing_address_line2: details.billing_address_line2 || null,
+      iban_proof_url: details.iban_proof_url || null,
+    };
+    console.log("[Action:upsertOrganizerBusinessDetails] Dados para upsert:", dataToUpsert);
+
+    const { data, error } = await supabase
+      .from('organizer_business_details')
+      .upsert(dataToUpsert, { onConflict: 'user_id', ignoreDuplicates: false })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[Action:upsertOrganizerBusinessDetails] Erro no upsert dos detalhes da empresa:", error);
+      return { success: false, error: `Erro no upsert: ${error.message}`, data: null };
+    }
+
+    console.log("[Action:upsertOrganizerBusinessDetails] Detalhes da empresa atualizados/inseridos:", data);
+    return { success: true, data };
+
+  } catch (e: any) {
+    console.error("[Action:upsertOrganizerBusinessDetails] Erro inesperado na action de upsert:", e);
+    return { success: false, error: `Erro inesperado na action de upsert: ${e.message}`, data: null };
+  }
+} 

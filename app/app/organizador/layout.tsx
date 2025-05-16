@@ -23,6 +23,9 @@ import {
   Settings,
   FileText,
   Building,
+  Ticket,
+  ScanLine,
+  Store,
 } from 'lucide-react'
 
 // Estilos Atualizados
@@ -102,11 +105,11 @@ export default function OrganizadorLayout({
   const sidebarLinks = [
     { href: '/app/organizador/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { href: '/app/organizador/eventos', label: 'Eventos', icon: <CalendarDays size={18} /> },
-    { href: '/app/organizador/bilheteria', label: 'Bilheteria', icon: <TicketCheck size={18} /> },
-    { href: '/app/organizador/eventos/checkin', label: 'Check-in', icon: <QrCode size={18} /> },
+    { href: '/app/organizador/bilhetes', label: 'Bilhetes', icon: <Ticket size={18} /> },
+    { href: '/app/organizador/check-in', label: 'Check-in', icon: <ScanLine size={18} /> },
     { href: '/app/organizador/equipes', label: 'Equipes', icon: <Users size={18} /> },
     { href: '/app/organizador/relatorios', label: 'Relatórios', icon: <FileText size={18} /> },
-    { href: '/app/organizador/organizacao', label: 'Organização', icon: <Building size={18} /> },
+    { href: '/app/organizador/organizacao', label: 'Organização', icon: <Store size={18} /> },
     { href: '/app/organizador/configuracoes', label: 'Configurações', icon: <Settings size={18} /> },
   ]
 

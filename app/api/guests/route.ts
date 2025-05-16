@@ -173,11 +173,25 @@ export async function POST(request: NextRequest) {
     
     // Gerar QR code como URL de dados
     let qrCodeUrl = null;
+    let qrCodeGenerationError = null;
     try {
       qrCodeUrl = await QRCode.toDataURL(qrCodeJson);
-      console.log('API - QR Code gerado com sucesso');
+      console.log('API - QR Code gerado com sucesso (local)');
     } catch (qrError) {
-      console.error('API - Erro ao gerar QR code:', qrError);
+      console.error('API - Erro ao gerar QR code localmente:', qrError);
+      // Fallback para API externa
+      try {
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeJson)}`;
+        // Opcional: testar se a URL responde (fetch HEAD), mas para robustez, apenas logar
+        console.log('API - QR Code gerado com sucesso via API externa (fallback)');
+      } catch (externalError) {
+        console.error('API - Erro ao gerar QR code via API externa:', externalError);
+        qrCodeGenerationError = externalError;
+      }
+    }
+    if (!qrCodeUrl) {
+      console.error('API - Falha total ao gerar QR code!');
+      return NextResponse.json({ error: 'Não foi possível gerar o QR code. Tente novamente mais tarde.' }, { status: 500 });
     }
     
     // METODO DIRETO COM SQL PARA SALVAR O CONVIDADO
@@ -252,13 +266,31 @@ export async function POST(request: NextRequest) {
             .select('*');
       
       if (error) {
+        // Tratamento de erro de duplicidade (Postgres 23505)
+        if (error.code === '23505' || (error.message && error.message.includes('duplicate key'))) {
+          console.warn('API - Tentativa de inscrição duplicada:', error);
+          return NextResponse.json(
+            { error: 'Já existe uma inscrição para este número neste evento.' },
+            { status: 409 }
+          );
+        }
         console.error('API - Erro ao inserir convidado (método service role):', error);
       } else if (data && data.length > 0) {
-        console.log('API - Convidado registrado com sucesso (método service role):', data[0]);
+        // Validação pós-inserção: SELECT para garantir gravação
+        const { data: checkData, error: checkError } = await supabaseAdmin
+          .from('guests')
+          .select('*')
+          .eq('id', guestId)
+          .maybeSingle();
+        if (checkError || !checkData) {
+          console.error('API - Falha na verificação pós-inserção:', checkError);
+          return NextResponse.json({ error: 'Erro ao verificar gravação do convidado.' }, { status: 500 });
+        }
+        console.log('API - Convidado registrado e verificado:', checkData);
         return NextResponse.json({
           success: true,
           source: 'service_role',
-          data: data[0],
+          data: checkData,
           qrCodeUrl
         });
       }

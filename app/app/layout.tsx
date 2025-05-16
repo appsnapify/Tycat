@@ -94,6 +94,7 @@ const getNavLinks = (role: string) => {
       return [
         { href: '/app/organizador/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/app/organizador/organizations', label: 'Organizações', icon: Building },
+        { href: '/app/organizador/configuracao', label: 'Configurações', icon: Users },
         // ... outros links organizador
       ];
     case 'chefe-equipe':

@@ -86,20 +86,23 @@ export async function createClient() {
             return undefined
           }
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options })
+            // Passar apenas as opções que são válidas para cookieStore.set
+            const { domain, expires, httpOnly, maxAge, path, sameSite, secure } = options;
+            cookieStore.set({ name, value, domain, expires, httpOnly, maxAge, path, sameSite, secure })
           } catch (e) {
             console.error(`Erro ao definir cookie ${name}:`, e)
-            // Não lançar erro para permitir operações sem falha
           }
         },
-        remove(name: string, options: any) {
+        remove(name: string, options: Pick<CookieOptions, 'path' | 'domain'>) {
           try {
-            cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+            // Usar delete que é mais direto e menos propenso a este tipo de erro do Next.js
+            // Passar apenas as opções que são válidas para cookieStore.delete
+            const { path, domain } = options;
+            cookieStore.delete({name, path, domain});
           } catch (e) {
             console.error(`Erro ao remover cookie ${name}:`, e)
-            // Não lançar erro para permitir operações sem falha
           }
         }
       }
@@ -114,4 +117,18 @@ export async function createClient() {
 export async function createServerSupabaseClient() {
   console.warn('createServerSupabaseClient() está obsoleto. Use createClient() ou createReadOnlyClient() baseado no contexto.');
   return await createClient();
+}
+
+// Preciso adicionar a interface CookieOptions que usei acima.
+// Normalmente isto viria de 'http' ou uma biblioteca de cookies, mas para este contexto,
+// vou definir uma interface simples baseada nas opções comuns.
+interface CookieOptions {
+  domain?: string;
+  expires?: Date;
+  httpOnly?: boolean;
+  maxAge?: number;
+  path?: string;
+  sameSite?: 'strict' | 'lax' | 'none';
+  secure?: boolean;
+  [key: string]: any; // Para outras opções que o Supabase possa passar
 } 

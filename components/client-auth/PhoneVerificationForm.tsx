@@ -12,10 +12,31 @@ import { isValidPhoneNumber } from 'react-phone-number-input'
 
 interface PhoneVerificationFormProps {
   onVerified: (phone: string, exists: boolean, userId?: string | null) => void
+  defaultPhone?: string
 }
 
-export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps) {
-  const [phone, setPhone] = useState<string>('')
+// Traduções em português para melhor localização
+const translations = {
+  'Telefone': 'Telemóvel',
+  'Por favor, insira um número de telemóvel': 'Por favor, introduz um número de telemóvel',
+  'Por favor, insira um número de telemóvel válido': 'Por favor, introduz um número de telemóvel válido',
+  'Formato de número incompleto ou inválido': 'Formato de número incompleto ou inválido',
+  'Formato de número válido!': 'Formato de número válido!',
+  'A iniciar verificação...': 'A iniciar verificação...',
+  'A contactar o servidor...': 'A contactar o servidor...',
+  'A verificar número...': 'A verificar número...',
+  'Quase concluído...': 'Quase concluído...',
+  'Verificação concluída!': 'Verificação concluída!',
+  'A verificar...': 'A verificar...',
+  'Tentar novamente': 'Tentar novamente',
+  'Continuar': 'Continuar',
+  'A verificação foi cancelada. Por favor, tente novamente.': 'A verificação foi cancelada. Por favor, tenta novamente.',
+  'Problema de conexão. Verifique sua internet e tente novamente.': 'Problema de conexão. Verifica a tua internet e tenta novamente.',
+  'A verificação demorou muito tempo. Por favor, tente novamente.': 'A verificação demorou muito tempo. Por favor, tenta novamente.'
+};
+
+export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVerificationFormProps) {
+  const [phone, setPhone] = useState<string>(defaultPhone)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
@@ -24,6 +45,13 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
+  
+  // Inicializar o telefone a partir da prop padrão se fornecida
+  useEffect(() => {
+    if (defaultPhone && !phone) {
+      setPhone(defaultPhone);
+    }
+  }, [defaultPhone]);
 
   // Limpar timeout ao desmontar componente
   useEffect(() => {
@@ -46,7 +74,7 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
     try {
       console.log('Iniciando fetch de verificação de telefone');
       
-      const response = await fetch('/api/client-auth/check-phone', {
+      const response = await fetch('/api/client-auth-v2/check-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +90,7 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
         try {
           const errorData = await response.json();
           console.error('Erro de verificação:', errorData);
-          throw new Error(errorData.error || 'Formato de telemóvel inválido');
+          throw new Error(errorData.error || translations['Por favor, insira um número de telemóvel válido']);
         } catch (e) {
           // Se não conseguir processar o JSON, use a informação de status
           throw new Error(`Erro de verificação (${response.status}): ${response.statusText}`);
@@ -308,10 +336,10 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="phone" className="text-sm font-medium">
-              Telemóvel
+              {translations['Telefone']}
             </label>
             <PhoneInput
-              international
+              international={false}
               countryCallingCodeEditable={false}
               defaultCountry="PT"
               flags={flags}
@@ -330,15 +358,15 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
                   className="h-6 px-2"
                 >
                   <RefreshCw className="h-3 w-3 mr-1" />
-                  <span className="text-xs">Tentar novamente</span>
+                  <span className="text-xs">{translations['Tentar novamente']}</span>
                 </Button>
               </div>
             )}
             {!error && phone && !isPhoneValid && (
-              <p className="text-xs text-amber-500">Formato de número incompleto ou inválido</p>
+              <p className="text-xs text-amber-500">{translations['Formato de número incompleto ou inválido']}</p>
             )}
             {!error && isPhoneValid && (
-              <p className="text-xs text-green-500">Formato de número válido!</p>
+              <p className="text-xs text-green-500">{translations['Formato de número válido!']}</p>
             )}
           </div>
           
@@ -359,16 +387,16 @@ export function PhoneVerificationForm({ onVerified }: PhoneVerificationFormProps
           <div className="pt-4 pb-2 button-container">
           <Button 
             type="submit" 
-              className="w-full text-white font-medium"
-              disabled={isSubmitting || !phone || !isPhoneValid}
+            className="w-full text-white font-medium"
+            disabled={isSubmitting || !phone || !isPhoneValid}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                A verificar...
+                {translations['A verificar...']}
               </>
             ) : (
-              'Continuar'
+              translations['Continuar']
             )}
           </Button>
           </div>

@@ -116,7 +116,6 @@ export async function updateGuestQRCode(guestId: string, qrCodeUrl: string) {
     return { error: 'Erro interno ao atualizar QR code' };
   }
 }
-
 /**
  * Gera um ID de emergência para uso quando a criação do registro falha
  */

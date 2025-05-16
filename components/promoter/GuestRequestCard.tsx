@@ -70,11 +70,26 @@ export function GuestRequestCard({
   // Normalizar o formato do número de telefone para consulta no banco de dados
   const normalizePhoneNumber = (phoneNumber: string): string => {
     try {
-      // Se for um número válido, usar o formato E.164 (padrão internacional)
+      // Se o telefone já está em formato internacional, retornar como está
+      if (phoneNumber.startsWith('+')) {
+        console.log('Telefone já em formato internacional:', phoneNumber);
+        return phoneNumber;
+      }
+      
+      // Para números portugueses - começando com 9 e tendo 9 dígitos
+      const cleanedPhone = phoneNumber.replace(/[\s\-()]/g, '');
+      if (/^9\d{8}$/.test(cleanedPhone)) {
+        console.log('Telefone é um número português (9 + 8 dígitos):', cleanedPhone);
+        return '+351' + cleanedPhone;
+      }
+      
+      // Se não tem formato específico, usar validação padrão
       if (isValidPhoneNumber(phoneNumber)) {
         return phoneNumber;
       }
-      return phoneNumber;
+      
+      // Caso não seja formato reconhecido, adicionar prefixo de Portugal como padrão
+      return '+351' + cleanedPhone;
     } catch (error) {
       console.error('Erro ao normalizar número de telefone:', error);
       return phoneNumber;
@@ -94,11 +109,26 @@ export function GuestRequestCard({
         body: JSON.stringify({ phone: phoneNumber }),
       });
       
-      if (!response.ok) {
-        throw new Error(`Erro na verificação (${response.status}): ${response.statusText}`);
+      // Obter texto de erro, se disponível
+      const responseText = await response.text();
+      let data;
+      
+      try {
+        // Tentar analisar como JSON
+        data = JSON.parse(responseText);
+      } catch (e) {
+        // Se não for JSON válido, criar objeto com mensagem de erro
+        console.error('Resposta não é JSON válido:', responseText);
+        throw new Error(`Resposta inválida do servidor: ${responseText.substring(0, 100)}`);
       }
       
-      const data = await response.json();
+      // Verificar erros na resposta
+      if (!response.ok) {
+        const errorMsg = data?.error || response.statusText;
+        console.error('Erro na resposta:', data);
+        throw new Error(`Erro na verificação (${response.status}): ${errorMsg}`);
+      }
+      
       console.log('Resposta da API de verificação:', data);
       
       return {
@@ -107,6 +137,8 @@ export function GuestRequestCard({
       };
     } catch (error) {
       console.error('Erro ao verificar telefone via API:', error);
+      // Mostrar toast com erro para melhor experiência de usuário
+      toast.error(`Erro ao verificar telefone: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       throw error;
     }
   };
@@ -194,6 +226,9 @@ export function GuestRequestCard({
         guestId = existingGuestResult.data.id;
         console.log('Pedido existente encontrado com ID:', guestId);
         
+        // MENSAGEM PARA PEDIDO EXISTENTE
+        toast.info("Encontrámos o seu pedido anterior para este evento. A apresentar o seu QR code.");
+
         if (existingGuestResult.data.qr_code_url) {
           qrCode = existingGuestResult.data.qr_code_url;
           console.log('Usando QR code existente');
@@ -250,6 +285,9 @@ export function GuestRequestCard({
           } else {
             console.log('QR code atualizado com sucesso');
           }
+          // MENSAGEM PARA NOVO PEDIDO
+          toast.success('Acesso aprovado! O seu novo QR code está pronto.');
+
         } catch (insertError) {
           console.error('Erro na operação de inserção:', insertError);
           // Se ocorrer erro na inserção, gerar um ID e QR code de emergência
@@ -257,14 +295,14 @@ export function GuestRequestCard({
           const emergency = await generateEmergencyId();
           guestId = emergency.id;
           qrCode = await generateQRCode(guestId);
+          // MENSAGEM PARA QR CODE DE EMERGÊNCIA (NOVO PEDIDO)
+          toast.warn('Atenção: O seu QR code foi gerado em modo de emergência.');
         }
       }
       
       // Atualizar o estado com a URL do QR code e mostrar
       setQrCodeUrl(qrCode);
       setShowQRCode(true);
-      
-      toast.success('Acesso aprovado! Seu QR code está pronto.');
       
     } catch (error) {
       console.error('Erro ao solicitar acesso:', error);
@@ -429,11 +467,14 @@ export function GuestRequestCard({
             <div className="flex items-center gap-2 w-full max-w-md">
               <div className="flex-1 relative">
                 <PhoneInput
-                  international
+                  international={false}
                   defaultCountry="PT"
                   flags={flags}
                   value={inputPhone}
-                  onChange={(value) => setInputPhone(value || '')}
+                  onChange={(value) => {
+                    console.log('PhoneInput onChange valor recebido:', value);
+                    setInputPhone(value || '');
+                  }}
                   placeholder="Digite seu telefone"
                   className="w-full rounded-full PhoneInputCustom"
                 />

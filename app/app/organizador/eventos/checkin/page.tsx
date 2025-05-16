@@ -452,7 +452,25 @@ export default function CheckInPage() {
           // Formato aninhado { guest: { id: "..." } }
           guestId = qrData.guest.id;
           console.log("ID extraído do campo aninhado guest.id:", guestId);
-        } else if (qrData.eventId) {
+        } 
+        // NOVO: Detectar se próprio QR code é o guestId (em alguns registros mais antigos)
+        else if (typeof qrData === 'string' && qrData.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          guestId = qrData;
+          console.log("QR code é diretamente o ID do convidado:", guestId);
+        }
+        // NOVO: Tratamento especial para o formato específico que vimos nos dados
+        else if (qrData.userId && qrData.eventId && qrData.timestamp) {
+          // Este é o formato encontrado em alguns registros recentes
+          console.log("Formato detectado: userId + eventId + timestamp");
+          
+          // Verificar se temos o mesmo evento
+          if (qrData.eventId === selectedEvent) {
+            // Buscar pelo userId como guestId (pois o userId neste caso é o guestId)
+            guestId = qrData.userId;
+            console.log("Usando userId como guestId:", guestId);
+          }
+        }
+        else if (qrData.eventId) {
           // Se temos um eventId, vamos verificar se corresponde ao evento selecionado
           console.log(`QR code contém eventId: ${qrData.eventId}, evento selecionado: ${selectedEvent}`);
           

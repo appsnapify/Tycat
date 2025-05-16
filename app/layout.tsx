@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter, Oswald } from 'next/font/google'
-import { Toaster } from 'sonner'
+// import { Toaster } from 'sonner' // Linha original comentada
+import { Toaster } from '@/components/ui/toaster' // Nova linha para shadcn/ui Toaster
 import { AuthProvider } from '@/hooks/use-auth'
 import { ClientAuthProvider } from '@/hooks/useClientAuth'
 import { Analytics } from '@vercel/analytics/react'

@@ -328,7 +328,7 @@ function EventListContent({ orgId }: EventListContentProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <h3 className="font-semibold text-lg mb-2 truncate" title={event.title || 'Nome Indisponível'}>
+                    <h3 className="font-semibold text-lg text-lime-500 mb-2 truncate" title={event.title || 'Nome Indisponível'}>
                       {event.title || 'Nome Indisponível'} {/* Use title */}
                     </h3>
                     <div className="text-sm text-muted-foreground space-y-1.5 mt-1">
@@ -352,7 +352,7 @@ function EventListContent({ orgId }: EventListContentProps) {
                        <Button
                           variant="outline"
                           size="sm"
-                          className="w-full"
+                          className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
                           onClick={() => handleShowMaterial(event.id, event.title)}
                        >
                            <Download className="mr-2 h-4 w-4" />
@@ -394,7 +394,7 @@ function EventListContent({ orgId }: EventListContentProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="p-4 bg-gray-50">
-                    <h3 className="font-semibold text-lg mb-2 truncate" title={event.title || 'Nome Indisponível'}>
+                    <h3 className="font-semibold text-lg text-lime-500 mb-2 truncate" title={event.title || 'Nome Indisponível'}>
                       {event.title || 'Nome Indisponível'} {/* Use title */}
                     </h3>
                     <div className="text-sm text-muted-foreground space-y-1.5 mt-1">
@@ -415,7 +415,7 @@ function EventListContent({ orgId }: EventListContentProps) {
                        <Button
                           variant="outline"
                           size="sm"
-                          className="w-full"
+                          className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
                           onClick={() => handleShowMaterial(event.id, event.title)}
                        >
                            <Download className="mr-2 h-4 w-4" />

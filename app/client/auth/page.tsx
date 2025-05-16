@@ -31,7 +31,7 @@ export default function ClientAuthPage() {
         router.push(redirectUrl);
       } else {
         // Caso contrário, ir para o dashboard
-        router.push('/client/dashboard');
+        router.push('/user/dashboard');
       }
     }
   }, [user, isLoading, router, searchParams]);
@@ -45,7 +45,7 @@ export default function ClientAuthPage() {
       router.push(redirectUrl);
     } else {
       // Caso contrário, ir para o dashboard
-      router.push('/client/dashboard');
+      router.push('/user/dashboard');
     }
   };
   

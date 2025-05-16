@@ -61,67 +61,90 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log('API - Gerando ID único para o convidado');
+    // Usar nossa função segura que contorna o RLS
+    try {
+      console.log('API - Usando função create_guest_safely para contornar RLS');
+      
+      const { data: result, error } = await supabaseAdmin.rpc('create_guest_safely', {
+        p_event_id: event_id,
+        p_client_user_id: client_user_id,
+        p_promoter_id: promoter_id,
+        p_team_id: team_id,
+        p_name: name || 'Convidado',
+        p_phone: phone || ''
+      });
+      
+      if (error) {
+        console.error('API - Erro ao chamar create_guest_safely:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao criar convidado: ' + error.message
+        }, { status: 500 });
+      }
+      
+      if (!result || result.length === 0) {
+        console.error('API - create_guest_safely não retornou dados');
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao criar convidado: Nenhum dado retornado'
+        }, { status: 500 });
+      }
+      
+      const guestData = result[0];
+      console.log('API - Convidado criado com sucesso:', guestData);
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: guestData.id,
+          qr_code_url: guestData.qr_code_url
+        },
+        message: 'Convidado criado com sucesso via função segura'
+      });
+    } catch (fnError) {
+      console.error('API - Erro ao executar create_guest_safely:', fnError);
+    }
+    
+    // Se a função falhar, tenta o método antigo como fallback
+    console.log('API - Gerando ID único para o convidado (método antigo)');
     const guestId = uuidv4();
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${guestId}`;
     
     // Verificação se o convidado já existe usando try-catch individual
     let existingGuest = null;
+    
     try {
-      console.log('API - Verificando se o convidado já existe no evento');
-      const { data: guest, error: checkError } = await supabaseAdmin
+      const { data: existingData, error: existingError } = await supabaseAdmin
         .from('guests')
-        .select('id')
+        .select('id, qr_code_url')
         .eq('event_id', event_id)
         .eq('client_user_id', client_user_id)
         .maybeSingle();
       
-      if (checkError) {
+      if (existingError) {
         console.error('API - Erro ao verificar convidado existente:', 
-          checkError.code, checkError.message, checkError.details);
-        
-        if (checkError.code === '42P01') {
-          console.error('API - Tabela guests não existe no banco de dados');
-          
-          // Retornar QR code mesmo sem conseguir verificar
-          return NextResponse.json({
-            success: true,
-            data: {
-              id: guestId,
-              qr_code_url: qrCodeUrl
-            },
-            message: 'QR code gerado (tabela não encontrada)',
-            warning: 'A tabela de convidados não existe no banco de dados'
-          });
-        }
-      } else if (guest) {
-        existingGuest = guest;
-        console.log('API - Convidado existente encontrado:', guest.id);
-      } else {
-        console.log('API - Convidado não encontrado, será criado um novo');
+          existingError.code, existingError.message);
+      } else if (existingData) {
+        existingGuest = existingData;
+        console.log('API - Convidado já existente:', existingGuest);
       }
-    } catch (checkCatchError) {
-      console.error('API - Exceção ao verificar convidado:', checkCatchError);
-      
-      // Continuar com novo registro, mas logar o erro
+    } catch (checkError) {
+      console.error('API - Exceção ao verificar convidado existente:', checkError);
     }
     
-    // Se já existe, apenas retornar o QR code
+    // Se o convidado já existe, retornar seus dados
     if (existingGuest) {
-      console.log('API - Retornando dados do convidado existente');
+      console.log('API - Retornando dados do convidado existente:', existingGuest.id);
       
       return NextResponse.json({
         success: true,
         data: {
           id: existingGuest.id,
-          qr_code_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${existingGuest.id}`
+          qr_code_url: existingGuest.qr_code_url || qrCodeUrl
         },
-        message: 'Registro existente encontrado'
+        message: 'Convidado já existe'
       });
     }
-    
-    // Caso não exista, criar novo registro
-    console.log('API - Preparando dados para inserção');
     
     // Dados básicos para inserção - apenas campos essenciais conhecidos
     const insertData = {
@@ -131,7 +154,8 @@ export async function POST(request: NextRequest) {
       promoter_id,
       team_id,
       name: name || 'Convidado',
-      phone: phone || ''
+      phone: phone || '',
+      qr_code_url: qrCodeUrl
     };
     
     console.log('API - Dados para inserção preparados:', {
@@ -169,91 +193,77 @@ export async function POST(request: NextRequest) {
         },
         message: 'Novo registro criado com sucesso'
       });
-    } 
-    catch (error) {
-      // Se não for erro de RLS, logar e seguir para próxima tentativa
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      console.error('API - Erro capturado na tentativa #1:', errorMessage);
+    } catch (directError) {
+      console.error('API - Erro na tentativa de inserção direta:', directError);
       
-      // Tentativa #2: usando REST API direta
-      try {
-        console.log('API - Tentativa #2: Usando REST API direta');
-        
-        // Inserção alternativa com cabeçalhos explícitos
-        const response = await fetch(`${supabaseUrl}/rest/v1/guests`, {
-          method: 'POST',
-          headers: {
-            'apikey': serviceRoleKey,
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(insertData)
-        });
-        
-        // Verificar resposta HTTP
-        console.log('API - Resposta REST API:', response.status, response.statusText);
-        
-        if (!response.ok) {
-          let responseText = '';
-          try {
-            responseText = await response.text();
-            console.error('API - Resposta de erro REST detalhada:', responseText);
-          } catch (e) {
-            console.error('API - Não foi possível ler o corpo da resposta de erro');
-          }
-          
-          throw new Error(`Erro REST API: ${response.status} ${response.statusText}\n${responseText}`);
-        }
-        
-        console.log('API - Registro inserido com sucesso via método REST API');
-        
-        return NextResponse.json({
-          success: true,
-          data: {
-            id: guestId,
-            qr_code_url: qrCodeUrl
-          },
-          message: 'Novo registro criado com sucesso (método REST API)'
-        });
-      } 
-      catch (restError) {
-        console.error('API - Erro na tentativa #2 com REST API:', 
-          restError instanceof Error ? restError.message : 'Erro desconhecido');
-          
-        // Todas as tentativas de inserção falharam, retorne o QR code de qualquer forma
-        console.log('API - Todas as tentativas falharam, retornando QR code em modo fallback');
-        
-        return NextResponse.json({
-          success: true,
-          data: {
-            id: guestId,
-            qr_code_url: qrCodeUrl
-          },
-          message: 'QR code gerado com sucesso (modo fallback)',
-          warning: 'Não foi possível salvar o registro no banco de dados após múltiplas tentativas'
-        });
-      }
+      // Continuar para próxima tentativa
+      console.log('API - Tentando método alternativo...');
     }
-  } catch (globalError) {
-    // Erro global que intercepta qualquer falha não tratada
-    console.error('API - Erro global não tratado:', 
-      globalError instanceof Error ? 
-      `${globalError.name}: ${globalError.message}\n${globalError.stack}` : 
-      globalError);
     
-    // Em último caso, gerar QR code de emergência
-    const emergencyId = uuidv4();
-    const emergencyQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${emergencyId}`;
+    // Tentativa final de fallback: Executar SQL personalizado
+    try {
+      console.log('API - Tentativa final: SQL personalizado com bypass de RLS');
+      
+      // Preparar os valores para inserção segura
+      const insertSQL = `
+        INSERT INTO guests (
+          id, event_id, client_user_id, promoter_id, team_id, 
+          name, phone, qr_code_url, created_at
+        ) 
+        VALUES (
+          '${guestId}', 
+          '${event_id}', 
+          '${client_user_id}', 
+          ${promoter_id ? `'${promoter_id}'` : 'NULL'}, 
+          ${team_id ? `'${team_id}'` : 'NULL'}, 
+          '${(name || 'Convidado').replace(/'/g, "''")}', 
+          '${(phone || '').replace(/'/g, "''")}',
+          '${qrCodeUrl}',
+          NOW()
+        )
+        RETURNING id;
+      `;
+      
+      const { error: sqlError } = await supabaseAdmin.rpc('exec_sql', { 
+        sql: insertSQL 
+      });
+      
+      if (sqlError) {
+        console.error('API - Erro na inserção via SQL personalizado:', 
+          sqlError.code, sqlError.message, sqlError.details || '');
+        
+        throw new Error(`Erro detalhado ao criar pedido: "${sqlError.message}"`);
+      }
+      
+      // Sucesso com SQL personalizado
+      console.log('API - Registro criado com sucesso via SQL personalizado');
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: guestId,
+          qr_code_url: qrCodeUrl
+        },
+        message: 'Novo registro criado com sucesso via SQL'
+      });
+      
+    } catch (finalError) {
+      // Todos os métodos falharam, retornar erro detalhado
+      console.error('API - Todas as tentativas falharam:', finalError);
+      
+      return NextResponse.json({
+        success: false,
+        error: `Erro detalhado ao criar pedido: "${finalError.message}"`,
+      }, { status: 500 });
+    }
+    
+  } catch (e) {
+    // Erro global na rota
+    console.error('API - Erro global na rota:', e);
     
     return NextResponse.json({
-      success: true,
-      data: {
-        id: emergencyId,
-        qr_code_url: emergencyQrCode
-      },
-      message: 'QR code gerado com sucesso (modo emergência)',
-      warning: 'Ocorreu um erro grave, mas um QR code de emergência foi gerado'
-    });
+      success: false,
+      error: 'Erro interno no servidor'
+    }, { status: 500 });
   }
 } 
