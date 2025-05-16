@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { Users } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useAuth } from "@/hooks/use-auth";
 
 // Definir o esquema de validação
@@ -35,7 +35,7 @@ const JoinTeamPage = () => {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClient();
+  const supabase = createClientComponentClient();
   const { user, updateUserRole } = useAuth();
 
   // Configurar o formulário

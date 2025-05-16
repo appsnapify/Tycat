@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-admin';
+import { createAdminClient } from '@/lib/supabase-admin';
 
 // Endpoint para adicionar coluna status de maneira simples e direta
 export async function GET(request: NextRequest) {
+  const supabase = createAdminClient();
   try {
     // SQL simples e direto para adicionar a coluna status
     const { error } = await supabase.sql(`

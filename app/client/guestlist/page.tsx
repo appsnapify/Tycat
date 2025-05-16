@@ -6,7 +6,7 @@ import { useClientAuth } from '@/hooks/useClientAuth';
 import { ClientProtectedRoute } from '@/components/client-auth/RequireClientAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Link from 'next/link';
 
 interface Event {
@@ -25,6 +25,7 @@ export default function GuestListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const supabase = createClientComponentClient();
   
   // Obter o ID do evento da URL, se presente
   useEffect(() => {
@@ -41,8 +42,6 @@ export default function GuestListPage() {
       
       setIsLoading(true);
       try {
-        const supabase = createClient();
-        
         // Buscar eventos ativos e publicados
         const { data, error } = await supabase
           .from('events')
@@ -79,8 +78,6 @@ export default function GuestListPage() {
     
     setIsSubmitting(true);
     try {
-      const supabase = createClient();
-      
       // Verificar se já existe um pedido para este evento e usuário
       const { data: existingRequest, error: checkError } = await supabase
         .from('guests')

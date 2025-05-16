@@ -31,8 +31,8 @@ interface PageProps {
 }
 
 // Simplificar generateMetadata para evitar buscas complexas aqui
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const eventId = params.id;
+export async function generateMetadata({ params: routeParams }: PageProps): Promise<Metadata> {
+  const eventId = routeParams.id;
   if (!eventId) return { title: 'Evento não encontrado' };
   return { title: `Evento ${eventId} - Detalhes` };
 }
@@ -239,66 +239,53 @@ async function fetchGenderStats(eventId: string, supabaseClient: any) {
 
 
 // Componente da Página Principal
-export default async function EventoDetalhesPage({ params }: PageProps) {
+export default async function EventoDetalhesPage({ params: routeParams }: PageProps) {
+  // Inicializar cookies e supabaseClient aqui
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
-  const eventId = params.id;
+  const eventId = routeParams.id;
   if (!eventId) {
     notFound();
   }
 
-  let supabase;
+  // Os dados agora serão buscados usando o supabase client inicializado acima
   try {
-      const cookieStore = cookies();
-      supabase = createServerComponentClient({ cookies });
-  } catch (error) {
-      console.error("Erro ao criar Supabase server client:", error);
-      return <div className="p-6 text-red-500">Erro interno ao inicializar a ligação de dados.</div>;
-  }
+    const eventData = await fetchEvent(eventId, supabase);
+    const guestStats = await fetchGuestStats(eventId, supabase);
+    const teamsStats = await fetchTopTeamsStats(eventId, supabase);
+    const promotersStats = await fetchTopPromotersStats(eventId, supabase);
+    const genderDataStats = await fetchGenderStats(eventId, supabase);
 
-  // Buscar dados - Evento e Estatísticas Básicas
-  let eventData;
-  let guestStats = { totalGuests: 0, totalCheckedIn: 0 }; // Valores padrão
-  let topTeamsStats: any[] = []; // Valor padrão
-  let topPromotersStats: any[] = []; // Valor padrão
-  let genderStats = { genderData: [] }; // Novo formato para estatísticas de gênero
-  
-  try {
-    // Buscar evento e estatísticas em paralelo
-    [eventData, guestStats, topTeamsStats, topPromotersStats, genderStats] = await Promise.all([
-      fetchEvent(eventId, supabase),
-      fetchGuestStats(eventId, supabase),
-      fetchTopTeamsStats(eventId, supabase),
-      fetchTopPromotersStats(eventId, supabase),
-      fetchGenderStats(eventId, supabase)
-    ]);
-    
-  } catch (error) {
-    console.error("Erro ao carregar dados do evento:", error);
-    // Para evitar mostrar erros específicos ao usuário, redirecionamos para 404
-    notFound();
-  }
+    if (!eventData) {
+      notFound();
+    }
 
-  const event = eventData;
-  
-  // No server component, já extraímos e passamos o ID diretamente como string
-  // para evitar que o params seja acessado no client component
-  const eventIdString = String(eventId);
-
-  return (
-    <div className="container mx-auto p-4 space-y-8">
-      <div className="flex justify-between items-center mb-6">
-        <BackButton />
+    return (
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <div className="mb-6">
+          <BackButton />
+        </div>
+        <EventDetailsClient 
+          event={eventData} 
+          totalGuests={guestStats.totalGuests}
+          totalCheckedIn={guestStats.totalCheckedIn}
+          topTeamsStats={teamsStats}
+          topPromotersStats={promotersStats}
+          genderStats={genderDataStats}
+        />
       </div>
-
-      <EventDetailsClient 
-        event={event} 
-        totalGuests={guestStats.totalGuests}
-        totalCheckedIn={guestStats.totalCheckedIn}
-        topTeamsStats={topTeamsStats}
-        topPromotersStats={topPromotersStats}
-        genderStats={genderStats}
-      />
-    </div>
-  );
+    );
+  } catch (error: any) {
+    console.error("Erro ao carregar dados da página do evento:", error.message);
+    // Considerar uma página de erro mais amigável ou um estado de erro na UI
+    // notFound(); // Pode ser muito agressivo, depende do tipo de erro
+    return (
+      <div className="container mx-auto p-4 text-center">
+        <BackButton />
+        <p className="mt-4 text-red-500">Ocorreu um erro ao carregar os detalhes do evento: {error.message}</p>
+      </div>
+    );
+  }
 }
 

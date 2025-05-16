@@ -7,7 +7,7 @@ import { useClientAuth } from '@/hooks/useClientAuth';
 import { ClientProtectedRoute } from '@/components/client-auth/RequireClientAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { GuestPassQRCode } from '@/components/client/GuestPassQRCode';
 
 interface GuestListRequest {
@@ -24,6 +24,7 @@ export default function ClientDashboardPage() {
   const { user, logout } = useClientAuth();
   const [requests, setRequests] = useState<GuestListRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClientComponentClient();
   
   // Carregar as solicitações do cliente
   useEffect(() => {
@@ -32,8 +33,6 @@ export default function ClientDashboardPage() {
       
       setIsLoading(true);
       try {
-        const supabase = createClient();
-        
         // Buscar guest list requests do usuário
         const { data, error } = await supabase
           .from('guests')

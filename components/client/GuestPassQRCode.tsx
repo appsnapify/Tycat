@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin } from 'lucide-react';
@@ -26,14 +26,13 @@ export function GuestPassQRCode() {
   const { user } = useClientAuth();
   const [passes, setPasses] = useState<GuestPass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchPasses = async () => {
       if (!user) return;
       
       try {
-        const supabase = createClient();
-        
         // Buscar os passes do usuário com detalhes do evento
         const { data, error } = await supabase
           .from('guests')

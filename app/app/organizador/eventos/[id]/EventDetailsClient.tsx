@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'; // Manter para estado de sa
 import { toast } from "@/components/ui/use-toast"; // Corrigido import do toast
 import { CalendarIcon, MapPinIcon, QrCode, ExternalLink, PencilIcon, Clock, MapPin } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import dynamic from 'next/dynamic';
+// import dynamic from 'next/dynamic'; // Comentado para teste
 // Import Tabs components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Importar componentes de Tabela
@@ -33,10 +33,10 @@ import {
 import GuestListTable from './GuestListTable'
 // Importar o componente de estatísticas avançadas
 import { AdvancedStatsSection } from './StatsComponents';
-import { ApexOptions } from 'apexcharts';
+// import { ApexOptions } from 'apexcharts'; // Comentado para teste
 
 // Importar ApexCharts com carregamento dinâmico para evitar erros de SSR
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+// const Chart = dynamic(() => import('react-apexcharts'), { ssr: false }); // Comentado para teste
 
 // Interface para os dados do evento recebidos como props
 interface EventData {
@@ -121,7 +121,8 @@ export default function EventDetailsClient({
     const [topLocations, setTopLocations] = useState<{code: string, name: string, count: number}[]>([]);
     const [loadingLocations, setLoadingLocations] = useState(false);
     
-    // Estado para o gráfico de localidades
+    // Estado para o gráfico de localidades - Comentado para teste
+    /*
     const [locationChartOptions, setLocationChartOptions] = useState<ApexOptions>({
         labels: ['Carregando...'],
         colors: ['#818cf8', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#6366f1'],
@@ -177,8 +178,10 @@ export default function EventDetailsClient({
         }]
     });
     const [locationChartSeries, setLocationChartSeries] = useState<number[]>([100]);
+    */
     
-    // Estado para o gráfico de gênero
+    // Estado para o gráfico de gênero - Comentado para teste
+    /*
     const [genderChartOptions, setGenderChartOptions] = useState<ApexOptions>({
         labels: ['Carregando...'],
         colors: ['#3b82f6', '#ec4899', '#8b5cf6'], // Azul, Rosa, Roxo
@@ -241,6 +244,7 @@ export default function EventDetailsClient({
     });
     const [genderChartSeries, setGenderChartSeries] = useState<number[]>([100]);
     const [genderChartLabels, setGenderChartLabels] = useState<string[]>(['Carregando...']);
+    */
 
     const eventId = event.id;
 
@@ -260,24 +264,24 @@ export default function EventDetailsClient({
                 colorMap[item.gender] || '#8b5cf6'
             );
             
-            setGenderChartSeries(percentages);
-            setGenderChartLabels(labels);
-            setGenderChartOptions(prev => ({
-                ...prev,
-                labels: labels,
-                colors: colors,
-                legend: {
-                    ...prev.legend,
-                    position: prev.legend?.position || 'bottom',
-                    formatter: function(seriesName: string, opts: any) {
-                        const value = opts.w.globals.series[opts.seriesIndex];
-                        const label = opts.w.globals.labels[opts.seriesIndex];
-                        const genderItem = genderStats.genderData.find(g => g.genderName === label);
-                        const count = genderItem?.count || 0;
-                        return `${label}: ${value}% (${count})`;
-                    }
-                }
-            }));
+            // setGenderChartSeries(percentages); // Comentado para teste
+            // setGenderChartLabels(labels); // Comentado para teste
+            // setGenderChartOptions(prev => ({ // Comentado para teste
+            //     ...prev,
+            //     labels: labels,
+            //     colors: colors,
+            //     legend: {
+            //         ...prev.legend,
+            //         position: prev.legend?.position || 'bottom',
+            //         formatter: function(seriesName: string, opts: any) {
+            //             const value = opts.w.globals.series[opts.seriesIndex];
+            //             const label = opts.w.globals.labels[opts.seriesIndex];
+            //             const genderItem = genderStats.genderData.find(g => g.genderName === label);
+            //             const count = genderItem?.count || 0;
+            //             return `${label}: ${value}% (${count})`;
+            //         }
+            //     }
+            // }));
         }
     }, [genderStats]);
 
@@ -360,28 +364,32 @@ export default function EventDetailsClient({
                         count: item.count
                     }));
                     
+                    setTopLocations(locationData); // Manter para dados da tabela, se houver
+
                     const labels = locationData.map(loc => `${loc.name} (${loc.code})`);
                     const series = locationData.map(loc => loc.count);
 
-                    setLocationChartSeries(series);
-                    setLocationChartOptions(prev => ({
-                        ...prev,
-                        labels: labels,
-                    }));
+                    // setLocationChartSeries(series); // Comentado para teste
+                    // setLocationChartOptions(prev => ({ // Comentado para teste
+                    //     ...prev,
+                    //     labels: labels,
+                    // }));
                 } else {
-                    setLocationChartSeries([0]);
-                    setLocationChartOptions(prev => ({
-                        ...prev,
-                        labels: ["Sem dados de localização"],
-                    }));
+                    // setLocationChartSeries([0]); // Comentado para teste
+                    // setLocationChartOptions(prev => ({ // Comentado para teste
+                    //     ...prev,
+                    //     labels: ["Sem dados de localização"],
+                    // }));
+                    setTopLocations([]); // Limpar dados da tabela
                 }
             } catch (error) {
                 console.error('Erro ao buscar localidades:', error);
-                setLocationChartSeries([0]);
-                setLocationChartOptions(prev => ({
-                    ...prev,
-                    labels: ["Erro ao carregar dados"],
-                }));
+                // setLocationChartSeries([0]); // Comentado para teste
+                // setLocationChartOptions(prev => ({ // Comentado para teste
+                //     ...prev,
+                //     labels: ["Erro ao carregar dados"],
+                // }));
+                setTopLocations([]); // Limpar dados da tabela
             } finally {
                 setLoadingLocations(false);
             }
@@ -483,15 +491,9 @@ export default function EventDetailsClient({
                             <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Distribuição por Gênero</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0">
                                 {genderStats.genderData.length > 0 ? (
-                                    <div className="h-48">
-                                        {typeof window !== 'undefined' && (
-                                            <Chart
-                                                options={{...genderChartOptions}}
-                                                series={[...genderChartSeries]}
-                                                type="donut"
-                                                height="100%"
-                                            />
-                                        )}
+                                    <div className="h-48 flex items-center justify-center text-sm text-gray-500">
+                                        {/* Chart comentado para teste */}
+                                        Gráfico de Gênero Desativado para Teste
                                     </div>
                                 ) : (
                                     <div className="h-32 flex items-center justify-center text-sm text-gray-500">
@@ -540,15 +542,11 @@ export default function EventDetailsClient({
                                 ) : (
                                     <>
                                         {topLocations.length > 0 ? (
-                                            <div className="h-48">
-                                                {typeof window !== 'undefined' && (
-                                                    <Chart
-                                                        options={{...locationChartOptions}}
-                                                        series={[...locationChartSeries]}
-                                                        type="pie"
-                                                        height="100%"
-                                                    />
-                                                )}
+                                             <div className="h-48 flex items-center justify-center text-sm text-gray-500">
+                                                {/* Chart comentado para teste */}
+                                                Gráfico de Localização Desativado para Teste
+                                                {/* Você pode querer mostrar os dados de topLocations como uma lista aqui para depuração */}
+                                                {/* Ex: <pre>{JSON.stringify(topLocations, null, 2)}</pre> */}
                                             </div>
                                         ) : (
                                             <div className="h-32 flex items-center justify-center text-sm text-gray-500">
