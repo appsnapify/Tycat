@@ -102,10 +102,10 @@ const GuestListFormSchema = z.object({
   guestListCloseDate: z.date({ required_error: 'A data de fechamento da lista é obrigatória' }),
   guestListCloseTime: z.string().regex(timeRegex, "Hora inválida (HH:MM)").default('17:00'),
   location: z.string().min(3, 'O local deve ter pelo menos 3 caracteres'),
-  flyer: z.instanceof(FileList)
-      .refine(files => files?.length === 1, "O flyer do evento é obrigatório.")
-      .refine(files => files?.[0]?.size <= MAX_FILE_SIZE_BYTES, `O flyer não pode exceder ${MAX_FILE_SIZE_MB}MB.`)
-      .refine(files => files?.[0]?.type.startsWith('image/'), "O flyer deve ser uma imagem."),
+  flyer: z.any()
+      .refine(files => files instanceof FileList && files.length === 1, "O flyer do evento é obrigatório.")
+      .refine(files => !(files instanceof FileList) || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE_BYTES, `O flyer não pode exceder ${MAX_FILE_SIZE_MB}MB.`)
+      .refine(files => !(files instanceof FileList) || files.length === 0 || files?.[0]?.type.startsWith('image/'), "O flyer deve ser uma imagem."),
   maxGuests: z.preprocess(
     (val) => (val === '' || val === null || isNaN(Number(val)) ? undefined : Number(val)),
     z.number({ invalid_type_error: "Deve ser um número" })
@@ -114,11 +114,11 @@ const GuestListFormSchema = z.object({
      .optional()
   ).default(1000),
   isEventActive: z.boolean().default(true),
-  promotionalImages: z.instanceof(FileList)
+  promotionalImages: z.any()
     .optional()
-    .refine(files => !files || files.length <= MAX_PROMO_IMAGES, { message: `Pode carregar no máximo ${MAX_PROMO_IMAGES} imagens.` })
-    .refine(files => !files || Array.from(files).every(file => file.size <= MAX_FILE_SIZE_BYTES), { message: `Cada imagem não pode exceder ${MAX_FILE_SIZE_MB}MB.` })
-    .refine(files => !files || Array.from(files).every(file => file.type.startsWith('image/')), { message: "Apenas ficheiros de imagem são permitidos." }),
+    .refine(files => !files || (files instanceof FileList && files.length <= MAX_PROMO_IMAGES), { message: `Pode carregar no máximo ${MAX_PROMO_IMAGES} imagens.` })
+    .refine(files => !files || !(files instanceof FileList) || Array.from(files).every(file => file.size <= MAX_FILE_SIZE_BYTES), { message: `Cada imagem não pode exceder ${MAX_FILE_SIZE_MB}MB.` })
+    .refine(files => !files || !(files instanceof FileList) || Array.from(files).every(file => file.type.startsWith('image/')), { message: "Apenas ficheiros de imagem são permitidos." }),
 }).refine(data => {
   const openDateTime = combineDateTime(data.guestListOpenDate, data.guestListOpenTime);
   const closeDateTime = combineDateTime(data.guestListCloseDate, data.guestListCloseTime);
@@ -273,22 +273,29 @@ export default function GuestListPage() {
           }
 
           // --- Lógica para Flyer Dummy --- 
-          let flyerValue: FileList;
-          if (event.flyer_url) {
-            console.log("Evento existente tem flyer_url:", event.flyer_url);
-            setExistingFlyerUrl(event.flyer_url); // <<< GUARDAR URL EXISTENTE
-            // Criar dummy FileList com 1 ficheiro placeholder para satisfazer Zod
-            const dummyFile = new File(["existing"], "flyer-placeholder.png", { type: "image/png" });
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(dummyFile);
-            flyerValue = dataTransfer.files;
-            setFlyerPreview(event.flyer_url); // Definir preview
+          let flyerValue: FileList | undefined = undefined; // Alterado tipo e valor default
+          // Garantir que esta lógica só corre no browser
+          if (typeof window !== 'undefined') { 
+            if (event.flyer_url) {
+              console.log("Evento existente tem flyer_url:", event.flyer_url);
+              setExistingFlyerUrl(event.flyer_url); // <<< GUARDAR URL EXISTENTE
+              // Criar dummy FileList com 1 ficheiro placeholder para satisfazer Zod
+              const dummyFile = new File(["existing"], "flyer-placeholder.png", { type: "image/png" });
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(dummyFile);
+              flyerValue = dataTransfer.files;
+              setFlyerPreview(event.flyer_url); // Definir preview
+            } else {
+              console.log("Evento existente NÃO tem flyer_url.");
+              setExistingFlyerUrl(null); // Garantir que está nulo
+              // Usar FileList vazio se não houver flyer existente
+              const dataTransfer = new DataTransfer(); // Precisa estar aqui também
+              flyerValue = dataTransfer.files;
+              setFlyerPreview(null); // Limpar preview
+            }
           } else {
-            console.log("Evento existente NÃO tem flyer_url.");
-            setExistingFlyerUrl(null); // Garantir que está nulo
-            // Usar FileList vazio se não houver flyer existente
-            flyerValue = new DataTransfer().files;
-            setFlyerPreview(null); // Limpar preview
+            // No servidor, flyerValue permanece undefined. A URL existente é definida abaixo.
+            console.log("Ambiente de servidor, flyerValue será undefined para form.reset. URL existente será usada se houver.");
           }
           // --- Fim Lógica Flyer Dummy --- 
 
@@ -317,7 +324,7 @@ export default function GuestListPage() {
             location: event.location || '',
             maxGuests: (event.guest_list_settings as any)?.max_guests ?? 1000,
             isEventActive: event.is_published !== false,
-            flyer: flyerValue, // Usar o flyerValue (dummy ou vazio)
+            flyer: flyerValue, // Usar o flyerValue (pode ser undefined no SSR)
             promotionalImages: undefined // Manter vazio ao carregar
           });
 
@@ -328,6 +335,12 @@ export default function GuestListPage() {
           setIsLoading(false)
         }
       } else if (!eventId) {
+          // Em modo de criação, não há flyer existente no servidor
+          if (typeof window !== 'undefined') {
+            setFlyerPreview(null);
+            const dataTransfer = new DataTransfer();
+            form.setValue('flyer', dataTransfer.files, { shouldValidate: false });
+          }
           setExistingFlyerUrl(null); // Garantir nulo em modo criação
           setIsLoading(false);
       }

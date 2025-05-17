@@ -42,7 +42,7 @@ if (isBrowser) {
 /**
  * Returns the module-level singleton Supabase client.
  */
-export const createSupabaseClient = (): SupabaseClient<Database> => {
+export const createBrowserClient = (): SupabaseClient<Database> => {
   // Basic check to ensure client is somewhat initialized, especially if accessed from non-browser early.
   if (!moduleLevelSupabaseClient) {
       console.error("[SupabaseClient DIAGNOSTIC] moduleLevelSupabaseClient is null or undefined. This should not happen if module initialized correctly.");

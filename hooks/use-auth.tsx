@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
 import * as auth from '@/lib/auth'
-import AuthErrorProvider from '@/app/app/_providers/auth-provider'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface AuthContextType {
@@ -531,9 +530,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      <AuthErrorProvider>
-        {children}
-      </AuthErrorProvider>
+      {children}
     </AuthContext.Provider>
   )
 }

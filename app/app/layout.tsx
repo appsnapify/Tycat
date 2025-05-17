@@ -1,28 +1,29 @@
 "use client"
 
 import '@/app/globals.css'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+// import Link from 'next/link' // Comentado se não usado diretamente neste ficheiro
+import { useRouter } from 'next/navigation' // Mantido para AppLayoutContent
 import { Toaster } from 'sonner'
-import { useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { useEffect } from 'react' // Mantido para AppLayoutContent
+// import { createClient } from '@/lib/supabase' // Comentado, não parece ser usado e pode causar confusão
 import { SidebarProvider } from '@/contexts/sidebar-context'
 import { OrganizationProvider } from '@/app/contexts/organization-context'
 import { Loader2 } from 'lucide-react'
-import { useAuth } from '@/hooks/use-auth'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+// import { useAuth } from '@/hooks/use-auth' // REMOVIDO - Será usado o de _providers
+import { ClientAuthProvider, useAuth } from '@/app/app/_providers/auth-provider' // ADICIONADO
+// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // Comentado, não parece ser usado diretamente aqui
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
-import { ErrorBoundary } from 'react-error-boundary'
-import { Suspense } from 'react'
-import { Card, Button } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { XCircle } from 'lucide-react'
-import { ContentArea } from '@/components/content-area'
-import { AppHeader } from '@/components/app-header'
-import { MobileMenu } from '@/components/mobile-menu'
-import { AppSidebar } from '@/components/app-sidebar'
-import { LayoutDashboard, Building, Users } from 'lucide-react'
+// import { ErrorBoundary } from 'react-error-boundary' // Comentado se não usado
+// import { Suspense } from 'react' // Comentado se não usado
+// import { Card, Button } from '@/components/ui/card' // Comentado se não usado
+// import { Badge } from '@/components/ui/badge' // Comentado se não usado
+// import { XCircle } from 'lucide-react' // Comentado se não usado
+// import { ContentArea } from '@/components/content-area' // Comentado se não usado
+// import { AppHeader } from '@/components/app-header' // Comentado se não usado
+// import { MobileMenu } from '@/components/mobile-menu' // Comentado se não usado
+// import { AppSidebar } from '@/components/app-sidebar' // Comentado se não usado
+import { LayoutDashboard, Building, Users } from 'lucide-react' // Mantido para getNavLinks
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -32,28 +33,30 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
-      <OrganizationProvider>
-        <Toaster />
-        <div className="flex min-h-screen flex-col">
-          <main className="flex-1">
-            <AppLayoutContent>
-              {children}
-            </AppLayoutContent>
-          </main>
-        </div>
-      </OrganizationProvider>
-    </SidebarProvider>
+    <ClientAuthProvider serverSession={null}> {/* ADICIONADO Provider */}
+      <SidebarProvider>
+        <OrganizationProvider>
+          <Toaster />
+          <div className="flex min-h-screen flex-col">
+            <main className="flex-1">
+              <AppLayoutContent>
+                {children}
+              </AppLayoutContent>
+            </main>
+          </div>
+        </OrganizationProvider>
+      </SidebarProvider>
+    </ClientAuthProvider>
   )
 }
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, isLoading: isLoadingAuth } = useAuth()
+  const { user, isLoadingUser: isLoadingAuth } = useAuth() // Agora usa o hook de _providers
   const router = useRouter()
   
   // Importar o custom hook para verificar ações pendentes
-  const { usePendingActions } = require('@/hooks/use-pending-actions');
-  usePendingActions();
+  // const { usePendingActions } = require('@/hooks/use-pending-actions'); // Comentado se a lógica de pending actions não for central aqui
+  // usePendingActions();
   
   console.log("DEBUG - AppLayoutContent iniciando:", { 
     userAutenticado: !!user, 
@@ -76,7 +79,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }
   
   if (!user) {
-    console.log("DEBUG - AppLayoutContent: Não há utilizador após carregamento do Auth (redirecionamento pendente).");
+    // Se isLoadingAuth é false e user é null, o useEffect já deve ter redirecionado.
+    // Manter um loader aqui pode ser bom para evitar piscar de ecrã de login se o redirecionamento demorar.
+    console.log("DEBUG - AppLayoutContent: Não há utilizador após carregamento do Auth (redirecionamento pode estar pendente ou já ocorreu).");
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -85,6 +90,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }
   
   console.log("DEBUG - AppLayoutContent: Auth carregado, utilizador encontrado. Renderizando children");
+  // A prop isLoadingUser do novo useAuth substitui a antiga isLoading
+  // A prop user do novo useAuth substitui a antiga user
   return children
 }
 

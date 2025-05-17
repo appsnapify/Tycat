@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { createClient } from '@/lib/supabase'
+import { createBrowserClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 interface Organization {
@@ -39,7 +39,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const supabase = createClient()
+        const supabase = createBrowserClient()
         
         console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
         
