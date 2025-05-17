@@ -98,6 +98,7 @@ export default function EquipePage() {
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<TeamDetails | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [detailedMembers, setDetailedMembers] = useState<DetailedMember[]>([])
   const [showMembersSection, setShowMembersSection] = useState(false)
@@ -178,6 +179,20 @@ export default function EquipePage() {
     setTimeout(() => setCopied(false), 2000)
     toast.success('Código da equipe copiado para a área de transferência')
   }
+  
+  // Nova função para copiar o link da página pública
+  const copyPublicProfileLink = () => {
+    if (!user?.id) return;
+    // Determinar o URL base dinamicamente ou usar um valor fixo para produção
+    const baseUrl = window.location.origin.includes('localhost') 
+      ? 'http://localhost:3000' 
+      : 'https://snapify-xm3c.vercel.app';
+    const publicLink = `${baseUrl}/promotor/${user.id}`;
+    navigator.clipboard.writeText(publicLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+    toast.success('Link da página pública copiado!');
+  };
   
   // formatDate (mantido de minha-equipe)
   const formatDate = (dateString: string | null) => {
@@ -324,6 +339,33 @@ export default function EquipePage() {
                  </div>
              </CardContent>
            </Card>
+
+          {/* NOVO CARD: Link de Partilha da Página Pública do Chefe */}
+          {user?.id && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg text-lime-500 font-semibold">Link Página Pública</CardTitle>
+                <CardDescription>Partilhe o link para a sua página de eventos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex space-x-2">
+                  <Input 
+                    readOnly 
+                    value={`${typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:3000' : 'https://snapify-xm3c.vercel.app'}/promotor/${user.id}`} 
+                    className="font-mono text-sm" 
+                  />
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    onClick={copyPublicProfileLink} 
+                    className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
+                  >
+                    {copiedLink ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
       </div>
       {/* --- FIM DA SECÇÃO REINTRODUZIDA --- */}
 
