@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useOrganization } from '@/app/contexts/organization-context'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Upload, Check, Save, Copy } from 'lucide-react'
@@ -54,7 +54,7 @@ export default function OrganizacaoPage() {
   // Correctly get currentOrganization and isLoading from the context
   const { currentOrganization, isLoading: isOrgLoading } = useOrganization()
   
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
   const [organizationData, setOrganizationData] = useState<OrganizationData | null>(null)
   // Rename isFetching to isLoadingDetails to be clearer
   const [isLoadingDetails, setIsLoadingDetails] = useState(false) 

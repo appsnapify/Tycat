@@ -2,7 +2,9 @@ import { NextResponse, NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/adminClient';
 import { cookies } from 'next/headers';
-import { verify } from 'jsonwebtoken';
+// import { verify } from 'jsonwebtoken'; // Removido - não mais usado
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Adicionado
+import { type Database } from '@/types/supabase'; // Adicionado para tipagem do cliente Supabase
 
 // Schema de validação
 const createGuestSchema = z.object({
@@ -11,44 +13,36 @@ const createGuestSchema = z.object({
   team_id: z.string().uuid("ID da equipe inválido").optional()
 });
 
-// Chave JWT secreta
-const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria';
+// const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria'; // Removido - não mais usado
 
 /**
- * API para criar registro de convidado a partir de um client_user autenticado
+ * API para criar registro de convidado a partir de um client_user autenticado (via Supabase session)
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('API - Iniciando processamento de requisição POST para criar guest com client');
+    console.log('API - Iniciando processamento de requisição POST para criar guest com client (Supabase Auth)');
     
-    // Verificar autenticação do cliente
-    const token = cookies().get('client_auth_token')?.value;
-    if (!token) {
-      console.log('API - Erro: Cliente não autenticado');
+    const supabaseRouteHandler = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session }, error: sessionError } = await supabaseRouteHandler.auth.getSession();
+
+    if (sessionError) {
+      console.error('API - Erro ao obter sessão Supabase:', sessionError);
       return NextResponse.json({
         success: false,
-        error: 'Cliente não autenticado'
+        error: 'Erro ao verificar autenticação'
+      }, { status: 500 });
+    }
+
+    if (!session || !session.user) {
+      console.log('API - Erro: Usuário não autenticado (Supabase)');
+      return NextResponse.json({
+        success: false,
+        error: 'Usuário não autenticado'
       }, { status: 401 });
     }
     
-    // Verificar JWT
-    let clientUserId;
-    try {
-      const decoded = verify(token, JWT_SECRET) as any;
-      clientUserId = decoded.id;
-      
-      if (!clientUserId) {
-        throw new Error('Token inválido ou expirado');
-      }
-      
-      console.log('API - Cliente autenticado:', { id: clientUserId });
-    } catch (tokenError) {
-      console.error('API - Erro ao verificar token:', tokenError);
-      return NextResponse.json({
-        success: false,
-        error: 'Token inválido ou expirado'
-      }, { status: 401 });
-    }
+    const clientUserId = session.user.id;
+    console.log('API - Usuário Supabase autenticado:', { id: clientUserId });
     
     // Extrair dados do request
     const data = await request.json();
@@ -71,17 +65,20 @@ export async function POST(request: NextRequest) {
     
     const { event_id, promoter_id, team_id } = result.data;
     
-    // Inicializar cliente Supabase
-    const supabase = createAdminClient();
+    // Inicializar cliente Supabase com privilégios de admin para a chamada RPC
+    // Nota: Idealmente, a RPC create_guest_with_client seria segura para ser chamada
+    // com as permissões do utilizador autenticado (via supabaseRouteHandler), não necessitando de adminClient.
+    // Manter adminClient aqui pressupõe que a RPC requer elevações especiais.
+    const supabaseAdmin = createAdminClient(); 
     
     // Usar função RPC para criar convidado
-    const { data: guestData, error: guestError } = await supabase.rpc('create_guest_with_client', {
+    const { data: guestData, error: guestError } = await supabaseAdmin.rpc('create_guest_with_client', {
       p_event_id: event_id,
-      p_client_user_id: clientUserId,
+      p_client_user_id: clientUserId, // ID do utilizador Supabase autenticado
       p_promoter_id: promoter_id || null,
       p_team_id: team_id || null,
-      p_name: null, // Usar o nome do client_user automaticamente
-      p_phone: null // Usar o telefone do client_user automaticamente
+      p_name: null, 
+      p_phone: null 
     });
     
     if (guestError) {

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useAuth } from '@/hooks/use-auth'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
 
@@ -103,7 +103,7 @@ const activityIcons = {
 export default function OrganizadorDashboardPage() {
   const router = useRouter()
   const { user, selectedOrganization } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
   
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState({
@@ -635,87 +635,99 @@ export default function OrganizadorDashboardPage() {
   
   const loadActivities = async (organizationId: string) => {
     try {
-      console.log('Iniciando carregamento de atividades para organização:', organizationId)
+      console.log('[Dashboard:loadActivities] Iniciando carregamento de atividades para organização:', organizationId)
       
       if (!organizationId) {
-        console.warn('ID da organização não fornecido para atividades')
+        console.warn('[Dashboard:loadActivities] ID da organização não fornecido. Usando mock.')
+        setActivities(getMockActivities())
+        return
       }
       
-      // Tentar primeiro buscar atividades reais do banco de dados
       let realActivities: Activity[] = []
       
-      try {
-        // Verificar se existe uma tabela de atividades/logs
-        const { data: activityData, error: activityError } = await supabase
-          .from('activity_logs')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(5)
-          
-        if (activityError) {
-          console.log('Tabela de atividades não encontrada ou erro:', {
-            code: activityError.code,
-            message: activityError.message
-          })
-        } else if (activityData && activityData.length > 0) {
-          // Mapear atividades reais se existirem
+      // Tentar buscar atividades reais do banco de dados diretamente
+      const { data: activityData, error: activityError } = await supabase
+        .from('activity_logs') // Nome da tabela conforme criada
+        .select('type, title, description, created_at') // Selecionar apenas os campos necessários
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (activityError) {
+        console.warn('[Dashboard:loadActivities] Erro ao buscar activity_logs:', {
+          code: activityError.code,
+          message: activityError.message,
+          details: activityError.details,
+          hint: activityError.hint
+        })
+        // Se o erro específico for "tabela não encontrada" (42P01), ou outro erro que impeça a leitura,
+        // usar dados simulados.
+        if (activityError.code === '42P01') {
+          console.warn('[Dashboard:loadActivities] Tabela activity_logs não encontrada (42P01). Usando mock.')
+        } else {
+          console.warn('[Dashboard:loadActivities] Erro desconhecido ao ler activity_logs, usando mock como fallback. Code:', activityError.code)
+        }
+        setActivities(getMockActivities())
+        return
+      }
+      
+      // Se não houve erro e activityData existe (pode ser um array vazio)
+      if (activityData) {
+        if (activityData.length > 0) {
           realActivities = activityData.map(act => ({
             type: act.type || 'other',
             title: act.title || 'Atividade',
             description: act.description || 'Sem descrição',
-            date: act.created_at || new Date().toISOString()
+            date: act.created_at || new Date().toISOString() // Usar created_at que selecionamos
           }))
-          
-          console.log(`Encontradas ${realActivities.length} atividades reais`)
+          console.log(`[Dashboard:loadActivities] Encontradas ${realActivities.length} atividades reais.`)
+          setActivities(realActivities)
+        } else {
+          console.log('[Dashboard:loadActivities] Nenhuma atividade real encontrada (tabela vazia). Usando mock.')
+          setActivities(getMockActivities()) // Usar mock se a tabela estiver vazia
         }
-      } catch (dbError) {
-        console.error('Erro ao buscar atividades reais:', dbError)
+      } else {
+        // Caso inesperado onde não há erro mas não há dados (improvável com .select() se a tabela existe)
+        console.warn('[Dashboard:loadActivities] Nenhum dado retornado de activity_logs, mas sem erro. Usando mock.')
+        setActivities(getMockActivities())
       }
-      
-      // Se encontramos atividades reais, usar elas, senão criar mock
-      if (realActivities.length > 0) {
-        setActivities(realActivities)
-        return
-      }
-      
-      // Simular atividades recentes (em um projeto real, isso seria buscado do banco)
-      console.log('Usando atividades simuladas')
-      const now = new Date()
-      const mockActivities: Activity[] = [
-        {
-          type: 'guest',
-          title: 'Novo convidado registrado',
-          description: 'João Silva registrou-se para o evento "Festival de Verão"',
-          date: new Date(now.getTime() - 30 * 60000).toISOString() // 30 min atrás
-        },
-        {
-          type: 'ticket',
-          title: 'Bilhete vendido',
-          description: 'Bilhete VIP vendido para o evento "Noite de Gala"',
-          date: new Date(now.getTime() - 2 * 3600000).toISOString() // 2 horas atrás
-        },
-        {
-          type: 'commission',
-          title: 'Comissão paga',
-          description: 'Comissão de €150 paga para equipe "Vendedores Elite"',
-          date: new Date(now.getTime() - 5 * 3600000).toISOString() // 5 horas atrás
-        }
-      ]
-      
-      setActivities(mockActivities)
-      console.log('Atividades simuladas carregadas com sucesso')
       
     } catch (e) {
+      // Catch para erros inesperados no processo
       const errorInfo = {
         name: e?.name || 'Unknown error',
         message: e?.message || 'No error message available',
         stack: e?.stack || 'No stack trace available'
       }
-      
-      console.error('Erro ao carregar atividades:', errorInfo)
-      setActivities([])
+      console.error('[Dashboard:loadActivities] Erro catastrófico ao carregar atividades:', errorInfo)
+      setActivities(getMockActivities()) // Fallback final para mock
     }
+  }
+  
+  // Função auxiliar para obter mock de atividades, para evitar repetição
+  const getMockActivities = (): Activity[] => {
+    console.log('[Dashboard:getMockActivities] Gerando atividades simuladas.')
+    const now = new Date()
+    return [
+      {
+        type: 'guest',
+        title: 'Novo convidado registrado (Mock)',
+        description: 'João Silva registrou-se para o evento "Festival de Verão" (Mock)',
+        date: new Date(now.getTime() - 30 * 60000).toISOString()
+      },
+      {
+        type: 'ticket',
+        title: 'Bilhete vendido (Mock)',
+        description: 'Bilhete VIP vendido para o evento "Noite de Gala" (Mock)',
+        date: new Date(now.getTime() - 2 * 3600000).toISOString()
+      },
+      {
+        type: 'commission',
+        title: 'Comissão paga (Mock)',
+        description: 'Comissão de €150 paga para equipe "Vendedores Elite" (Mock)',
+        date: new Date(now.getTime() - 5 * 3600000).toISOString()
+      }
+    ];
   }
   
   const determineEventStatus = (dateString: string): 'upcoming' | 'past' | 'draft' => {

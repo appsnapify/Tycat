@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-import { sign } from 'jsonwebtoken';
+// import { cookies } from 'next/headers'; // Comentado, pois cookies().set foi comentado
+// import { sign } from 'jsonwebtoken'; // Comentado, pois a criação do token foi comentada
 
 // Schema de validação
 const loginSchema = z.object({
@@ -10,9 +10,9 @@ const loginSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória")
 });
 
-// Chave JWT secreta
-const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria';
-const JWT_EXPIRY = '7d'; // 7 dias
+// Chave JWT secreta e expiração - Comentados pois não são mais usados aqui
+// const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria';
+// const JWT_EXPIRY = '7d'; 
 
 export async function POST(request: Request) {
   try {
@@ -89,7 +89,8 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Criar token JWT
+    // Criar token JWT - LÓGICA COMENTADA
+    /*
     const token = sign(
       { 
         id: userData.id,
@@ -99,14 +100,18 @@ export async function POST(request: Request) {
       JWT_SECRET, 
       { expiresIn: JWT_EXPIRY }
     );
+    */
     
-    // Definir cookie
-    cookies().set('client_auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60, // 7 dias em segundos
-      path: '/'
-    });
+    // console.log('Token gerado para o cliente:', token); // Comentado pois token não é mais gerado aqui
+
+    // Definir o cookie de autenticação - JÁ COMENTADO ANTERIORMENTE
+    // cookies().set('client_auth_token', token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV !== 'development',
+    //   maxAge: 60 * 60 * 24 * 7, // 1 semana
+    //   path: '/',
+    //   sameSite: 'lax'
+    // });
     
     console.log('Login realizado com sucesso:', { id: userData.id });
     

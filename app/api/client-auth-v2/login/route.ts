@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/adminClient';
-import { cookies } from 'next/headers';
-import { sign } from 'jsonwebtoken';
-import { JWT_SECRET, JWT_EXPIRY } from '@/lib/constants';
+// import { cookies } from 'next/headers'; // Comentado
+// import { sign } from 'jsonwebtoken'; // Comentado
+// import { JWT_SECRET, JWT_EXPIRY } from '@/lib/constants'; // Comentado
 
 // Schema de validação
 const loginSchema = z.object({
@@ -79,7 +79,8 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Criar token JWT
+    // Criar token JWT - LÓGICA COMENTADA
+    /*
     const token = sign(
       { 
         id: userData.id,
@@ -89,14 +90,18 @@ export async function POST(request: Request) {
       JWT_SECRET, 
       { expiresIn: JWT_EXPIRY }
     );
+    */
     
-    // Definir cookie
-    cookies().set('client_auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 7 * 24 * 60 * 60, // 7 dias em segundos
-      path: '/'
-    });
+    // console.log('Token gerado para o cliente:', token); // Comentado
+
+    // Definir o cookie de autenticação - JÁ COMENTADO ANTERIORMENTE
+    // cookies().set('client_auth_token', token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV !== 'development',
+    //   maxAge: 60 * 60 * 24 * 7, // 1 semana
+    //   path: '/',
+    //   sameSite: 'lax'
+    // });
     
     console.log('[V2] Login realizado com sucesso:', { id: userData.id });
     

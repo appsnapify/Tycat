@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { Ticket, BarChart2, Users, CheckCircle, LayoutDashboard, ClipboardList, LogOut } from 'lucide-react'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 
 // Cores modernizadas - alinhadas com o novo tema claro
 const colors = {

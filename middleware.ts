@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs' // REVERTIDO
-// import { createServerClient, type CookieOptions } from '@supabase/ssr' // REMOVIDO
+// import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs' // REMOVIDO
+import { createServerClient, type CookieOptions } from '@supabase/ssr' // ADICIONADO
 
 // Definir função de normalização para consistência entre banco e frontend
+const roleMappings: Record<string, string> = {
+  'promoter': 'promotor',
+  'team-leader': 'chefe-equipe',
+  'chefe-equipe': 'chefe-equipe', // Mantém para o caso de já estar normalizado
+  'organizador': 'organizador',
+  'organizer': 'organizador'
+};
+
 const normalizeRole = (role: string | null | undefined): string => {
   if (!role) return 'desconhecido';
-  
-  // Conversão para string e lowercase para comparação mais robusta
   const roleLower = typeof role === 'string' ? role.toLowerCase() : '';
-  
-  // Versão mais robusta do mapeamento
-  if (roleLower === 'promoter') return 'promotor';
-  if (roleLower === 'team-leader') return 'chefe-equipe';
-  if (roleLower === 'chefe-equipe') return 'chefe-equipe';
-  if (roleLower === 'organizador') return 'organizador';
-  if (roleLower === 'organizer') return 'organizador';
-  
-  console.log(`[Middleware:normalizeRole] Papel não reconhecido: ${role}, usando valor original`);
-  return typeof role === 'string' ? role : 'desconhecido'; // CORRIGIDO: retornar string ou 'desconhecido'
+  const normalized = roleMappings[roleLower];
+  if (normalized) {
+    return normalized;
+  }
+  console.log(`[Middleware:normalizeRole] Papel não reconhecido: ${roleLower}, usando valor original ou 'desconhecido'`);
+  return typeof role === 'string' ? role : 'desconhecido';
 };
 
 // Função para obter URL do dashboard com base no papel
@@ -28,13 +30,9 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
     case 'chefe-equipe':
       return '/app/chefe-equipe/dashboard';
     case 'promotor':
-      // Verificar se o promotor tem uma equipe
       if (userMetadata?.team_id) {
-        // Promotor com equipe vai para o dashboard
         return '/app/promotor/dashboard';
       } else {
-        // Promotor sem equipe vai para a página de equipes
-        // para escolher entre criar ou aderir a uma equipe
         return '/app/promotor/equipes';
       }
     case 'organizador':
@@ -47,13 +45,16 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
 
 // Middleware de autenticação para controlar acesso a rotas protegidas
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next() // REVERTIDO para a forma original de criar res
-  
+  // Criar uma resposta inicial que pode ser modificada
+  let res = NextResponse.next({
+    request: {
+      headers: new Headers(req.headers), // Clonar headers para modificação segura
+    },
+  })
+
   // Verificar se estamos em ambiente de desenvolvimento e acessando a rota de envio de email
   if (process.env.NODE_ENV === 'development' && 
       req.nextUrl.pathname.startsWith('/api/send-welcome-email')) {
-    
-    // Verificar se a API key do Resend está configurada
     if (!process.env.RESEND_API_KEY) {
       console.error('⚠️ RESEND_API_KEY não está configurada! Email não será enviado.')
       return NextResponse.json(
@@ -87,14 +88,37 @@ export async function middleware(req: NextRequest) {
     return res
   }
   
-  // Obter a sessão do usuário usando @supabase/auth-helpers-nextjs (REVERTIDO)
-  const supabase = createMiddlewareClient({ req, res })
+  // Log para depuração de cookies e headers ANTES de getSession
+  console.log('[Middleware] Request Headers:', Object.fromEntries(req.headers.entries()));
+  console.log('[Middleware] Cookies on request:', req.cookies.getAll());
+  
+  // Criar cliente Supabase usando createServerClient de @supabase/ssr
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // Se o middleware precisar definir cookies, ele os adicionará à resposta.
+          res.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          // Se o middleware precisar remover cookies, ele os adicionará à resposta.
+          res.cookies.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
   
   const { data: { session } } = await supabase.auth.getSession()
+  console.log('[Middleware] Session object from getSession() using @supabase/ssr:', session);
   
   // Verificar se o usuário está autenticado
   if (!session) {
-    console.log(`[Middleware] Usuário não autenticado. Redirecting to /login`)
+    console.log(`[Middleware] Usuário não autenticado (via @supabase/ssr). Redirecting to /login`)
     
     // Se estiver acessando uma rota protegida, redirecionar para login
     if (req.nextUrl.pathname.startsWith('/app')) {
@@ -106,36 +130,44 @@ export async function middleware(req: NextRequest) {
   }
   
   // Log para depuração
-  console.log(`[Middleware] Usuário autenticado: ${session.user.email}`)
-  console.log('[Middleware] Metadados do usuário:', JSON.stringify(session.user.user_metadata)) // CORRIGIDO user_metadata
+  console.log(`[Middleware] Usuário autenticado (via @supabase/ssr): ${session.user.email}`)
+  console.log('[Middleware] Metadados do usuário (via @supabase/ssr):', JSON.stringify(session.user.user_metadata))
   
   // Definir papel base do usuário e normalizar
   let userRole = normalizeRole(session.user.user_metadata?.role || 'desconhecido')
-  console.log(`[Middleware] Papel normalizado do usuário: ${userRole}`)
+  console.log(`[Middleware] Papel normalizado do usuário (inicial): ${userRole}`)
   
   // Verificar compatibilidade: se tiver flag is_team_leader mas não tiver role=chefe-equipe
   if (session.user.user_metadata?.is_team_leader === true && userRole !== 'chefe-equipe') {
     console.log('[Middleware] Compatibilidade: Usuário marcado como líder pelo flag is_team_leader');
-    // Atualizar o userRole para uso no middleware 
-    userRole = 'chefe-equipe';
+    userRole = 'chefe-equipe'; // Atualizar o userRole
   }
   
-  // Verificar equipe nos metadados
+  // Verificar equipe nos metadados e ajustar papel se for líder de equipe
+  // Esta lógica também deve ser considerada para o userRole usado no redirecionamento
   if (session.user.user_metadata?.team_id) {
     console.log(`[Middleware] Usuário pertence à equipe ID: ${session.user.user_metadata.team_id}`);
-    
-    // Se o papel na equipe é 'leader' ou 'chefe' mas o papel geral não é 'chefe-equipe', ajustar
     const teamRole = session.user.user_metadata.team_role?.toLowerCase() || '';
     if ((teamRole === 'leader' || teamRole === 'chefe') && userRole !== 'chefe-equipe') {
-      console.log('[Middleware] Detectado inconsistência: usuário é líder na equipe mas papel principal não é chefe-equipe');
+      console.log('[Middleware] Detectado inconsistência: usuário é líder na equipe mas papel principal não é chefe-equipe. Ajustando papel.');
       userRole = 'chefe-equipe';
     }
   }
+  console.log(`[Middleware] Papel normalizado do usuário (final, após verificações de compatibilidade): ${userRole}`);
+
+  // NOVO: Redirecionar usuários autenticados de /login e /register
+  if (pathname === '/login' || pathname === '/register') {
+    const redirectTo = getDashboardUrlByRole(userRole, session.user.user_metadata);
+    console.log(`[Middleware] Usuário autenticado (${session.user.email}, papel: ${userRole}) acessando ${pathname}. Redirecionando para ${redirectTo}`);
+    return NextResponse.redirect(new URL(redirectTo, req.url));
+  }
   
-  // Configurar headers com informações do usuário para logging e debugging (REVERTIDO para usar requestHeaders)
-  requestHeaders.set('x-user-role', userRole)
-  requestHeaders.set('x-user-email', session.user.email || '')
-  requestHeaders.set('x-user-id', session.user.id || '')
+  // Adicionar headers à *requisição* que será encaminhada para o servidor de origem (página/rota Next.js)
+  // Isto é feito clonando os headers da requisição original e adicionando novos.
+  // A `res` já foi criada com estes headers clonados.
+  res.headers.set('x-user-role', userRole)
+  res.headers.set('x-user-email', session.user.email || '')
+  res.headers.set('x-user-id', session.user.id || '')
   
   // Controle de acesso baseado em papel
   const isProtectedRoute = req.nextUrl.pathname.startsWith('/app/')
@@ -198,14 +230,7 @@ export async function middleware(req: NextRequest) {
     }
   }
   
-  // Atualizar headers da resposta para debugging (REVERTIDO)
-  const responseWithHeaders = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  })
-  
-  return responseWithHeaders
+  return res // Retorna a resposta (potencialmente com cookies atualizados se supabase.auth.getSession os refrescou)
 }
 
 // Configurar quais caminhos este middleware deve ser executado

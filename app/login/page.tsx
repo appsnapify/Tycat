@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Mail, Lock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // Cores modernizadas
@@ -31,7 +31,7 @@ interface FormData {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn } = useAuth()
+  const { signIn, user, supabase } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
@@ -59,12 +59,34 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      await signIn(formData.email, formData.password)
-      // Se chegou aqui, o login foi bem sucedido
+      const { error: signInError } = await signIn({ email: formData.email, password: formData.password })
+      
       setIsLoading(false)
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      // CORRETO: Verificar a sessão no lado do cliente após o signIn bem-sucedido
+      if (supabase) { 
+        const { data: clientSessionData, error: clientSessionError } = await supabase.auth.getSession();
+        console.log('[LoginPage] Client-side session after signIn:', clientSessionData?.session);
+        if (clientSessionError) {
+          console.error('[LoginPage] Error getting client-side session after signIn:', clientSessionError);
+        }
+      } else {
+        console.warn('[LoginPage] Supabase client not available from useAuth for getSession check.');
+      }
+      
+      // Se não houve erro, o onAuthStateChange no provider deve ter tratado o user.
+      // O redirecionamento pode ser tratado aqui ou num useEffect que observa o user.
+      // Por agora, vamos assumir que o provider lida com o redirecionamento ou que
+      // a página de destino fará a verificação.
+      // router.push('/'); // Exemplo de redirecionamento, pode ser ajustado
+
     } catch (error: any) {
       console.error('Erro ao fazer login:', error)
-      setIsLoading(false) // Garantir que o loading seja resetado em caso de erro
+      setIsLoading(false)
       
       if (error?.message?.includes('Invalid login credentials') || 
           error?.message?.includes('Email ou senha incorretos')) {
@@ -72,10 +94,17 @@ export default function LoginPage() {
       } else if (error?.message?.includes('rate limit')) {
         setError('Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.')
       } else {
-        setError(`Ocorreu um erro ao fazer login: ${error.message}`)
+        setError(`Ocorreu um erro ao fazer login: ${error.message || 'Erro desconhecido.'}`)
       }
     }
   }
+
+  useEffect(() => {
+    if (user) { // user é do useAuth(), que é atualizado pelo onAuthStateChange
+      console.log("[LoginPage] User state updated, attempting redirect to /app/organizador/dashboard");
+      router.push('/app/organizador/dashboard'); 
+    }
+  }, [user, router]);
 
   // Função para limpar campos e erro
   const resetForm = () => {
@@ -139,69 +168,38 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6 mt-6">
             <div>
               <Label htmlFor="email" className={`block text-sm font-medium ${colors.textPrimary}`}>
-                E-mail
+                Email
               </Label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className={`h-5 w-5 text-lime-500`} />
-                </div>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`pl-10 bg-white/70 border-gray-200 text-gray-900 rounded-md focus:ring-1 focus:ring-lime-500 focus:border-lime-500`}
-                  placeholder="seu@email.com"
-                />
-              </div>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className={`mt-1 block w-full ${colors.textPrimary}`}
+              />
             </div>
-
             <div>
               <Label htmlFor="password" className={`block text-sm font-medium ${colors.textPrimary}`}>
-                Palavra-passe
+                Senha
               </Label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className={`h-5 w-5 text-fuchsia-500`} />
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`pl-10 bg-white/70 border-gray-200 text-gray-900 rounded-md focus:ring-1 focus:ring-fuchsia-500 focus:border-fuchsia-500`}
-                  placeholder="••••••••"
-                />
-              </div>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                className={`mt-1 block w-full ${colors.textPrimary}`}
+              />
             </div>
-
-            <div className="flex items-center justify-center">
-              <Button 
-                type="submit" 
-                disabled={isLoading}
-                className={`${colors.bgAccentLime} text-white w-full font-semibold shadow-md`}
-              >
-                {isLoading ? 'A iniciar sessão...' : 'Iniciar Sessão'}
-              </Button>
-            </div>
+            <Button type="submit" disabled={isLoading} className={`w-full ${colors.bgAccentLime} text-white`}>
+              {isLoading ? 'Entrando...' : 'Entrar'}
+            </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className={`text-sm ${colors.textSecondary}`}>
-              Esqueceu sua senha?{" "}
-              <Link href="/forgot-password" className={`font-medium ${colors.accentMagenta}`}>
-                Recuperar Acesso
-              </Link>
-            </p>
-          </div>
         </div>
-
-        {/* Sombra adicional para profundidade */}
-        <div className="h-2 mx-8 bg-gradient-to-r from-transparent via-gray-200 to-transparent rounded-full opacity-50 mt-1"></div>
       </motion.div>
     </div>
   )
 }
-

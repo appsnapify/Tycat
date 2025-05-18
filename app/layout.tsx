@@ -2,8 +2,9 @@ import './globals.css'
 import { Inter, Oswald } from 'next/font/google'
 // import { Toaster } from 'sonner' // Linha original comentada
 import { Toaster } from '@/components/ui/toaster' // Nova linha para shadcn/ui Toaster
-import { AuthProvider } from '@/hooks/use-auth'
-import { ClientAuthProvider } from '@/hooks/useClientAuth'
+// import { AuthProvider } from '@/hooks/use-auth' // REMOVIDO
+// import { ClientAuthProvider } from '@/hooks/useClientAuth' // REMOVIDO
+import { ClientAuthProvider } from '@/app/app/_providers/auth-provider' // ADICIONADO - O Provider Unificado
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 
@@ -54,14 +55,12 @@ export default function RootLayout({
   return (
     <html lang="pt" className={`${inter.variable} ${oswald.variable} font-sans`}>
       <body>
-        <AuthProvider>
-          <ClientAuthProvider>
+        <ClientAuthProvider serverSession={null}> {/* PROVIDER UNIFICADO ENVOLVENDO TUDO */}
             {children}
             <Toaster />
             <Analytics />
             <SpeedInsights />
-          </ClientAuthProvider>
-        </AuthProvider>
+        </ClientAuthProvider>
       </body>
     </html>
   )

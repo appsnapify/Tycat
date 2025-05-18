@@ -14,7 +14,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase/client';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Schema de validação
 const registerSchema = z.object({
@@ -124,7 +124,7 @@ export default function ClientRegistrationForm({
       // 2. Se o registro for bem sucedido, fazer login do lado do cliente
       try {
         // Obter cliente Supabase (usando padrão singleton)
-        const supabase = createBrowserClient();
+        const supabase = getSupabaseBrowserClient();
         
         // Autenticar usuário com email e senha fornecidos
         const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
