@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useOrganization } from '@/app/contexts/organization-context'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Upload, Check, Save, Copy } from 'lucide-react'
@@ -54,7 +54,7 @@ export default function OrganizacaoPage() {
   // Correctly get currentOrganization and isLoading from the context
   const { currentOrganization, isLoading: isOrgLoading } = useOrganization()
   
-  const supabase = getSupabaseBrowserClient()
+  const supabase = createClient()
   const [organizationData, setOrganizationData] = useState<OrganizationData | null>(null)
   // Rename isFetching to isLoadingDetails to be clearer
   const [isLoadingDetails, setIsLoadingDetails] = useState(false) 

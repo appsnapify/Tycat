@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
@@ -103,7 +103,7 @@ const activityIcons = {
 export default function OrganizadorDashboardPage() {
   const router = useRouter()
   const { user, selectedOrganization } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = createClient()
   
   const [loading, setLoading] = useState(true)
   const [kpis, setKpis] = useState({

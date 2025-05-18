@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 // import { useAuth } from '@/hooks/use-auth' // Linha ANTIGA comentada
 import { useAuth } from '@/app/app/_providers/auth-provider' // Linha NOVA - Apontar para o useAuth unificado
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 
 interface Organization {
@@ -40,7 +40,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const supabase = getSupabaseBrowserClient()
+        const supabase = createClient()
         
         console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
         

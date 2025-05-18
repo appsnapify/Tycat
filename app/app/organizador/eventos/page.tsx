@@ -531,8 +531,13 @@ export default function EventosPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} onAction={handleAction} />
+          {filteredEvents.map((event, index) => (
+            <EventCard 
+              key={event.id} 
+              event={event} 
+              onAction={handleAction} 
+              isLCPImage={index === 0 && !!event.flyer_url}
+            />
           ))}
         </div>
       )}
@@ -541,7 +546,7 @@ export default function EventosPage() {
 }
 
 // Componente para o card de evento
-function EventCard({ event, onAction }: { event: Event, onAction: (action: string, eventId: string) => void }) {
+function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (action: string, eventId: string) => void, isLCPImage?: boolean }) {
   const router = useRouter()
   const eventImg = event.flyer_url || '/placeholder-event.jpg'
   const { toast } = useToast()
@@ -698,6 +703,7 @@ function EventCard({ event, onAction }: { event: Event, onAction: (action: strin
             fill
             style={{ objectFit: 'cover' }}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={isLCPImage}
           />
           
           {/* Overlay para eventos passados ou inativos */}

@@ -10,7 +10,7 @@ import {
   useCallback,
 } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import type { Session, SupabaseClient, User, AuthChangeEvent, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js'
 // import { getRoleFromClaims } from '@/lib/auth/roles' // Comentado temporariamente
 // import { ROLES, PromoterSalesRole } from '@/lib/auth/constants' // Comentado temporariamente
@@ -71,7 +71,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   children,
   serverSession,
 }) => {
-  const supabase = useMemo(() => getSupabaseBrowserClient(), [])
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const pathname = usePathname()
 

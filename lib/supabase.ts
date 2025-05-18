@@ -1,10 +1,10 @@
-import { getSupabaseBrowserClient } from './supabase/client';
+import { createClient as getSingletonSupabaseClient } from './supabase/singleton-client';
 import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // A função createClient agora simplesmente retorna o cliente singleton do browser.
 export const createClient = (): SupabaseClient<Database> => {
-  return getSupabaseBrowserClient();
+  return getSingletonSupabaseClient();
 };
 
 // Nota: Se precisar de um cliente de servidor aqui no futuro (para SSR em Pages Router ou funções legadas),

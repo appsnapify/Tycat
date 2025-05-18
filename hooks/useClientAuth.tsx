@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/singleton-client';
 import { ClientUser } from '@/types/client';
 
 // Interface para o contexto de autenticação do cliente
@@ -49,7 +49,7 @@ export const ClientAuthProvider = ({
   });
 
   // Referência ao cliente Supabase
-  const supabaseClientRef = useRef(getSupabaseBrowserClient())
+  const supabaseClientRef = useRef(createClient())
   
   console.log('ClientAuthProvider montado - modo sem persistência de sessão');
   

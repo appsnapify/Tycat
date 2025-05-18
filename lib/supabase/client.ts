@@ -12,14 +12,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-// Exporta uma função que cria e retorna uma instância do cliente Supabase para o navegador.
-// Esta é a abordagem recomendada para uso em Client Components com o App Router.
-export const getSupabaseBrowserClient = () => {
-  return createBrowserClient<Database>(
-    supabaseUrl!,
-    supabaseAnonKey!
-  );
-}
+// A função getSupabaseBrowserClient foi removida pois agora usamos um cliente singleton
+// centralizado em lib/supabase/singleton-client.ts e acedido via lib/supabase.ts.
 
 // Nota: A versão original do seu ficheiro tinha funções como:
 // - createBrowserClientWithoutPersistence
