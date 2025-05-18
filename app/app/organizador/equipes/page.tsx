@@ -23,10 +23,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { Label } from '@/components/ui/label'
 import { associateTeamAction } from '@/app/actions/organizerActions'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { createClient } from '@/lib/supabase'
 
 // Definir cores consistentes com o tema
 const colors = {

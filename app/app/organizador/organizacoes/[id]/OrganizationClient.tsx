@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/use-auth'
+import { createClient } from '@/lib/supabase'
+import { useAuth } from '@/app/app/_providers/auth-provider'
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 interface Organization {
   id: string

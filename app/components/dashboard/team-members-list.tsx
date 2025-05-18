@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { LoadingSpinner } from '@/components/loading-spinner'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 
 // Interface para membro da equipe
 export interface TeamMember {

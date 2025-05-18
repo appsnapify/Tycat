@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { LogOut, Loader2, Building, AlertCircle, Calendar, Settings } from 'lucide-react'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { TeamType, TeamMemberType } from '@/lib/database.types'
@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Link from 'next/link'
+import Image from 'next/image'
 
 // Função para normalizar papéis
 function normalizeRole(role: string | null | undefined): string {

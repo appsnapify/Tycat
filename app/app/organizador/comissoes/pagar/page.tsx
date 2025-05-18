@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useAuth } from '@/hooks/use-auth'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/app/app/_providers/auth-provider'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { v4 as uuidv4 } from 'uuid'
 
 import { Button } from '@/components/ui/button'

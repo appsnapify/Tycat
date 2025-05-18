@@ -6,7 +6,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 
 interface Organization {
   id: string

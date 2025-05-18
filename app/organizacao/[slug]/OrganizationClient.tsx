@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { Loader2, Instagram, Facebook, Youtube, Twitter, Globe, Music, ClipboardList } from 'lucide-react'
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 interface Organization {
   id: string

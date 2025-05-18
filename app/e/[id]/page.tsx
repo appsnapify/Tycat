@@ -7,9 +7,12 @@ import { CalendarIcon, MapPin, Share2, TicketIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import { use } from 'react'
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 // Interface do evento
 interface Event {

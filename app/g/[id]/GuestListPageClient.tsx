@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase' // Usar cliente normal no cliente
+import { createClient } from '@/lib/supabase' // Corrigido
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -31,6 +31,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { format, formatDistanceToNow } from 'date-fns'
 import { pt } from 'date-fns/locale'
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 // Schema de validação para o formulário de registro
 const guestFormSchema = z.object({

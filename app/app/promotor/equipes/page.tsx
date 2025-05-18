@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,9 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Users, PlusCircle, Loader2, AlertCircle, Info } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface Team {
   id: string

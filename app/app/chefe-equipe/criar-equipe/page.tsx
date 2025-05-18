@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'

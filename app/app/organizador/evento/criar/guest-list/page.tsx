@@ -29,10 +29,9 @@ import {
 } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/use-toast'
-import { createClient } from '@supabase/supabase-js'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { v4 as uuidv4 } from 'uuid'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
 
 // --- Funções Auxiliares para Data/Hora ---
@@ -150,6 +149,9 @@ const GuestListFormSchema = z.object({
 });
 
 type GuestListFormValues = z.infer<typeof GuestListFormSchema>
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 export default function GuestListPage() {
   const router = useRouter()

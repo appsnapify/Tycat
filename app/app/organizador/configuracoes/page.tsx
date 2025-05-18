@@ -7,7 +7,7 @@ import * as z from 'zod'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

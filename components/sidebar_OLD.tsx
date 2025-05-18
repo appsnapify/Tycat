@@ -3,6 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -12,7 +14,7 @@ import {
   Building2,
   CreditCard,
 } from 'lucide-react'
-import { useAuth } from '@/hooks/use-auth'
+import { TeamSwitcher } from './team-switcher'
 
 const routes = [
   {

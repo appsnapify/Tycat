@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
@@ -12,13 +12,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Slider } from '@/components/ui/slider'
-import { AlertCircle, ArrowLeft, Building, CreditCard, Percent } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Building, CreditCard, Percent, PlusCircle, Search } from 'lucide-react'
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
 import { toast } from 'sonner'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface Organization {
   id: string

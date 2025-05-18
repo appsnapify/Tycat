@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Scan, UserCheck, RotateCcw, Camera, X } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -25,6 +25,9 @@ const Html5QrcodeScanner = dynamic(() => import('./Html5QrScanner').catch(err =>
     </div>
   );
 }), { ssr: false });
+
+// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+const supabase = createClient();
 
 interface ScanResult {
   success: boolean

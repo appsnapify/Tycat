@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Upload, Link as LinkIcon, Check } from 'lucide-react'
 import Link from 'next/link'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { OrganizationPreview } from '@/components/organization-preview'
 import { generateSlug } from '@/lib/utils'
+import { createClient } from '@/lib/supabase'
 
 interface FormData {
   name: string
