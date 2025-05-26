@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 // import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs' // REMOVIDO
 import { createServerClient, type CookieOptions } from '@supabase/ssr' // ADICIONADO
+// import { rateLimit } from './lib/security/rate-limit'
 
 // Definir função de normalização para consistência entre banco e frontend
 const roleMappings: Record<string, string> = {
@@ -33,7 +34,7 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
       if (userMetadata?.team_id) {
         return '/app/promotor/dashboard';
       } else {
-        return '/app/promotor/equipes';
+        return '/app/promotor/equipes/escolha';
       }
     case 'organizador':
       return '/app/organizador/dashboard';
@@ -42,6 +43,12 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
       return '/app';
   }
 };
+
+// Configuração do rate limiting
+// const limiter = rateLimit({
+//   interval: 60 * 1000, // 1 minuto
+//   uniqueTokenPerInterval: 500
+// });
 
 // Middleware de autenticação para controlar acesso a rotas protegidas
 export async function middleware(req: NextRequest) {
@@ -99,17 +106,33 @@ export async function middleware(req: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return req.cookies.get(name)?.value
+          const cookie = req.cookies.get(name)
+          return cookie?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          // Se o middleware precisar definir cookies, ele os adicionará à resposta.
-          res.cookies.set({ name, value, ...options })
+          // Garantir que o cookie seja configurado corretamente
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+            path: options.path || '/',
+            sameSite: options.sameSite || 'lax',
+            httpOnly: options.httpOnly !== false,
+            secure: process.env.NODE_ENV === 'production' && options.secure !== false
+          })
         },
         remove(name: string, options: CookieOptions) {
-          // Se o middleware precisar remover cookies, ele os adicionará à resposta.
-          res.cookies.set({ name, value: '', ...options })
-        },
-      },
+          // Garantir que o cookie seja removido corretamente
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+            path: options.path || '/',
+            maxAge: 0,
+            expires: new Date(0)
+          })
+        }
+      }
     }
   )
   
@@ -230,6 +253,18 @@ export async function middleware(req: NextRequest) {
     }
   }
   
+  // Aplicar rate limiting apenas em rotas sensíveis
+  if (pathname.startsWith('/api/client-auth') || pathname.startsWith('/api/guests')) {
+    try {
+      // Obter IP do cliente através dos headers
+      const forwardedFor = req.headers.get('x-forwarded-for')
+      const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : '127.0.0.1'
+      // await limiter.check(ip);
+    } catch {
+      return new NextResponse('Too Many Requests', { status: 429 });
+    }
+  }
+  
   return res // Retorna a resposta (potencialmente com cookies atualizados se supabase.auth.getSession os refrescou)
 }
 
@@ -240,5 +275,7 @@ export const config = {
     '/app/:path*',
     '/login',
     '/register',
+    '/api/client-auth/:path*',
+    '/api/guests/:path*',
   ],
 } 

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import { qrCodeService } from '@/lib/services/qrcode.service';
 
 /**
  * Verifica se um convidado já existe para um evento/usuário e retorna os dados
@@ -12,7 +13,7 @@ export async function checkExistingGuest(eventId: string, clientUserId: string) 
     
     const { data, error } = await supabase
       .from('guests')
-      .select('id, qr_code_url')
+      .select('id, qr_code_url, qr_code')
       .eq('event_id', eventId)
       .eq('client_user_id', clientUserId)
       .maybeSingle();
@@ -43,19 +44,11 @@ export async function createGuestRecord(data: {
   try {
     const supabase = await createClient();
     
-    // Garantir que temos um qr_code válido para satisfazer a restrição NOT NULL
-    // Criamos primeiro os dados que serão codificados no QR code
-    const qrCodeData = {
-      userId: data.clientUserId,
-      eventId: data.eventId,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Convertemos para string JSON
-    const qrCodeString = JSON.stringify(qrCodeData);
-    
-    // Geramos a URL do QR code
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCodeString)}`;
+    // Gerar QR Code usando o novo serviço
+    const { qrCodeUrl, qrCodeData } = await qrCodeService.generateQRCode(
+      data.clientUserId,
+      data.eventId
+    );
     
     // Criamos o objeto de inserção com todos os campos necessários
     const insertData = {
@@ -65,13 +58,13 @@ export async function createGuestRecord(data: {
       client_user_id: data.clientUserId,
       promoter_id: data.promoterId,
       team_id: data.teamId,
-      qr_code: qrCodeString,       // JSON válido para satisfazer a restrição NOT NULL
-      qr_code_url: qrCodeUrl       // URL do QR code
+      qr_code: qrCodeData,       // Dados assinados do QR code
+      qr_code_url: qrCodeUrl     // URL ou data URL do QR code
     };
     
     console.log('Tentando inserir novo convidado com dados:', {
       ...insertData,
-      qr_code: 'JSON string (truncado para log)'
+      qr_code: 'Dados assinados (truncado para log)'
     });
     
     // Tentamos a inserção com todos os campos necessários
@@ -96,13 +89,22 @@ export async function createGuestRecord(data: {
 /**
  * Atualiza o QR code na tabela de convidados
  */
-export async function updateGuestQRCode(guestId: string, qrCodeUrl: string) {
+export async function updateGuestQRCode(guestId: string, eventId: string) {
   try {
     const supabase = await createClient();
     
+    // Gerar novo QR Code
+    const { qrCodeUrl, qrCodeData } = await qrCodeService.generateQRCode(
+      guestId,
+      eventId
+    );
+    
     const { error } = await supabase
       .from('guests')
-      .update({ qr_code_url: qrCodeUrl })
+      .update({ 
+        qr_code_url: qrCodeUrl,
+        qr_code: qrCodeData
+      })
       .eq('id', guestId);
     
     if (error) {
@@ -110,16 +112,30 @@ export async function updateGuestQRCode(guestId: string, qrCodeUrl: string) {
       return { error: error.message };
     }
     
-    return { success: true };
+    return { success: true, qrCodeUrl, qrCodeData };
   } catch (error) {
     console.error('Exceção ao atualizar QR code (server action):', error);
     return { error: 'Erro interno ao atualizar QR code' };
   }
 }
+
 /**
  * Gera um ID de emergência para uso quando a criação do registro falha
  */
 export async function generateEmergencyId() {
   const id = uuidv4();
   return { id };
+}
+
+/**
+ * Valida um QR code
+ */
+export async function validateGuestQRCode(qrCodeData: string) {
+  try {
+    const isValid = await qrCodeService.validateQRCode(qrCodeData);
+    return { isValid };
+  } catch (error) {
+    console.error('Erro ao validar QR code:', error);
+    return { error: 'Erro ao validar QR code' };
+  }
 } 

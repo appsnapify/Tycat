@@ -49,6 +49,17 @@ BEGIN
     updated_at = NOW()
   WHERE id = user_id_param;
   
+  -- Atualizar os metadados do usuário
+  UPDATE auth.users
+  SET raw_user_meta_data = 
+    COALESCE(raw_user_meta_data, '{}'::jsonb) || 
+    jsonb_build_object(
+      'role', 'promotor',
+      'team_id', v_team_id,
+      'team_name', v_team_name
+    )
+  WHERE id = user_id_param;
+  
   -- Preparar resultado
   v_result := json_build_object(
     'success', TRUE,

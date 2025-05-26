@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -28,8 +27,7 @@ interface Team {
 }
 
 export default function PromotorDashboardPage() {
-  const { user } = useAuth()
-  const supabase = createClientComponentClient()
+  const { user, initialAuthCheckCompleted, supabase } = useAuth()
   
   // Estado Essencial
   const [loadingTeams, setLoadingTeams] = useState(true)
@@ -121,16 +119,32 @@ export default function PromotorDashboardPage() {
   // --- Use Effects --- 
   // 1. Carrega as equipas
   useEffect(() => {
-    if (user) {
+    console.log(`DashboardPromotor useEffect: user: ${user ? user.id : 'null'}, initialAuthCheckCompleted: ${initialAuthCheckCompleted}`);
+    if (initialAuthCheckCompleted && user?.id) {
+      console.log("DashboardPromotor: Chamando loadTeams pois initialAuthCheckCompleted é true e user.id existe.");
       loadTeams();
+    } else if (initialAuthCheckCompleted && !user?.id) {
+      console.warn("DashboardPromotor: initialAuthCheckCompleted é true, mas não há user.id. Não carregando equipas.");
+      setLoadingTeams(false);
+      setError("Utilizador não autenticado ou sessão inválida."); // Poderia ser uma mensagem mais específica
+      setTeams([]); 
     } else {
-      const timer = setTimeout(() => !user && setLoadingTeams(false), 2000);
-      return () => clearTimeout(timer);
+      console.log("DashboardPromotor: Aguardando initialAuthCheckCompleted ou user.id.");
+      // Mantém o loading ativo se a verificação inicial ainda não ocorreu
+      // ou se ainda não há utilizador.
+      // Opcionalmente, adicionar um timeout para evitar loading infinito se algo correr mal no AuthProvider
+      // mas por agora, vamos confiar que initialAuthCheckCompleted ficará true.
+      // setLoadingTeams(true); // Já está true por defeito
     }
-  }, [user]);
+  }, [user, user?.id, initialAuthCheckCompleted]); // Adicionar user.id e initialAuthCheckCompleted às dependências
 
   // --- Render Logic ---
-  if (loadingTeams) { // Loading inicial
+  const nomePromotor =
+    `${user?.user_metadata?.first_name || user?.profile?.first_name || ''} ${user?.user_metadata?.last_name || user?.profile?.last_name || ''}`.trim() ||
+    user?.email ||
+    'Promotor';
+
+  if (!initialAuthCheckCompleted && loadingTeams) { // Mostra loader enquanto o authProvider não completou a verificação inicial
     return (
       <div className="flex items-center justify-center h-[calc(100vh-150px)]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -166,7 +180,7 @@ export default function PromotorDashboardPage() {
       <div className="mb-6">
          <h1 className="text-2xl md:text-3xl font-bold">Dashboard Promotor</h1>
          <p className="text-muted-foreground mt-1">
-             Bem-vindo {user?.user_metadata?.full_name || user?.email || 'Promotor'}!
+             Bem-vindo <strong className="font-medium text-foreground">{nomePromotor}</strong>!
          </p>
       </div>
       
@@ -195,7 +209,7 @@ export default function PromotorDashboardPage() {
           <Card className="max-w-xs w-full overflow-hidden"> {/* Max width e full width */} 
             <CardContent className="p-4 flex flex-col items-center space-y-3"> {/* Padding, flex column, centralizado */} 
               {/* Nome da Equipa em Destaque */} 
-              <p className="text-lg font-semibold text-indigo-600 truncate"> 
+              <p className="text-lg font-semibold text-lime-500 truncate"> 
                 {teams[0].name}
               </p>
               {/* Código da Equipa */} 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { Loader2, UserCheck, Phone, ArrowRight } from 'lucide-react';
@@ -19,6 +19,7 @@ import PhoneInput from 'react-phone-number-input';
 import flags from 'react-phone-number-input/flags';
 import 'react-phone-number-input/style.css';
 import { createClient } from '@/lib/supabase/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 // Importar as Server Actions
 import { checkExistingGuest, createGuestRecord, updateGuestQRCode, generateEmergencyId } from '@/app/actions/promo';
 
@@ -35,7 +36,11 @@ export function GuestRequestCard({
   teamId,
   className = ''
 }: GuestRequestCardProps) {
+  console.log('[DEBUG] GuestRequestCard - Props recebidas:', { eventId, promoterId, teamId });
+  
   const { user, updateUser } = useClientAuth();
+  console.log('[DEBUG] GuestRequestCard - Estado inicial do usuário:', user);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,6 +50,39 @@ export function GuestRequestCard({
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [showQRCode, setShowQRCode] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasRequestedAccess, setHasRequestedAccess] = useState(false);
+  
+  // Efeito para verificar se o usuário já tem acesso
+  useEffect(() => {
+    console.log('[DEBUG] GuestRequestCard - useEffect - Verificando acesso do usuário:', user?.id);
+    if (user?.id) {
+      checkExistingAccess(user.id);
+    }
+  }, [user?.id]);
+
+  // Função para verificar acesso existente
+  const checkExistingAccess = async (userId: string) => {
+    console.log('[DEBUG] GuestRequestCard - Verificando acesso existente para:', userId);
+    try {
+      const supabase = createClientComponentClient();
+      const { data, error } = await supabase
+        .from('guest_list_requests')
+        .select('id, status')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[ERROR] Erro ao verificar acesso:', error);
+        return;
+      }
+
+      console.log('[DEBUG] GuestRequestCard - Resultado da verificação de acesso:', data);
+      setHasRequestedAccess(!!data);
+    } catch (error) {
+      console.error('[ERROR] Erro ao verificar acesso:', error);
+    }
+  };
   
   // Função para gerar QR code com fallback
   const generateQRCode = async (guestId: string): Promise<string> => {

@@ -67,30 +67,35 @@ export default function RegisterPage() {
     let registrationError: Error | null = null;
 
     try {
-      const newUser = await signUp(data.email, data.password, {
-        first_name: data.first_name,
-        last_name: data.last_name,
-        role: data.role
-      });
+      const { error } = await signUp(
+        {
+          email: data.email,
+          password: data.password,
+        },
+        {
+          first_name: data.first_name,
+          last_name: data.last_name,
+          role: data.role,
+          email_verified: true
+        }
+      );
 
-      if (newUser) {
-        // Sucesso: Mostrar mensagem e redirecionar
-        toast.success("Conta criada com sucesso! Redirecionando...");
-
-        // Determinar o dashboard correto OU a página de escolha de equipe
-        const redirectPath = data.role === 'organizador' 
-          ? '/app/organizador/dashboard' 
-          : '/app/promotor/equipes';
-        
-        // Adicionar um pequeno delay antes de redirecionar para dar tempo ao toast
-        setTimeout(() => {
-          router.push(redirectPath);
-        }, 1500); // Delay de 1.5 segundos
-
-      } else {
-        // Caso inesperado onde signUp não retorna usuário ou erro
-        throw new Error('Falha ao obter dados do usuário após registro.');
+      if (error) {
+        throw error;
       }
+
+      // Sucesso: Mostrar mensagem e redirecionar
+      toast.success("Conta criada com sucesso! Redirecionando...");
+
+      // Determinar o dashboard correto OU a página de escolha de equipe
+      const redirectPath = data.role === 'organizador' 
+        ? '/app/organizador/dashboard' 
+        : '/app/promotor/equipes/escolha';
+      
+      // Adicionar um pequeno delay antes de redirecionar para dar tempo ao toast
+      setTimeout(() => {
+        router.push(redirectPath);
+      }, 1500); // Delay de 1.5 segundos
 
     } catch (error) {
       console.error('Error during registration:', error);
@@ -103,11 +108,6 @@ export default function RegisterPage() {
       // Exibe o toast de erro imediatamente no catch
       toast.error(registrationError.message);
       setIsLoading(false);
-    } finally {
-      // Definir isLoading como false apenas se não estivermos redirecionando
-      // O redirecionamento cuidará da mudança de página
-      // setIsLoading(false); 
-      // Comentado para evitar que o botão volte ao estado normal antes do redirect
     }
   }
 

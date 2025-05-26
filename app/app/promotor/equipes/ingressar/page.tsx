@@ -53,8 +53,8 @@ export default function IngressarEquipePage() {
       const { data, error: rpcError } = await supabase.rpc(
         'join_team_with_code',
         {
-          p_team_code: teamCode.trim(),
-          p_user_id: user.id
+          user_id_param: user.id,
+          team_code_param: teamCode.trim()
         }
       )
       
@@ -86,13 +86,16 @@ export default function IngressarEquipePage() {
       // Atualizar a sessão para refletir as mudanças
       console.log("Atualizando sessão após aderição bem-sucedida.");
       
+      // Forçar atualização da sessão para obter os novos metadados
+      await supabase.auth.refreshSession();
+      
       // Mostrar mensagem de sucesso
       const teamName = data.team_name || 'selecionada';
       toast.success(`Você aderiu com sucesso à equipa ${teamName}!`);
       
       // Pequeno atraso para permitir que o toast seja visto
       setTimeout(() => {
-        router.push('/app/promotor/equipes');
+        router.push('/app/promotor/dashboard');
       }, 1500);
       
     } catch (error: any) {

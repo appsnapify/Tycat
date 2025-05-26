@@ -32,6 +32,39 @@ export async function POST(request: NextRequest) {
   try {
     console.log('API - Iniciando processamento de requisição POST');
     
+    const body = await request.json();
+    const { eventId } = body;
+    
+    // Verificar se o evento existe e não passou
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from('events')
+      .select('date, is_active')
+      .eq('id', eventId)
+      .single();
+      
+    if (eventError || !event) {
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
+    }
+    
+    // Verificar se o evento já passou
+    const eventDate = new Date(event.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (eventDate < today) {
+      return NextResponse.json(
+        { error: 'Este evento já foi realizado. Não é possível criar nova guest list.' },
+        { status: 400 }
+      );
+    }
+    
+    if (!event.is_active) {
+      return NextResponse.json(
+        { error: 'Este evento não está ativo.' },
+        { status: 400 }
+      );
+    }
+    
     // Extração de dados do request
     const data = await request.json();
     const { 

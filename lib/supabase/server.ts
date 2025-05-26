@@ -26,7 +26,10 @@ const setCookieSafe = async (name: string, value: string, options: any = {}) => 
       value, 
       ...options, 
       path: options.path || '/',
-      maxAge: options.maxAge || 60 * 60 * 24 * 7
+      maxAge: options.maxAge || 60 * 60 * 24 * 7,
+      sameSite: options.sameSite || 'lax',
+      httpOnly: options.httpOnly !== false,
+      secure: process.env.NODE_ENV === 'production' && options.secure !== false
     });
     return true;
   } catch (e) {
@@ -41,7 +44,9 @@ const deleteCookieSafe = async (name: string, options: any = {}) => {
     cookieStore.delete({ 
       name, 
       ...options,
-      path: options.path || '/'
+      path: options.path || '/',
+      maxAge: 0,
+      expires: new Date(0)
     });
     return true;
   } catch (e) {

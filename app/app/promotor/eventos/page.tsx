@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { type Database } from '@/types/supabase';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // Added for event flyer
@@ -114,7 +115,33 @@ export default async function EventosPromotorPage({
   }
 
   const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch (error) {
+            // O erro ocorre no middleware durante a pre-renderização estática
+            // Ignorar o erro, mas registá-lo para que saiba se acontece
+            console.warn(`[SupabaseServerClient WARN] Erro ao definir cookie '${name}' no Server Component (provavelmente pre-renderização):`, error);
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.delete({ name, ...options });
+          } catch (error) {
+            console.warn(`[SupabaseServerClient WARN] Erro ao remover cookie '${name}' no Server Component (provavelmente pre-renderização):`, error);
+          }
+        },
+      },
+    }
+  );
 
   let organization: Organizacao | null = null;
   let allEvents: Evento[] = []; // Rename to allEvents

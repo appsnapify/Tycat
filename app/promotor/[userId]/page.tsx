@@ -8,24 +8,34 @@ import Link from 'next/link'; // Re-added Link import
 import Image from 'next/image';
 // Import a reusable EventCard component (adjust path as needed)
 import { EventCard } from '@/components/ui/event-card';
+import { Suspense } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatDate } from '@/lib/utils/date';
+import { EventImage } from '@/components/ui/event-image';
+import { PromoterProfile } from './PromoterProfile';
+import { EventsList } from './EventsList';
 
 // Define the expected return type from our RPC
-// Ensure this matches the RETURNS TABLE definition in the SQL function
 type PromoterPageDataEntry = {
   promoter_first_name: string | null;
   promoter_last_name: string | null;
   promoter_avatar_url: string | null;
-  event_id: string; // UUID as string
+  event_id: string;
   event_title: string | null;
   event_flyer_url: string | null;
   event_type: string | null;
-  event_date: string | null; // date as string
-  event_time: string | null; // time as string
-  org_id: string | null; // UUID as string
+  event_date: string | null;
+  event_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  org_id: string | null;
   org_name: string | null;
   org_logo_url: string | null;
-  tracking_promoter_id: string; // UUID as string
-  tracking_team_id: string; // UUID as string
+  team_id: string | null;
+  tracking_promoter_id: string;
+  tracking_team_id: string | null;
+  is_active?: boolean;
+  is_published?: boolean;
 };
 
 // Helper function to get initials
@@ -38,173 +48,199 @@ const getInitials = (firstName?: string | null, lastName?: string | null): strin
 // Removed renderSocialLink function
 // Removed ProfileSocialMedia type
 
-// Update function signature to access params properly in Next.js 14
-export default async function PromoterPublicPage({ params }: { params: { userId: string } }) {
-  // Uso dos parâmetros com await - necessário no Next.js 14
-  const { userId } = await params;
+// Validation constants
+const MAX_EVENTS_PER_PAGE = 50;
+const VALID_EVENT_TYPES = ['guest-list', 'regular', 'vip'] as const;
+type ValidEventType = typeof VALID_EVENT_TYPES[number];
 
-  // Basic UUID validation
-  const isValidUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(userId);
-  if (!isValidUUID) {
+// Validation functions
+function isValidUUID(uuid: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(uuid);
+}
+
+function isValidEventType(type: string): type is ValidEventType {
+  return VALID_EVENT_TYPES.includes(type as ValidEventType);
+}
+
+function validateEvent(event: PromoterPageDataEntry): boolean {
+  if (!event.event_id || !isValidUUID(event.event_id)) return false;
+  if (!event.event_title?.trim()) return false;
+  if (event.event_type && !isValidEventType(event.event_type)) return false;
+  if (event.event_date && isNaN(new Date(event.event_date).getTime())) return false;
+  return true;
+}
+
+// Error component
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <p className="font-medium">Ocorreu um erro</p>
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+
+// Add this new component at the top of the file, after the imports
+const EventImage = ({ src, alt }: { src: string; alt: string }) => {
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      className="object-cover transform group-hover:scale-105 transition-transform duration-300"
+      onError={(e) => {
+        const target = e.target as HTMLImageElement;
+        target.src = '/images/event-placeholder.jpg';
+      }}
+    />
+  );
+};
+
+// Update function signature to access params properly in Next.js 14
+export default async function PromoterPublicPage({
+  params,
+}: {
+  params: { userId: string };
+}) {
+  // Await the cookies store
+  const cookieStore = await cookies();
+  const { userId } = params;
+
+  if (!isValidUUID(userId)) {
+    console.error(`Invalid UUID format: ${userId}`);
     notFound();
   }
 
   try {
-    // Criar cliente Supabase usando a abordagem recomendada com await
-    const cookieStore = await cookies();
-    const supabase = createServerComponentClient<Database>({ 
-      cookies: () => cookieStore 
+    const supabase = createServerComponentClient<Database>({
+      cookies: () => cookieStore
     });
 
-    // Call the RPC to get all data in one go
-    const { data: pageData, error: rpcError } = await (supabase as any).rpc(
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
       'get_public_promoter_page_data',
       { promoter_user_id: userId }
     );
 
-    // Improved Error and Data Handling
     if (rpcError) {
       console.error(`RPC Error fetching data for promoter ${userId}:`, rpcError);
-      notFound(); // Or throw new Error("Failed to load promoter data");
+      throw new Error('Falha ao carregar dados do promotor');
     }
 
-    // Check if data is an array and not empty
-    if (!Array.isArray(pageData) || pageData.length === 0) {
-      console.warn(`No data returned or data is not an array for promoter ${userId}. RPC Result:`, pageData);
-      notFound();
+    if (!rpcData || !Array.isArray(rpcData) || rpcData.length === 0) {
+      const { data: promoterUser, error: userError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !promoterUser) {
+        console.error(`Promoter not found: ${userId}`);
+        notFound();
+      }
+
+      return (
+        <PromoterProfile
+          promoterUser={promoterUser}
+          events={[]}
+        />
+      );
     }
 
-    // Type assertion now that we know it's a non-empty array
-    const validPageData = pageData as PromoterPageDataEntry[];
+    const validEvents = rpcData
+      .filter(validateEvent)
+      .slice(0, MAX_EVENTS_PER_PAGE);
 
-    // Extract promoter info (using the correct field names)
-    const promoterInfo = validPageData[0];
-    const promoterName = `${promoterInfo.promoter_first_name || ''} ${promoterInfo.promoter_last_name || ''}`.trim() || 'Promotor';
-    const initials = getInitials(promoterInfo.promoter_first_name, promoterInfo.promoter_last_name);
-    const avatarUrl = promoterInfo.promoter_avatar_url;
-
-    // Debug log to verify data
-    console.log("Promoter data loaded successfully:", {
-      name: promoterName,
-      hasAvatar: !!avatarUrl,
-      eventCount: validPageData.length
-    });
-
-    // Get current date for filtering - MODIFICAÇÃO AQUI
-    const now = new Date();
-    // Para permitir eventos até o dia seguinte, subtraia 1 dia da data atual
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    // Mostrar todos os eventos que ainda não passaram ou ocorreram ontem
-    const visibleEvents = validPageData.filter((event: PromoterPageDataEntry) => {
-      if (!event.event_date) return false;
-      const eventDate = new Date(event.event_date);
-      return eventDate >= yesterday; // Incluir eventos do dia anterior
-    }).sort((a, b) => {
-      if (!a.event_date || !b.event_date) return 0;
-      return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
-    });
+    const promoterInfo = validEvents[0];
 
     return (
-      // Match overall background/font from organization page if desired
-      <div className="min-h-screen bg-white font-sans">
+      <PromoterProfile
+        promoterUser={{
+          first_name: promoterInfo.promoter_first_name,
+          last_name: promoterInfo.promoter_last_name,
+          avatar_url: promoterInfo.promoter_avatar_url
+        }}
+        events={validEvents}
+      />
+    );
 
-        {/* Section 1: Promoter Info Header (Replaces Banner/Overlay) */}
-        {/* Use similar padding/margins as the top content area of the organization page */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8"> {/* Added top padding */}
-          {/* Center the content */}
-          <div className="flex flex-col items-center text-center">
-            {/* Avatar (Styled like Organization Logo) */}
-            {/* Maintaining size, border, shadow from previous attempts */}
-            <div className="w-28 h-28 rounded-full bg-gray-200 overflow-hidden border-8 border-white shadow-md mb-4"> {/* Added bottom margin */}
-               <Avatar className="h-full w-full">
-                  {avatarUrl ? (
-                    <AvatarImage src={avatarUrl} alt={promoterName} className="object-cover" />
-                  ) : null } {/* Render nothing if no image, fallback will show */}
-                  <AvatarFallback className="text-3xl">
-                    {initials || 'P'}
-                  </AvatarFallback>
-               </Avatar>
-            </div>
+  } catch (error) {
+    console.error('Error in PromoterPublicPage:', error);
+    throw error;
+  }
+}
 
-            {/* Promoter Name (Styled like Organization Name) */}
-            {/* Maintaining font, size, weight from previous attempts */}
-            <h1 className="text-2xl font-bold text-gray-900 font-oswald">{promoterName}</h1>
-
-            {/* Placeholder for potential future elements like bio or location */}
-
+// Loading component for events
+function EventsLoading() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md shadow-black/20 h-full">
+          <Skeleton className="h-40 w-full rounded-t-xl" />
+          <div className="p-6">
+            <Skeleton className="h-6 w-3/4 mb-4" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
         </div>
+      ))}
+    </div>
+  );
+}
 
-        {/* Section 2: Eventos - MODIFICAÇÃO DO TÍTULO AQUI */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-10 font-oswald">Eventos</h2>
-          {visibleEvents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-              {visibleEvents.map((event: PromoterPageDataEntry, index: number) => {
-                // Determine correct link based on event type
-                let linkHref: string;
-                if (event.event_type === 'guest-list') {
-                  linkHref = `/promo/${event.event_id}/${event.tracking_promoter_id}/${event.tracking_team_id}`;
-                } else {
-                  linkHref = `/e/${event.event_id}`;
-                }
-                
-                // Parse date for display
+// Event list component with error boundary
+function EventsList({ events }: { events: PromoterPageDataEntry[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+      {events.map((event, index) => {
+        const linkHref = event.event_type === 'guest-list' && event.team_id && event.tracking_promoter_id
+          ? `/promo/${event.event_id}/${event.tracking_promoter_id}/${event.team_id}`
+          : `/e/${event.event_id}`;
+
                 const eventDate = event.event_date ? new Date(event.event_date) : null;
+        const formattedDate = eventDate?.toLocaleDateString('pt-BR', { 
+          day: 'numeric',
+          month: 'short'
+        });
                 
                 return (
                   <Link href={linkHref} key={event.event_id} className="block no-underline group">
-                    <div className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md shadow-black/20 h-full">
-                      {/* Imagem/Flyer área */}
+            <div className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md hover:shadow-lg transition-shadow duration-300 h-full">
                       <div className="relative mx-4 -mt-6 h-40 overflow-hidden rounded-xl bg-clip-border text-white shadow-lg bg-gray-200">
                         {event.event_flyer_url ? (
-                          <Image
+                  <EventImage
                             src={event.event_flyer_url}
                             alt={event.event_title || 'Evento'}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            priority={index === 0} // Priorizar apenas a primeira imagem (LCP)
-                            className="object-cover"
+                    priority={index === 0}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <p className="text-gray-400">Sem imagem</p>
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                    <span className="text-gray-400">Sem imagem</span>
                           </div>
                         )}
                       </div>
                       
-                      {/* Conteúdo do card */}
                       <div className="p-6 flex flex-col flex-grow relative">
-                        {/* Badge de data */}
-                        <div className="absolute top-16 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
-                          <span className="block text-xs font-bold uppercase text-blue-600 tracking-wide">
-                            {eventDate ? eventDate.toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '') : ''}
-                          </span>
+                {eventDate && (
+                  <div className="absolute top-0 right-4 -mt-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
                           <span className="block text-xl font-bold text-blue-600 leading-tight">
-                            {eventDate ? eventDate.getDate() : ''}
+                      {formattedDate}
                           </span>
                         </div>
+                )}
 
-                        {/* Título do evento */}
-                        <h5 className="mb-4 block font-oswald text-xl font-semibold leading-snug tracking-normal text-blue-gray-900 antialiased">
+                <h5 className="mb-4 block font-oswald text-xl font-semibold leading-snug tracking-normal text-blue-gray-900 antialiased group-hover:text-blue-600 transition-colors duration-300">
                           {event.event_title || 'Evento sem título'}
                         </h5>
 
-                        {/* >>> ADICIONAR TIPO DE EVENTO <<< */}
                         {event.event_type && (
                           <p className="mb-4 block font-sans text-sm font-normal leading-relaxed text-gray-700 antialiased">
                             Tipo: <span className="font-semibold capitalize">{event.event_type.replace('-', ' ')}</span>
                           </p>
                         )}
-                        {/* >>> FIM DA ADIÇÃO <<< */}
-
                       </div>
                       
-                      {/* Botão Ver Evento */}
                       <div className="p-6 pt-0 flex justify-center">
-                        <span className="select-none rounded-lg bg-blue-500 py-2 px-4 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20">
+                <span className="select-none rounded-lg bg-blue-500 py-2 px-4 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-600 transition-colors duration-300">
                           Ver Evento
                         </span>
                       </div>
@@ -212,18 +248,6 @@ export default async function PromoterPublicPage({ params }: { params: { userId:
                   </Link>
                 );
               })}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Nenhum evento encontrado para este promotor.</p>
-          )}
-        </div>
-
-        {/* SEÇÃO DE EVENTOS PASSADOS REMOVIDA */}
       </div>
     );
-  } catch (error) {
-    // Catch any unexpected errors
-    console.error("Unexpected error in promoter page:", error);
-    notFound();
-  }
 } 
