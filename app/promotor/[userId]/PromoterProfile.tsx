@@ -35,13 +35,30 @@ function EventsLoading() {
   );
 }
 
+type Event = {
+  event_id: string;
+  event_title: string;
+  event_flyer_url: string | null;
+  event_date: string;
+  event_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  location: string | null;
+  event_type: string | null;
+  tracking_promoter_id: string;
+  tracking_team_id: string | null;
+  is_active: boolean;
+  is_published: boolean;
+};
+
 type PromoterProfileProps = {
   promoterUser: {
+    id: string;
     first_name: string | null;
     last_name: string | null;
     avatar_url: string | null;
   };
-  events: any[]; // Use the proper type from your page component
+  events: Event[];
 };
 
 export function PromoterProfile({ promoterUser, events }: PromoterProfileProps) {
@@ -80,15 +97,8 @@ export function PromoterProfile({ promoterUser, events }: PromoterProfileProps) 
         eventEndDate.setHours(23, 59, 59, 999);
       }
       
-      // Show event if:
-      // 1. It's active and published
-      // 2. End date/time hasn't passed yet
-      // 3. Remove duplicates based on event_id
-      return (
-        (event.is_active !== false) && // undefined or true
-        (event.is_published !== false) && // undefined or true
-        eventEndDate >= now
-      );
+      // Show event if end date/time hasn't passed yet
+      return eventEndDate >= now;
     })
     // Remove duplicates by event_id
     .filter((event, index, self) => 

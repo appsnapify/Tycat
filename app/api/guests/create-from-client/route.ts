@@ -1,121 +1,188 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { z } from 'zod';
-import { createAdminClient } from '@/lib/supabase/adminClient';
+import { NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-// import { verify } from 'jsonwebtoken'; // Removido - não mais usado
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Adicionado
-import { type Database } from '@/types/supabase'; // Adicionado para tipagem do cliente Supabase
+import { isValidPhoneNumber } from 'libphonenumber-js';
 
-// Schema de validação
-const createGuestSchema = z.object({
-  event_id: z.string().uuid("ID do evento inválido"),
-  promoter_id: z.string().uuid("ID do promotor inválido").optional(),
-  team_id: z.string().uuid("ID da equipe inválido").optional()
-});
+// Função auxiliar para validar UUID
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return uuidRegex.test(id);
+}
 
-// const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria'; // Removido - não mais usado
-
-/**
- * API para criar registro de convidado a partir de um client_user autenticado (via Supabase session)
- */
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    console.log('API - Iniciando processamento de requisição POST para criar guest com client (Supabase Auth)');
-    
-    const supabaseRouteHandler = createRouteHandlerClient<Database>({ cookies });
-    const { data: { session }, error: sessionError } = await supabaseRouteHandler.auth.getSession();
+    const { phone, eventId, promoterId, teamId } = await request.json();
+    console.log('[DEBUG] Dados recebidos:', { phone, eventId, promoterId, teamId });
 
-    if (sessionError) {
-      console.error('API - Erro ao obter sessão Supabase:', sessionError);
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao verificar autenticação'
-      }, { status: 500 });
+    // Validação dos campos obrigatórios e formato
+    if (!phone || !eventId || !promoterId || !teamId) {
+      console.error('[ERROR] Campos obrigatórios faltando:', { phone, eventId, promoterId, teamId });
+      return NextResponse.json(
+        { message: 'Todos os campos são obrigatórios' },
+        { status: 400 }
+      );
     }
 
-    if (!session || !session.user) {
-      console.log('API - Erro: Usuário não autenticado (Supabase)');
-      return NextResponse.json({
-        success: false,
-        error: 'Usuário não autenticado'
-      }, { status: 401 });
+    // Validação de UUIDs
+    if (!isValidUUID(eventId) || !isValidUUID(promoterId) || !isValidUUID(teamId)) {
+      console.error('[ERROR] IDs inválidos:', { eventId, promoterId, teamId });
+      return NextResponse.json(
+        { message: 'IDs inválidos fornecidos' },
+        { status: 400 }
+      );
     }
-    
-    const clientUserId = session.user.id;
-    console.log('API - Usuário Supabase autenticado:', { id: clientUserId });
-    
-    // Extrair dados do request
-    const data = await request.json();
-    console.log('API - Dados recebidos:', {
-      event_id: data.event_id,
-      promoter_id: data.promoter_id || 'não informado',
-      team_id: data.team_id || 'não informado'
-    });
-    
-    // Validar dados
-    const result = createGuestSchema.safeParse(data);
-    if (!result.success) {
-      console.error('API - Erro de validação:', result.error.format());
-      return NextResponse.json({
-        success: false,
-        error: 'Dados inválidos',
-        details: result.error.format()
-      }, { status: 400 });
+
+    // Validação do formato do telefone
+    if (!isValidPhoneNumber(phone)) {
+      console.error('[ERROR] Número de telefone inválido:', phone);
+      return NextResponse.json(
+        { message: 'Formato de telefone inválido' },
+        { status: 400 }
+      );
     }
-    
-    const { event_id, promoter_id, team_id } = result.data;
-    
-    // Inicializar cliente Supabase com privilégios de admin para a chamada RPC
-    // Nota: Idealmente, a RPC create_guest_with_client seria segura para ser chamada
-    // com as permissões do utilizador autenticado (via supabaseRouteHandler), não necessitando de adminClient.
-    // Manter adminClient aqui pressupõe que a RPC requer elevações especiais.
-    const supabaseAdmin = createAdminClient(); 
-    
-    // Usar função RPC para criar convidado
-    const { data: guestData, error: guestError } = await supabaseAdmin.rpc('create_guest_with_client', {
-      p_event_id: event_id,
-      p_client_user_id: clientUserId, // ID do utilizador Supabase autenticado
-      p_promoter_id: promoter_id || null,
-      p_team_id: team_id || null,
-      p_name: null, 
-      p_phone: null 
-    });
-    
-    if (guestError) {
-      console.error('API - Erro ao criar convidado:', guestError);
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao criar convidado: ' + guestError.message
-      }, { status: 500 });
+
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Verificar se o evento existe e está ativo
+    console.log('[DEBUG] Verificando evento:', eventId);
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id, title, is_active, guest_list_open_datetime, guest_list_close_datetime')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError) {
+      console.error('[ERROR] Erro ao buscar evento:', eventError);
+      return NextResponse.json(
+        { message: 'Erro ao verificar evento' },
+        { status: 500 }
+      );
     }
-    
-    if (!guestData || guestData.length === 0) {
-      console.error('API - create_guest_with_client não retornou dados');
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao criar convidado: Nenhum dado retornado'
-      }, { status: 500 });
+
+    if (!event) {
+      console.error('[ERROR] Evento não encontrado:', eventId);
+      return NextResponse.json(
+        { message: 'Evento não encontrado' },
+        { status: 404 }
+      );
     }
-    
-    const guest = guestData[0];
-    console.log('API - Convidado criado com sucesso:', guest);
-    
-    // Retornar dados do convidado criado
+
+    if (!event.is_active) {
+      console.error('[ERROR] Evento inativo:', eventId);
+      return NextResponse.json(
+        { message: 'Este evento não está mais aceitando registros' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar se a guest list está aberta
+    const now = new Date();
+    const openTime = event.guest_list_open_datetime ? new Date(event.guest_list_open_datetime) : null;
+    const closeTime = event.guest_list_close_datetime ? new Date(event.guest_list_close_datetime) : null;
+
+    if (openTime && now < openTime) {
+      console.error('[ERROR] Guest list ainda não aberta:', { now, openTime });
+      return NextResponse.json(
+        { 
+          message: `A guest list abre apenas em ${openTime.toLocaleString('pt-BR', { timeZone: 'Europe/Lisbon' })}` 
+        },
+        { status: 400 }
+      );
+    }
+
+    if (closeTime && now > closeTime) {
+      console.error('[ERROR] Guest list já fechada:', { now, closeTime });
+      return NextResponse.json(
+        { message: 'A guest list já está fechada' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar se o promotor está associado ao evento e equipe
+    console.log('[DEBUG] Verificando associação do promotor:', { promoterId, teamId, eventId });
+    const { data: association, error: associationError } = await supabase
+      .from('event_promoters')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('promoter_id', promoterId)
+      .eq('team_id', teamId)
+      .maybeSingle();
+
+    if (associationError) {
+      console.error('[ERROR] Erro ao verificar associação:', associationError);
+      return NextResponse.json(
+        { message: 'Erro ao verificar associação do promotor' },
+        { status: 500 }
+      );
+    }
+
+    if (!association) {
+      console.error('[ERROR] Promotor não associado:', { promoterId, teamId, eventId });
+      return NextResponse.json(
+        { message: 'Promotor não está associado a este evento/equipe' },
+        { status: 403 }
+      );
+    }
+
+    // Verificar se o telefone já está registrado
+    console.log('[DEBUG] Verificando registro existente:', phone);
+    const { data: existingGuest, error: checkError } = await supabase
+      .from('guests')
+      .select('id')
+      .eq('phone', phone)
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('[ERROR] Erro ao verificar registro existente:', checkError);
+      return NextResponse.json(
+        { message: 'Erro ao verificar registro existente' },
+        { status: 500 }
+      );
+    }
+
+    if (existingGuest) {
+      console.log('[INFO] Telefone já registrado:', phone);
+      return NextResponse.json(
+        { message: 'Este telefone já está registrado para este evento' },
+        { status: 409 }
+      );
+    }
+
+    // Criar o registro do convidado
+    console.log('[DEBUG] Criando registro do convidado');
+    const { data: guest, error: insertError } = await supabase
+      .from('guests')
+      .insert({
+        phone,
+        event_id: eventId,
+        promoter_id: promoterId,
+        team_id: teamId,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('[ERROR] Erro ao criar registro:', insertError);
+      return NextResponse.json(
+        { message: 'Erro ao criar registro' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[SUCCESS] Registro criado com sucesso:', guest);
     return NextResponse.json({
-      success: true,
-      data: {
-        id: guest.id,
-        qr_code_url: guest.qr_code_url
-      },
-      message: 'Convidado criado com sucesso'
+      message: 'Registro criado com sucesso',
+      guest
     });
-    
+
   } catch (error) {
-    console.error('API - Erro global na rota:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: 'Erro interno no servidor'
-    }, { status: 500 });
+    console.error('[ERROR] Erro não tratado:', error);
+    return NextResponse.json(
+      { message: 'Erro interno do servidor' },
+      { status: 500 }
+    );
   }
 } 

@@ -3,9 +3,145 @@
 2. NÃO MODIFICAR CÓDIGO SEM PERMISSÃO: O assistente NUNCA deve modificar código, configurações ou dados sem aprovação prévia.
 3. PERGUNTAR ANTES DE EXECUTAR: Antes de sugerir qualquer comando terminal, perguntar "Posso executar este comando?"
 4. NÃO EDITAR PÁGINAS/FLUXOS: Não editar páginas, fluxos, imagens ou dados sensíveis sem consultar primeiro.
+5. VERIFICAÇÃO DE IMPACTO OBRIGATÓRIA: Antes de qualquer modificação em providers, contexts, layouts ou componentes compartilhados, SEMPRE verificar e alertar sobre potencial impacto em outras páginas. Listar explicitamente que páginas podem ser afetadas e solicitar confirmação do usuário.
+6. ANÁLISE DE DEPENDÊNCIAS: Antes de modificar QUALQUER arquivo, mapear TODAS as dependências e importações desse arquivo.
+7. TESTE LOCAL SIMULADO: Antes de aplicar mudanças, simular mentalmente o impacto e documentar possíveis efeitos colaterais.
+8. SQL E POLÍTICAS SUPABASE: NUNCA executar SQL direto sem análise profunda. SEMPRE verificar políticas RLS antes de qualquer operação.
 
 [VIOLAÇÕES]
 Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lembrado destas restrições.
+
+[REGRAS_ESPECIAIS_SUPABASE_SQL]
+⚠️ EXTREMA CAUTELA com operações no Supabase:
+
+1. **ANTES DE EXECUTAR QUALQUER SQL:**
+   - Analisar COMPLETAMENTE o impacto
+   - Verificar se afeta dados de produção
+   - Confirmar se é SELECT (leitura) ou modificação (INSERT/UPDATE/DELETE)
+   - SEMPRE pedir confirmação explícita para modificações
+   - Verificar se há políticas RLS que podem bloquear a operação
+
+2. **POLÍTICAS RLS (Row Level Security):**
+   - NUNCA desabilitar RLS sem autorização EXPLÍCITA
+   - Sempre verificar políticas existentes antes de criar tabelas
+   - Documentar TODAS as políticas necessárias
+   - Testar políticas em ambiente isolado primeiro
+   - Considerar impacto em TODOS os tipos de usuários
+
+3. **OPERAÇÕES PERIGOSAS (NUNCA sem dupla confirmação):**
+   - DROP TABLE/DATABASE
+   - DELETE sem WHERE
+   - UPDATE sem WHERE
+   - ALTER TABLE em tabelas com dados
+   - TRUNCATE
+   - Mudanças em políticas de tabelas em produção
+
+4. **CHECKLIST SQL OBRIGATÓRIO:**
+   □ É uma leitura (SELECT) ou modificação?
+   □ Tem WHERE clause apropriada?
+   □ Vai afetar quantas linhas?
+   □ Existem políticas RLS que podem interferir?
+   □ Há foreign keys que serão afetadas?
+   □ Foi testado com LIMIT 1 primeiro?
+   □ Há backup dos dados?
+
+[ANÁLISE_DE_IMPACTO_OBRIGATÓRIA]
+Antes de QUALQUER modificação, o assistente DEVE:
+
+1. **MAPEAR DEPENDÊNCIAS**
+   - Listar TODOS os arquivos que importam o arquivo a ser modificado
+   - Identificar TODOS os arquivos que o arquivo modificado importa
+   - Verificar se é usado em: APIs, páginas, componentes, hooks, contextos, utils
+   - Para SQL: verificar TODAS as tabelas relacionadas
+
+2. **AVALIAR EFEITO CASCATA**
+   - Se modificar uma API: Quais componentes/páginas a consomem?
+   - Se modificar um hook: Quais componentes o utilizam?
+   - Se modificar um tipo: Onde é referenciado?
+   - Se modificar utils: Quais partes do código dependem dela?
+   - Se modificar tabela SQL: Quais outras tabelas têm foreign keys?
+
+3. **IDENTIFICAR RISCOS**
+   - Build pode quebrar? Por quê?
+   - Funcionalidades podem parar? Quais?
+   - Haverá breaking changes? Onde?
+   - Dependências externas serão afetadas?
+   - Dados podem ser perdidos?
+   - Políticas RLS podem bloquear usuários?
+
+4. **PROPOR TESTE**
+   - Como validar que a mudança funcionou?
+   - Quais cenários testar?
+   - Que erros podem aparecer?
+   - Como reverter se der errado?
+
+[WORKFLOW_SEGURO_EXPANDIDO]
+1. **ANALISAR**: 
+   - Entender o problema completamente
+   - Mapear arquivos envolvidos
+   - Identificar dependências
+   - Para SQL: analisar esquema e relações
+   
+2. **MAPEAR IMPACTO**:
+   - Listar TODOS os arquivos afetados
+   - Documentar possíveis quebras
+   - Avaliar risco (BAIXO/MÉDIO/ALTO/CRÍTICO)
+   - Para SQL: quantificar linhas afetadas
+   
+3. **PROPOR**:
+   - Apresentar solução detalhada
+   - Mostrar análise de impacto
+   - Sugerir plano de teste
+   - Para SQL: mostrar query EXATA
+   - AGUARDAR APROVAÇÃO EXPLÍCITA
+   
+4. **IMPLEMENTAR**:
+   - Apenas após aprovação
+   - Uma mudança por vez
+   - Verificar sintaxe antes de salvar
+   - Para SQL: executar com LIMIT primeiro
+   
+5. **VERIFICAR**:
+   - Confirmar mudanças realizadas
+   - Sugerir comandos de teste (sem executar)
+   - Documentar o que foi alterado
+   - Para SQL: verificar contagem de linhas afetadas
+
+[CHECKLIST_PRÉ_MODIFICAÇÃO]
+□ Arquivo identificado e analisado?
+□ Dependências mapeadas?
+□ Impacto em outras partes avaliado?
+□ Riscos documentados?
+□ Solução proposta claramente?
+□ Aprovação explícita recebida?
+□ Teste planejado?
+□ Para SQL: políticas RLS verificadas?
+□ Para SQL: backup considerado?
+
+[TIPOS_DE_ARQUIVOS_CRÍTICOS]
+Requerem ANÁLISE EXTRA antes de modificar:
+- **package.json**: Pode quebrar TODO o projeto
+- **tsconfig.json**: Afeta compilação TypeScript
+- **next.config.js**: Afeta build e runtime
+- **.env***: Pode quebrar conexões/autenticações
+- **middleware.ts**: Afeta TODAS as rotas
+- **/lib/supabase/***: Afeta TODA comunicação com BD
+- **/hooks/***: Usado em múltiplos componentes
+- **/contexts/***: Afeta árvore de componentes
+- **/api/***: Quebra comunicação frontend-backend
+- **migrations/***: Altera estrutura do banco permanentemente
+
+[SINAIS_DE_ALERTA]
+PARAR imediatamente se:
+- Import de biblioteca não instalada
+- Remoção de imports usados
+- Mudança de tipos sem verificar uso
+- Alteração de nomes de funções exportadas
+- Modificação de estrutura de dados
+- Adição de dependências externas
+- SQL sem WHERE em UPDATE/DELETE
+- Desabilitação de RLS
+- DROP de qualquer estrutura
 
 [WORKFLOW_SEGURO]
 1. ANALISAR: Primeiro analisar o problema sem modificar nada
@@ -18,6 +154,7 @@ Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lemb
 <CODIGO>
 1. NUNCA começar a criar ou modificar código sem:
    - Pedido explícito do usuário
+   - Análise de impacto completa
    - Confirmação do usuário sobre a abordagem
    - Especificação clara do que deve ser feito
 
@@ -26,9 +163,12 @@ Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lemb
    - Modificar código existente
    - Implementar novas funcionalidades
    - Fazer alterações estruturais
+   - Adicionar/remover dependências
+   - Executar QUALQUER SQL
 
 3. Processo para criação de código:
    - Primeiro, explicar a proposta
+   - Mostrar análise de impacto
    - Esperar confirmação do usuário
    - Só então começar a implementação
    - Manter o usuário informado em cada etapa
@@ -37,11 +177,111 @@ Se o assistente violar estas regras, ele deve ser imediatamente corrigido e lemb
    - Perguntar ao usuário
    - Não assumir nada
    - Não prosseguir sem confirmação
+   - Preferir análise a ação
 </CODIGO>
 
 <COMUNICACAO>
 1. Ser claro e direto
 2. Explicar o que será feito
-3. Esperar confirmação
-4. Manter o usuário no controle
-</COMUNICACAO> 
+3. Mostrar possíveis consequências
+4. Esperar confirmação
+5. Manter o usuário no controle
+</COMUNICACAO>
+
+<MENTALIDADE_DE_TESTE>
+"Cada linha de código modificada pode quebrar 10 outras"
+"Cada query SQL pode afetar milhares de registros"
+"Cada política RLS mal configurada pode bloquear toda a aplicação"
+- Pensar em efeitos colaterais SEMPRE
+- Assumir que mudanças PODEM quebrar algo
+- Testar mentalmente antes de aplicar
+- Documentar riscos SEMPRE
+- Preferir mudanças pequenas e incrementais
+- Para SQL: sempre começar com SELECT antes de modificar
+</MENTALIDADE_DE_TESTE>
+
+[NOVA_MENTALIDADE_DE_ANÁLISE_DE_IMPACTO]
+
+## PROCESSO MENTAL OBRIGATÓRIO
+
+### 1. ANTES de modificar qualquer arquivo:
+🔍 **PERGUNTO-ME SEMPRE:**
+- Quem usa este arquivo?
+- O que este arquivo usa?
+- Se mudar X, o que mais pode quebrar?
+- Isto pode afetar o build?
+- Vai criar erros em runtime?
+- Há testes que vão falhar?
+- Políticas RLS serão afetadas?
+
+### 2. MAPA DE DEPENDÊNCIAS:
+📊 **EXEMPLO PRÁTICO:**
+```
+Se vou modificar: /api/guests/check
+  ↓ É importado/usado por:
+    - GuestRequestCard.tsx
+    - GuestRequestClientButton.tsx
+    - GuestRequestClientButton.fixed.tsx
+  ↓ Que são usados por:
+    - PromoterGuestListContent.tsx
+  ↓ Que afeta páginas:
+    - /promo/[...params]
+  ↓ Possíveis quebras:
+    - Erro 500 se importar lib não instalada
+    - Falha no registro de guests
+    - Interface quebrada para usuários
+```
+
+### 3. ANÁLISE DE RISCO:
+🚨 **NÍVEIS DE RISCO:**
+```
+CRÍTICO: 
+- APIs core (auth, supabase)
+- Políticas RLS
+- Migrations
+- Middleware
+
+ALTO: 
+- Hooks compartilhados
+- Contextos globais
+- Utils amplamente usadas
+- Types/interfaces base
+
+MÉDIO: 
+- Componentes reutilizados
+- Funções de API específicas
+- Componentes de UI compartilhados
+
+BAIXO: 
+- Páginas isoladas
+- Componentes específicos de página
+- Estilos locais
+```
+
+### 4. DECISÃO BASEADA EM IMPACTO:
+✅ **PROSSEGUIR SE:**
+- Impacto isolado e controlado
+- Teste claro e simples
+- Reversão fácil
+- Aprovação explícita
+
+❌ **PARAR E CONSULTAR SE:**
+- Afeta múltiplos sistemas
+- Pode quebrar produção
+- Envolve dados sensíveis
+- Não há certeza do impacto
+
+### 5. DOCUMENTAÇÃO DE MUDANÇAS:
+📝 **SEMPRE DOCUMENTAR:**
+```
+MUDANÇA: [arquivo modificado]
+MOTIVO: [por que foi necessário]
+IMPACTO: [o que pode ser afetado]
+TESTE: [como validar]
+REVERSÃO: [como desfazer se necessário]
+```
+
+**LEMBRETE FINAL:**
+"É melhor perguntar 10 vezes do que quebrar 1 vez"
+"Cada erro evitado economiza horas de debug"
+"O usuário confia em mim para proteger seu código" 

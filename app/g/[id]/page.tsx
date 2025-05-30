@@ -11,13 +11,14 @@ import GuestListPageClient from './GuestListPageClient';
 
 // Interface para props da página
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // A função default é agora um Server Component simples que apenas passa o ID.
-// Torná-la async não é estritamente necessário aqui, mas pode ser mantido.
 export default async function GuestListPage({ params }: PageProps) {
-  const eventId = params.id; // Tratar o ID da URL diretamente como eventId
+  // Await params before using its properties (Next.js 15 requirement)
+  const resolvedParams = await params;
+  const eventId = resolvedParams.id; // Tratar o ID da URL diretamente como eventId
 
   // Validação básica do ID (opcional, mas recomendado)
   if (!eventId) {

@@ -1,11 +1,11 @@
 "use client"
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { Ticket, BarChart2, Users, CheckCircle, LayoutDashboard, ClipboardList, LogOut } from 'lucide-react'
-import { useAuth } from '@/app/app/_providers/auth-provider'
+import { createClient } from '@/lib/supabase'
 
 // Cores modernizadas - alinhadas com o novo tema claro
 const colors = {
@@ -23,15 +23,57 @@ const colors = {
 }
 
 export default function HomePage() {
-  const { user, signOut } = useAuth()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient()
+    
+    // Verificar sessão atual
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        setUser(session?.user || null)
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkUser()
+
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user || null)
+        setLoading(false)
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleLogout = async () => {
     try {
-      await signOut();
-      // Não é necessário redirecionar, pois o hook useAuth já faz isso
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      setUser(null)
+      // Redirecionar para página inicial
+      window.location.href = '/'
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error('Erro ao fazer logout:', error)
     }
+  }
+
+  // Mostrar loading básico enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-500"></div>
+      </div>
+    )
   }
 
   return (

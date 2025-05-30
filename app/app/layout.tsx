@@ -10,7 +10,7 @@ import { SidebarProvider } from '@/contexts/sidebar-context'
 import { OrganizationProvider } from '@/app/contexts/organization-context'
 import { Loader2 } from 'lucide-react'
 // import { useAuth } from '@/hooks/use-auth' // REMOVIDO - Será usado o de _providers
-import { ClientAuthProvider, useAuth } from '@/app/app/_providers/auth-provider' // ADICIONADO
+import { useAuth, ClientAuthProvider } from '@/app/app/_providers/auth-provider' // ADICIONADO ClientAuthProvider aqui
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // Comentado, não parece ser usado diretamente aqui
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -33,7 +33,7 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClientAuthProvider serverSession={null}> {/* ADICIONADO Provider */}
+    <ClientAuthProvider serverSession={null}>
       <SidebarProvider>
         <OrganizationProvider>
           <Toaster />

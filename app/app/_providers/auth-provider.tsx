@@ -56,6 +56,7 @@ interface AuthContextType {
   // isLoadingCurrentOrg: boolean
   // refreshUserProfile: () => Promise<void>
   // setCurrentOrganizationById: (orgId: string | null) => Promise<void>
+  updateUserRole: (newRole: string) => Promise<void>
 }
 
 interface ClientAuthProviderProps {
@@ -104,6 +105,44 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       console.log('[ClientAuthProvider] Role updated: null')
     }
   }, [])
+
+  // Adicionar função updateUserRole com suporte a ambos os formatos de role
+  const updateUserRole = useCallback(async (newRole: string) => {
+    if (!user) {
+      console.error('[ClientAuthProvider] Cannot update role: no user logged in');
+      return;
+    }
+
+    try {
+      // Normalizar o role para manter compatibilidade
+      const normalizedRole = newRole === 'chefe-equipe' ? 'chefe-equipa' : newRole;
+      
+      // Preservar metadados existentes
+      const currentMetadata = user.user_metadata || {};
+      
+      const { data: userData, error: updateError } = await supabase.auth.updateUser({
+        data: { 
+          ...currentMetadata, // Manter outros metadados
+          role: normalizedRole,
+          previous_role: currentMetadata.role || 'promotor'
+        }
+      });
+
+      if (updateError) {
+        console.error('[ClientAuthProvider] Error updating user role:', updateError);
+        throw updateError;
+      }
+
+      if (userData.user) {
+        setUser(userData.user);
+        updateRole(userData.user);
+        console.log('[ClientAuthProvider] User role updated successfully to:', normalizedRole);
+      }
+    } catch (error) {
+      console.error('[ClientAuthProvider] Error in updateUserRole:', error);
+      throw error;
+    }
+  }, [user, supabase.auth, updateRole]);
 
   useEffect(() => {
     // Inicializar estado do user e role com base na serverSession
@@ -236,10 +275,10 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       signOut,
       signIn,
       signUp,
-      // Adicione outros valores de contexto
+      updateUserRole, // Adicionar updateUserRole ao contexto
     }),
     // [supabase, session, user, currentRole, isLoadingUser], // currentRole removido
-    [supabase, session, user, isLoadingUser, initialAuthCheckCompleted, signOut, signIn, signUp],
+    [supabase, session, user, isLoadingUser, initialAuthCheckCompleted, signOut, signIn, signUp, updateUserRole],
   )
 
   return (

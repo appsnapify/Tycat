@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ 
         success: false, 
         error: 'Dados inválidos', 
-        details: result.error.format() 
+        details: result.error.issues.map(issue => issue.message).join(', ')
       }, { status: 400 });
     }
     

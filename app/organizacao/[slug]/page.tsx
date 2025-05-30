@@ -2,10 +2,11 @@
 import OrganizationClient from './OrganizationClient'
 
 interface PageProps {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function OrganizationPage(props: PageProps) {
-  return <OrganizationClient slug={props.params.slug} />
+  const resolvedParams = await props.params;
+  return <OrganizationClient slug={resolvedParams.slug} />
 } 

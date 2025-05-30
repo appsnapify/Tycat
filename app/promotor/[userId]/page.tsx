@@ -2,40 +2,44 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// Removed social icons import
 import { Database } from '@/lib/database.types';
-import Link from 'next/link'; // Re-added Link import
-import Image from 'next/image';
-// Import a reusable EventCard component (adjust path as needed)
-import { EventCard } from '@/components/ui/event-card';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDate } from '@/lib/utils/date';
-import { EventImage } from '@/components/ui/event-image';
-import { PromoterProfile } from './PromoterProfile';
 import { EventsList } from './EventsList';
 
 // Define the expected return type from our RPC
-type PromoterPageDataEntry = {
-  promoter_first_name: string | null;
-  promoter_last_name: string | null;
-  promoter_avatar_url: string | null;
+type RPCEventData = {
+  promoter_first_name: string;
+  promoter_last_name: string;
+  promoter_avatar_url: string;
   event_id: string;
-  event_title: string | null;
+  event_title: string;
+  event_flyer_url: string;
+  event_type: string;
+  event_date: string;
+  event_time: string;
+  org_id: string;
+  org_name: string;
+  org_logo_url: string;
+  tracking_promoter_id: string;
+  tracking_team_id: string;
+};
+
+// Type for EventsList component
+type EventForList = {
+  event_id: string;
+  event_title: string;
   event_flyer_url: string | null;
-  event_type: string | null;
-  event_date: string | null;
+  event_date: string;
   event_time: string | null;
   end_date: string | null;
   end_time: string | null;
-  org_id: string | null;
-  org_name: string | null;
-  org_logo_url: string | null;
-  team_id: string | null;
+  location: string | null;
+  event_type: string | null;
   tracking_promoter_id: string;
   tracking_team_id: string | null;
-  is_active?: boolean;
-  is_published?: boolean;
+  is_active: boolean;
+  is_published: boolean;
 };
 
 // Helper function to get initials
@@ -44,9 +48,6 @@ const getInitials = (firstName?: string | null, lastName?: string | null): strin
   const lastInitial = lastName?.charAt(0)?.toUpperCase() || '';
   return `${firstInitial}${lastInitial}`;
 };
-
-// Removed renderSocialLink function
-// Removed ProfileSocialMedia type
 
 // Validation constants
 const MAX_EVENTS_PER_PAGE = 50;
@@ -62,14 +63,6 @@ function isValidEventType(type: string): type is ValidEventType {
   return VALID_EVENT_TYPES.includes(type as ValidEventType);
 }
 
-function validateEvent(event: PromoterPageDataEntry): boolean {
-  if (!event.event_id || !isValidUUID(event.event_id)) return false;
-  if (!event.event_title?.trim()) return false;
-  if (event.event_type && !isValidEventType(event.event_type)) return false;
-  if (event.event_date && isNaN(new Date(event.event_date).getTime())) return false;
-  return true;
-}
-
 // Error component
 function ErrorMessage({ message }: { message: string }) {
   return (
@@ -80,93 +73,100 @@ function ErrorMessage({ message }: { message: string }) {
   );
 }
 
-// Add this new component at the top of the file, after the imports
-const EventImage = ({ src, alt }: { src: string; alt: string }) => {
-  return (
-    <Image
-      src={src}
-      alt={alt}
-      fill
-      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-      className="object-cover transform group-hover:scale-105 transition-transform duration-300"
-      onError={(e) => {
-        const target = e.target as HTMLImageElement;
-        target.src = '/images/event-placeholder.jpg';
-      }}
-    />
-  );
-};
+interface PageProps {
+  params: Promise<{
+    userId: string;
+  }>;
+}
 
-// Update function signature to access params properly in Next.js 14
-export default async function PromoterPublicPage({
-  params,
-}: {
-  params: { userId: string };
-}) {
-  // Await the cookies store
-  const cookieStore = await cookies();
-  const { userId } = params;
-
-  if (!isValidUUID(userId)) {
-    console.error(`Invalid UUID format: ${userId}`);
+export default async function PromoterPublicPage({ params }: PageProps) {
+  // Await params before using its properties (Next.js 15 requirement)
+  const resolvedParams = await params;
+  
+  if (!resolvedParams?.userId) {
+    console.error('[ERROR] ID do usuário não fornecido');
     notFound();
   }
 
+  // Await cookies before using (Next.js 15 requirement)
+  const cookieStore = await cookies();
+  const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
+
   try {
-    const supabase = createServerComponentClient<Database>({
-      cookies: () => cookieStore
-    });
+    // Buscar dados do usuário
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', resolvedParams.userId)
+      .single();
 
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      'get_public_promoter_page_data',
-      { promoter_user_id: userId }
-    );
-
-    if (rpcError) {
-      console.error(`RPC Error fetching data for promoter ${userId}:`, rpcError);
-      throw new Error('Falha ao carregar dados do promotor');
+    if (userError || !userData) {
+      console.error('[ERROR] Erro ao buscar dados do usuário:', userError);
+      notFound();
     }
 
-    if (!rpcData || !Array.isArray(rpcData) || rpcData.length === 0) {
-      const { data: promoterUser, error: userError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, avatar_url')
-        .eq('id', userId)
-        .single();
+    // Buscar eventos usando a função RPC get_public_promoter_page_data
+    const { data: eventsData, error: eventsError } = await supabase
+      .rpc('get_public_promoter_page_data', {
+        promoter_user_id: resolvedParams.userId
+      }) as { data: RPCEventData[] | null, error: any };
 
-      if (userError || !promoterUser) {
-        console.error(`Promoter not found: ${userId}`);
-        notFound();
-      }
+    if (eventsError) {
+      console.error('[ERROR] Erro ao buscar eventos:', eventsError);
+      return <div>Ocorreu um erro ao buscar os eventos. Por favor, tente novamente mais tarde.</div>;
+    }
 
+    // Map RPC data to EventsList format
+    const mappedEvents = eventsData ? mapRPCDataToEventsList(eventsData) : [];
+
+    // Filtrar apenas eventos futuros
+    const currentDate = new Date();
+    const futureEvents = mappedEvents.filter(event => {
+      const eventDate = new Date(event.event_date);
+      return eventDate >= currentDate;
+    });
+
+    // Se não houver eventos futuros, mostrar página sem eventos
+    if (!futureEvents || futureEvents.length === 0) {
       return (
-        <PromoterProfile
-          promoterUser={promoterUser}
-          events={[]}
-        />
+        <div className="container mx-auto p-4">
+          <div className="text-center mb-8">
+            <Avatar className="w-24 h-24 mx-auto mb-4">
+              <AvatarImage src={userData.avatar_url || undefined} />
+              <AvatarFallback>{getInitials(userData.first_name, userData.last_name)}</AvatarFallback>
+            </Avatar>
+            <h1 className="text-3xl font-bold">
+              {userData.first_name} {userData.last_name}
+            </h1>
+            <p className="text-muted-foreground">Promotor</p>
+          </div>
+
+          <div className="text-center p-8 bg-gray-50 rounded-lg">
+            <p className="text-lg text-gray-600">Este promotor não tem eventos ativos no momento.</p>
+          </div>
+        </div>
       );
     }
 
-    const validEvents = rpcData
-      .filter(validateEvent)
-      .slice(0, MAX_EVENTS_PER_PAGE);
-
-    const promoterInfo = validEvents[0];
-
     return (
-      <PromoterProfile
-        promoterUser={{
-          first_name: promoterInfo.promoter_first_name,
-          last_name: promoterInfo.promoter_last_name,
-          avatar_url: promoterInfo.promoter_avatar_url
-        }}
-        events={validEvents}
-      />
-    );
+      <div className="container mx-auto p-4">
+        <div className="text-center mb-8">
+          <Avatar className="w-24 h-24 mx-auto mb-4">
+            <AvatarImage src={userData.avatar_url || undefined} />
+            <AvatarFallback>{getInitials(userData.first_name, userData.last_name)}</AvatarFallback>
+          </Avatar>
+          <h1 className="text-3xl font-bold">
+            {userData.first_name} {userData.last_name}
+          </h1>
+          <p className="text-muted-foreground">Promotor</p>
+        </div>
 
+        <EventsList events={futureEvents} />
+      </div>
+    );
   } catch (error) {
-    console.error('Error in PromoterPublicPage:', error);
-    throw error;
+    console.error('[ERROR] Erro não tratado:', error);
+    return <div>Ocorreu um erro ao carregar a página. Por favor, tente novamente mais tarde.</div>;
   }
 }
 
@@ -187,67 +187,21 @@ function EventsLoading() {
   );
 }
 
-// Event list component with error boundary
-function EventsList({ events }: { events: PromoterPageDataEntry[] }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-      {events.map((event, index) => {
-        const linkHref = event.event_type === 'guest-list' && event.team_id && event.tracking_promoter_id
-          ? `/promo/${event.event_id}/${event.tracking_promoter_id}/${event.team_id}`
-          : `/e/${event.event_id}`;
-
-                const eventDate = event.event_date ? new Date(event.event_date) : null;
-        const formattedDate = eventDate?.toLocaleDateString('pt-BR', { 
-          day: 'numeric',
-          month: 'short'
-        });
-                
-                return (
-                  <Link href={linkHref} key={event.event_id} className="block no-underline group">
-            <div className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md hover:shadow-lg transition-shadow duration-300 h-full">
-                      <div className="relative mx-4 -mt-6 h-40 overflow-hidden rounded-xl bg-clip-border text-white shadow-lg bg-gray-200">
-                        {event.event_flyer_url ? (
-                  <EventImage
-                            src={event.event_flyer_url}
-                            alt={event.event_title || 'Evento'}
-                    priority={index === 0}
-                          />
-                        ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <span className="text-gray-400">Sem imagem</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="p-6 flex flex-col flex-grow relative">
-                {eventDate && (
-                  <div className="absolute top-0 right-4 -mt-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
-                          <span className="block text-xl font-bold text-blue-600 leading-tight">
-                      {formattedDate}
-                          </span>
-                        </div>
-                )}
-
-                <h5 className="mb-4 block font-oswald text-xl font-semibold leading-snug tracking-normal text-blue-gray-900 antialiased group-hover:text-blue-600 transition-colors duration-300">
-                          {event.event_title || 'Evento sem título'}
-                        </h5>
-
-                        {event.event_type && (
-                          <p className="mb-4 block font-sans text-sm font-normal leading-relaxed text-gray-700 antialiased">
-                            Tipo: <span className="font-semibold capitalize">{event.event_type.replace('-', ' ')}</span>
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="p-6 pt-0 flex justify-center">
-                <span className="select-none rounded-lg bg-blue-500 py-2 px-4 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-600 transition-colors duration-300">
-                          Ver Evento
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-      </div>
-    );
+// Function to map RPC data to EventsList format
+function mapRPCDataToEventsList(rpcData: RPCEventData[]): EventForList[] {
+  return rpcData.map(event => ({
+    event_id: event.event_id,
+    event_title: event.event_title,
+    event_flyer_url: event.event_flyer_url,
+    event_date: event.event_date,
+    event_time: event.event_time,
+    end_date: null, // Not available from RPC
+    end_time: null, // Not available from RPC
+    location: null, // Not available from RPC
+    event_type: event.event_type,
+    tracking_promoter_id: event.tracking_promoter_id,
+    tracking_team_id: event.tracking_team_id,
+    is_active: true, // Assumed true from RPC filter
+    is_published: true, // Assumed true from RPC filter
+  }));
 } 

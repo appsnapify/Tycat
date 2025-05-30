@@ -12,9 +12,9 @@ const CACHE_EXPIRY = 10 * 60 * 1000;
 // Schema de validação
 const phoneSchema = z.object({
   phone: z.string()
-    .min(10, "Telefone deve ter pelo menos 10 dígitos")
+    .min(9, "Telefone deve ter pelo menos 9 dígitos")
     .max(15, "Telefone muito longo")
-    .regex(/^\+?[1-9]\d{9,14}$/, "Formato de telefone inválido")
+    .regex(/^\+?[1-9]\d{8,14}$/, "Formato de telefone inválido")
 });
 
 export async function POST(request: Request) {
@@ -61,11 +61,12 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Resposta genérica para não revelar existência do usuário
+    // Retornar informações completas sobre a existência do usuário
     return NextResponse.json({
       success: true,
-      nextStep: userData ? 'password' : 'register',
-      // Não retornamos exists: true/false para evitar enumeração
+      exists: !!userData,
+      userId: userData?.id || null,
+      nextStep: userData ? 'password' : 'register'
     });
 
   } catch (error) {

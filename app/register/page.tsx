@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { motion } from 'framer-motion'
 import { ArrowLeft, User, Mail, Building2, Lock, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { useAuth } from '@/app/app/_providers/auth-provider'
+import { createClient } from '@/lib/supabase'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -45,7 +45,6 @@ type FormData = z.infer<typeof formSchema>
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { signUp } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<FormData>({
@@ -64,49 +63,45 @@ export default function RegisterPage() {
     if (isLoading) return;
     
     setIsLoading(true);
-    let registrationError: Error | null = null;
 
     try {
-      const { error } = await signUp(
-        {
-          email: data.email,
-          password: data.password,
-        },
-        {
-          first_name: data.first_name,
-          last_name: data.last_name,
-          role: data.role,
-          email_verified: true
+      const supabase = createClient()
+      const { data: signUpData, error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            role: data.role,
+            email_verified: true
+          }
         }
-      );
+      })
 
       if (error) {
         throw error;
       }
 
-      // Sucesso: Mostrar mensagem e redirecionar
-      toast.success("Conta criada com sucesso! Redirecionando...");
+      if (signUpData.user) {
+        // Sucesso: Mostrar mensagem e redirecionar
+        toast.success("Conta criada com sucesso! Redirecionando...");
 
-      // Determinar o dashboard correto OU a página de escolha de equipe
-      const redirectPath = data.role === 'organizador' 
-        ? '/app/organizador/dashboard' 
-        : '/app/promotor/equipes/escolha';
-      
-      // Adicionar um pequeno delay antes de redirecionar para dar tempo ao toast
-      setTimeout(() => {
-        router.push(redirectPath);
-      }, 1500); // Delay de 1.5 segundos
+        // Determinar o dashboard correto OU a página de escolha de equipe
+        const redirectPath = data.role === 'organizador' 
+          ? '/app/organizador/dashboard' 
+          : '/app/promotor/equipes/escolha';
+        
+        // Adicionar um pequeno delay antes de redirecionar para dar tempo ao toast
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1500); // Delay de 1.5 segundos
+      }
 
     } catch (error) {
       console.error('Error during registration:', error);
-      // Armazena o erro para mostrar *depois* de sair do loading
-      if (error instanceof Error) {
-        registrationError = error;
-      } else {
-        registrationError = new Error('Erro desconhecido ao criar conta.');
-      }
-      // Exibe o toast de erro imediatamente no catch
-      toast.error(registrationError.message);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao criar conta.';
+      toast.error(errorMessage);
       setIsLoading(false);
     }
   }

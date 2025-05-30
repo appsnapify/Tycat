@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Mail, Lock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
-import { useAuth } from '@/app/app/_providers/auth-provider'
+import { createClient } from '@/lib/supabase'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // Cores modernizadas
@@ -31,13 +31,31 @@ interface FormData {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, user, supabase } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: ''
   })
+
+  // Verificar se o usuário já está autenticado e redirecionar
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user) {
+          // Usuário já está logado, redirecionar para o dashboard
+          router.push('/app/organizador/dashboard')
+        }
+      } catch (error) {
+        console.error('Erro ao verificar sessão:', error)
+      }
+    }
+
+    checkAuthAndRedirect()
+  }, [router])
 
   // Efeito para limpar sessão quando há erro de autenticação
   useEffect(() => {
@@ -59,30 +77,21 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error: signInError } = await signIn({ email: formData.email, password: formData.password })
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      })
       
-      setIsLoading(false)
-
       if (signInError) {
-        throw signInError;
+        throw signInError
       }
 
-      // CORRETO: Verificar a sessão no lado do cliente após o signIn bem-sucedido
-      if (supabase) { 
-        const { data: clientSessionData, error: clientSessionError } = await supabase.auth.getSession();
-        console.log('[LoginPage] Client-side session after signIn:', clientSessionData?.session);
-        if (clientSessionError) {
-          console.error('[LoginPage] Error getting client-side session after signIn:', clientSessionError);
-        }
-      } else {
-        console.warn('[LoginPage] Supabase client not available from useAuth for getSession check.');
+      if (data.user) {
+        console.log('[LoginPage] Login successful, redirecting to dashboard')
+        // Redirecionar para o dashboard
+        router.push('/app/organizador/dashboard')
       }
-      
-      // Se não houve erro, o onAuthStateChange no provider deve ter tratado o user.
-      // O redirecionamento pode ser tratado aqui ou num useEffect que observa o user.
-      // Por agora, vamos assumir que o provider lida com o redirecionamento ou que
-      // a página de destino fará a verificação.
-      // router.push('/'); // Exemplo de redirecionamento, pode ser ajustado
 
     } catch (error: any) {
       console.error('Erro ao fazer login:', error)
@@ -98,13 +107,6 @@ export default function LoginPage() {
       }
     }
   }
-
-  useEffect(() => {
-    if (user) { // user é do useAuth(), que é atualizado pelo onAuthStateChange
-      console.log("[LoginPage] User state updated, attempting redirect to /app/organizador/dashboard");
-      router.push('/app/organizador/dashboard'); 
-    }
-  }, [user, router]);
 
   // Função para limpar campos e erro
   const resetForm = () => {

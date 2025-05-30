@@ -1,4 +1,7 @@
--- Função para aderir a uma equipe usando o código
+-- Primeiro, remover a função existente
+DROP FUNCTION IF EXISTS public.join_team_with_code(UUID, TEXT);
+
+-- Agora, criar a nova versão da função
 CREATE OR REPLACE FUNCTION public.join_team_with_code(
   user_id_param UUID,
   team_code_param TEXT
@@ -8,14 +11,21 @@ DECLARE
   v_team_id UUID;
   v_team_name TEXT;
   v_result JSON;
+  v_current_metadata JSONB;
 BEGIN
+  -- Log inicial
+  RAISE NOTICE 'Iniciando join_team_with_code para usuário % e código %', user_id_param, team_code_param;
+
   -- Verificar se o código da equipe existe
   SELECT id, name INTO v_team_id, v_team_name
   FROM public.teams
   WHERE team_code = team_code_param;
   
+  -- Log após busca da equipe
+  RAISE NOTICE 'Resultado da busca da equipe: ID %, Nome %', v_team_id, v_team_name;
+  
   IF v_team_id IS NULL THEN
-    RAISE EXCEPTION 'Equipe não encontrada com o código fornecido';
+    RAISE EXCEPTION 'Equipe não encontrada com o código fornecido --> %', team_code_param;
   END IF;
   
   -- Verificar se o usuário já é membro da equipe
@@ -23,32 +33,25 @@ BEGIN
     SELECT 1 FROM public.team_members
     WHERE user_id = user_id_param AND team_id = v_team_id
   ) THEN
-    RAISE EXCEPTION 'Usuário já é membro desta equipe';
+    RAISE EXCEPTION 'Usuário já é membro desta equipe --> %', v_team_name;
   END IF;
   
   -- Registrar o usuário como membro da equipe
   INSERT INTO public.team_members (
-    user_id,
     team_id,
+    user_id,
     role,
-    joined_at,
-    is_active
+    joined_at
   ) VALUES (
-    user_id_param,
     v_team_id,
+    user_id_param,
     'member',
-    NOW(),
-    TRUE
+    NOW()
   );
-  
-  -- Atualizar o perfil do usuário para refletir a associação à equipe
-  UPDATE public.profiles
-  SET 
-    role = 'promotor',
-    team_id = v_team_id,
-    updated_at = NOW()
-  WHERE id = user_id_param;
-  
+
+  -- Log após inserção do membro
+  RAISE NOTICE 'Membro inserido com sucesso na equipe';
+
   -- Atualizar os metadados do usuário
   UPDATE auth.users
   SET raw_user_meta_data = 
@@ -59,28 +62,65 @@ BEGIN
       'team_name', v_team_name
     )
   WHERE id = user_id_param;
-  
-  -- Preparar resultado
+
+  -- Log após atualização dos metadados
+  RAISE NOTICE 'Metadados do usuário atualizados';
+
+  -- Preparar o resultado
   v_result := json_build_object(
-    'success', TRUE,
+    'success', true,
     'team_id', v_team_id,
     'team_name', v_team_name,
-    'message', 'Adesão à equipe realizada com sucesso'
+    'message', 'Usuário adicionado à equipe com sucesso'
   );
+
+  -- Log final
+  RAISE NOTICE 'Operação concluída com sucesso';
   
   RETURN v_result;
+
 EXCEPTION
   WHEN OTHERS THEN
-    RETURN json_build_object(
-      'success', FALSE,
-      'error', SQLERRM
+    -- Log de erro
+    RAISE NOTICE 'Erro na função: %', SQLERRM;
+    
+    v_result := json_build_object(
+      'success', false,
+      'error', SQLERRM,
+      'message', 'Erro ao adicionar usuário à equipe'
     );
+    RETURN v_result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Conceder permissões para executar a função
+-- Remover permissões antigas se existirem
+REVOKE ALL ON FUNCTION public.join_team_with_code FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.join_team_with_code FROM authenticated;
+REVOKE ALL ON FUNCTION public.join_team_with_code FROM anon;
+
+-- Conceder permissões específicas
 GRANT EXECUTE ON FUNCTION public.join_team_with_code TO authenticated;
+GRANT EXECUTE ON FUNCTION public.join_team_with_code TO service_role;
 
 -- Adicionar comentário à função
 COMMENT ON FUNCTION public.join_team_with_code IS 
-'Permite que um usuário ingressse em uma equipe usando o código da equipe. Requer o ID do usuário e o código da equipe.'; 
+'Permite que um usuário ingresse em uma equipe usando o código da equipe. Requer o ID do usuário e o código da equipe.';
+
+-- Garantir que as tabelas necessárias têm as políticas corretas
+ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+
+-- Política para permitir inserção de membros
+DROP POLICY IF EXISTS "Allow team member insertion" ON public.team_members;
+CREATE POLICY "Allow team member insertion"
+ON public.team_members
+FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+-- Política para permitir leitura de membros
+DROP POLICY IF EXISTS "Allow team member reading" ON public.team_members;
+CREATE POLICY "Allow team member reading"
+ON public.team_members
+FOR SELECT
+TO authenticated
+USING (true); 

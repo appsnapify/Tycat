@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
 import { Users, ArrowLeft, Info, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,7 +42,6 @@ export default function CriarEquipePage() {
   const router = useRouter()
   const { user, updateUserRole, isTeamLeader } = useAuth()
   const supabase = createClientComponentClient()
-  const { toast } = useToast()
   
   const [loading, setLoading] = useState(false)
   const [diagnosisLoading, setDiagnosisLoading] = useState(false)
@@ -110,11 +108,7 @@ export default function CriarEquipePage() {
   const checkIfAlreadyTeamLeader = () => {
     console.log("Verificando se o utilizador já é líder de equipa (usando estado isTeamLeader):");
     if (isTeamLeader) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Já é líder de uma equipa",
-      });
+      toast.error("Já é líder de uma equipa");
       router.push("/app/chefe-equipe/dashboard");
       return true;
     }
@@ -132,11 +126,7 @@ export default function CriarEquipePage() {
       
       // Verificar se o usuário está autenticado
       if (!user || !user.id) {
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Precisa de estar autenticado para criar uma equipa",
-        });
+        toast.error("Precisa de estar autenticado para criar uma equipa");
         setLoading(false);
         return;
       }
@@ -146,170 +136,100 @@ export default function CriarEquipePage() {
       console.log("Metadados atuais do utilizador:", user.user_metadata);
       
       // Chamar a função RPC para criar a equipe
-      const { data, error: rpcError } = await supabase.rpc("create_promoter_team_v2", {
-        p_team_name: formData.name,
-        p_team_description: formData.description || null,
+      const { data: teamResponse, error: rpcError } = await supabase.rpc("create_promoter_team_v2", {
+        user_id: user.id,
+        team_name: formData.name,
+        team_description: formData.description || null,
       });
       
       if (rpcError) {
-        console.error("Erro ao criar equipa RPC:", rpcError);
-        
-        if (rpcError.message?.includes('já é')) {
-          toast({
-            variant: "destructive",
-            title: "Já é líder de uma equipa",
-            description: "Um utilizador só pode liderar uma equipa de cada vez.",
-          });
-          router.push("/app/chefe-equipe/dashboard");
-        } else if (rpcError.message?.includes('permissão')) {
-          toast({
-            variant: "destructive",
-            title: "Permissão negada",
-            description: "Não tem permissão para criar uma equipa",
-          });
-        } else if (rpcError.code === '42501') {
-          toast({
-            variant: "destructive",
-            title: "Erro de permissão",
-            description: "Problemas com as políticas de segurança. Por favor, execute o script SQL fornecido.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Erro ao criar equipa",
-            description: rpcError.message || "Ocorreu um erro ao criar a equipa",
-          });
-        }
-        
-        setError(rpcError.message || "Ocorreu um erro ao criar a equipa");
-        setLoading(false);
-        return;
+        throw new Error(`Erro ao criar equipe: ${rpcError.message}`);
       }
       
-      console.log("Resposta da função create_promoter_team_v2:", data);
-      
-      // Extrair o ID da equipe da resposta
-      let teamId: string | undefined;
-      let teamCode: string | undefined;
-      let teamName: string | undefined;
-      
-      if (data === null || data === undefined) {
-        console.error("Resposta nula da função create_promoter_team_v2");
-        setError("Erro: Resposta nula ao criar equipa");
-        setLoading(false);
-        return;
+      if (!teamResponse) {
+        throw new Error('ID da equipe não foi retornado após a criação');
       }
       
-      if (typeof data === "object" && data !== null) {
-        // Nova versão: retorna um objeto JSONB
-        if ('id' in data) {
-          teamId = data.id;
-          teamCode = data.team_code;
-          teamName = data.name;
+      console.log("Resposta da função create_promoter_team_v2:", teamResponse);
+      
+      // Extrair informações da equipe do objeto retornado
+      const teamId = teamResponse.id;
+      const teamCode = teamResponse.team_code;
+      const teamName = teamResponse.team_name;
+      
           console.log("Team ID extraído do objeto JSONB:", teamId);
           console.log("Team Code:", teamCode);
           console.log("Team Name:", teamName);
-        } else if ('team_id' in data) {
-          // Formato alternativo possível
-          teamId = data.team_id;
-          teamCode = data.team_code;
-          teamName = data.team_name;
-          console.log("Team ID extraído do campo team_id:", teamId);
-          console.log("Team Code:", teamCode);
-          console.log("Team Name:", teamName);
-        } else {
-          // Tentar encontrar qualquer campo que possa ser um UUID
-          console.log("Tentando encontrar o ID da equipa em:", data);
-          for (const key in data) {
-            const value = data[key];
-            if (typeof value === 'string' && 
-                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-              teamId = value;
-              console.log(`Team ID encontrado no campo ${key}:`, teamId);
-              break;
-            }
-          }
-        }
-      } else if (typeof data === "string") {
-        // Versão antiga: retorna apenas o UUID como string
-        teamId = data;
-        console.log("Team ID extraído diretamente da string:", teamId);
-      }
       
-      if (!teamId) {
-        console.error("Não foi possível extrair o ID da equipa da resposta:", data);
-        setError("Erro ao obter ID da equipa criada");
-        setLoading(false);
-        return;
-      }
-      
-      // Verificar se os metadados foram atualizados automaticamente pela função SQL
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      console.log("Metadados do utilizador após criar equipa:", userData?.user?.user_metadata);
-      
-      const userMetadata = userData?.user?.user_metadata || {};
-      const metadataTeamId = userMetadata.team_id;
-      const metadataRole = userMetadata.role;
-      
-      // Se a função SQL não atualizou os metadados corretamente, fazemos manualmente
-      if (userError || !metadataTeamId || metadataTeamId !== teamId || metadataRole !== 'chefe-equipa') {
-        console.log("Atualizando metadados do utilizador manualmente...");
-        
-        // Atualizar o papel do utilizador
-        await updateUserRole("chefe-equipa");
-        
-        // Atualizar metadados adicionais se necessário
-        if (!metadataTeamId || metadataTeamId !== teamId) {
+      // Função auxiliar para atualizar metadados com retry
+      const updateMetadataWithRetry = async (retries = 3, delay = 1000) => {
+        for (let i = 0; i < retries; i++) {
           try {
-            const { error: updateError } = await supabase.auth.updateUser({
+            // Tentar obter a sessão atual
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError || !session) {
+              console.log("Sessão não encontrada, aguardando...");
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+            
+            // Atualizar metadados do usuário
+            const { error: metadataError } = await supabase.auth.updateUser({
               data: {
+                role: 'chefe-equipe',
+                previous_role: user?.user_metadata?.role || 'promotor',
                 team_id: teamId,
-                team_code: teamCode || userMetadata.team_code,
-                team_name: teamName || formData.name,
-                role: 'chefe-equipa',
-                previous_role: userMetadata.role || 'promotor'
+                team_code: teamCode,
+                team_name: teamName,
+                team_role: 'leader'
               }
             });
             
-            if (updateError) {
-              console.error("Erro ao atualizar metadados adicionais:", updateError);
-            } else {
-              console.log("Metadados adicionais atualizados com sucesso");
+            if (!metadataError) {
+              console.log("Metadados atualizados com sucesso!");
+              return true;
             }
-          } catch (updateError) {
-            console.error("Exceção ao atualizar metadados adicionais:", updateError);
+            
+            console.log(`Tentativa ${i + 1} falhou, aguardando próxima tentativa...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+          } catch (error) {
+            console.error(`Erro na tentativa ${i + 1}:`, error);
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
-      } else {
-        console.log("Metadados do utilizador já foram atualizados pela função SQL");
+        return false;
+      };
+      
+      // Atualizar o papel do usuário primeiro
+      console.log("Atualizando papel do utilizador para chefe-equipa...");
+      await updateUserRole('chefe-equipe');
+        
+      // Aguardar um momento para a sessão se atualizar
+      await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      // Tentar atualizar os metadados com retry
+      const metadataUpdateSuccess = await updateMetadataWithRetry();
+      
+      if (!metadataUpdateSuccess) {
+        console.error("Não foi possível atualizar os metadados após várias tentativas");
+        // Continuar mesmo assim, já que a equipe foi criada e o papel foi atualizado
       }
       
-      // Aguardar um momento para que a sessão do utilizador seja atualizada
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Mostrar mensagem de sucesso e redirecionar
+      toast.success('Equipa criada com sucesso! Você agora é um Chefe de Equipe.');
+      router.push('/app/chefe-equipe/dashboard');
       
-      // Força a atualização da sessão
-      await supabase.auth.refreshSession();
+    } catch (error) {
+      console.error('Erro ao criar equipa:', error);
+      const errorMsg = error instanceof Error 
+        ? `Erro: ${error.message}` 
+        : 'Ocorreu um erro desconhecido ao criar a equipa. Tente novamente.';
       
-      // Mostrar notificação de sucesso
-      toast({
-        title: "Sucesso!",
-        description: "Equipa criada com sucesso. Agora é um Chefe de Equipa!",
-      });
-      
-      // Pequeno atraso para garantir que a sessão seja atualizada
-      setTimeout(() => {
-        // Redirecionar para o dashboard de chefe de equipa
-        console.log("Redirecionando para o dashboard de chefe de equipa");
-        router.push("/app/chefe-equipe/dashboard");
-      }, 1500);
-    } catch (err: any) {
-      console.error("Erro GERAL ao criar equipa:", err);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: err.message || "Ocorreu um erro inesperado ao criar a equipa",
-      });
-      setError(err.message || "Ocorreu um erro inesperado ao criar a equipa");
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

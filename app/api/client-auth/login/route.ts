@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 // import { cookies } from 'next/headers'; // Comentado, pois cookies().set foi comentado
 // import { sign } from 'jsonwebtoken'; // Comentado, pois a criação do token foi comentada
 
@@ -38,22 +38,12 @@ export async function POST(request: Request) {
     
     const { phone, password } = result.data;
     
-    // Inicializar cliente Supabase com a chave anônima (não precisa da chave de serviço)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Variáveis de ambiente do Supabase não configuradas');
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Configuração inválida do servidor' 
-      }, { status: 500 });
-    }
-    
-    const supabase = createSupabaseJsClient(supabaseUrl, supabaseAnonKey);
+    // Criar cliente Supabase
+    const supabase = await createClient();
     
     console.log('Buscando usuário pelo telefone:', phone.substring(0, 3) + '****');
     
+    // Buscar usuário na tabela client_users
     const { data: userData, error: userError } = await supabase
       .from('client_users')
       .select('id, first_name, last_name, phone, email, password')
@@ -89,29 +79,77 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Criar token JWT - LÓGICA COMENTADA
-    /*
-    const token = sign(
-      { 
-        id: userData.id,
-        phone: userData.phone,
-        email: userData.email 
-      }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRY }
-    );
-    */
+    // Criar email temporário para o Supabase Auth se não existir
+    let userEmail = userData.email;
+    if (!userEmail) {
+      userEmail = `client_${userData.id}@temp.snap.com`;
+    }
     
-    // console.log('Token gerado para o cliente:', token); // Comentado pois token não é mais gerado aqui
-
-    // Definir o cookie de autenticação - JÁ COMENTADO ANTERIORMENTE
-    // cookies().set('client_auth_token', token, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV !== 'development',
-    //   maxAge: 60 * 60 * 24 * 7, // 1 semana
-    //   path: '/',
-    //   sameSite: 'lax'
-    // });
+    // Tentar fazer login no Supabase Auth
+    console.log('Tentando criar sessão Supabase Auth para:', userData.id);
+    
+    try {
+      // Primeiro, verificar se já existe uma conta auth para este email
+      const { data: existingAuthUser } = await supabase.auth.admin.getUserByEmail(userEmail);
+      
+      if (existingAuthUser.user) {
+        console.log('Usuário auth já existe, fazendo login...');
+        
+        // Tentar login com email e senha
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: password
+        });
+        
+        if (authError) {
+          console.error('Erro no login Supabase Auth:', authError);
+          // Se der erro, criar nova conta
+          throw authError;
+        }
+        
+        console.log('Login Supabase Auth bem-sucedido');
+        
+      } else {
+        console.log('Criando nova conta auth...');
+        
+        // Criar nova conta no Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: userEmail,
+          password: password,
+          user_metadata: {
+            client_user_id: userData.id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            phone: userData.phone
+          },
+          email_confirm: true
+        });
+        
+        if (authError) {
+          console.error('Erro ao criar usuário auth:', authError);
+          throw authError;
+        }
+        
+        console.log('Conta auth criada com sucesso');
+        
+        // Agora fazer login
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: password
+        });
+        
+        if (loginError) {
+          console.error('Erro no login após criação:', loginError);
+          throw loginError;
+        }
+        
+        console.log('Login após criação bem-sucedido');
+      }
+      
+    } catch (authError) {
+      console.error('Erro na autenticação Supabase:', authError);
+      // Continuar sem sessão Supabase por agora
+    }
     
     console.log('Login realizado com sucesso:', { id: userData.id });
     

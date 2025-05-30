@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
+import { joinTeamWithCode } from '../../../actions/team-actions'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,97 +21,105 @@ import { toast } from 'sonner'
 export default function IngressarEquipePage() {
   const router = useRouter()
   const { user } = useAuth()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(false)
   const [teamCode, setTeamCode] = useState('')
   const [error, setError] = useState('')
   const [sugestao, setSugestao] = useState('')
+  const [redirecting, setRedirecting] = useState(false)
+  
+  useEffect(() => {
+    if (redirecting) {
+      const timer = setTimeout(() => {
+        router.push('/app/promotor/dashboard')
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [redirecting, router])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!teamCode.trim()) {
-      setError('Por favor, insira o código da equipa.')
-      return
-    }
-    
-    setError('')
-    setSugestao('')
-    setLoading(true)
-    
     try {
-      console.log(`Tentando aderir à equipa com código: ${teamCode.trim()} para user ${user?.id}`);
-      console.log(`ID do usuário atual: ${user?.id}`);
+      // 1. Validação inicial
+      if (!teamCode.trim()) {
+        setError('Por favor, insira o código da equipa.')
+        return
+      }
       
       if (!user?.id) {
         setError('Você precisa estar logado para aderir a uma equipa.')
         return
       }
       
-      // Usar a função RPC join_team_with_code que contorna problemas de RLS
-      const { data, error: rpcError } = await supabase.rpc(
-        'join_team_with_code',
-        {
-          user_id_param: user.id,
-          team_code_param: teamCode.trim()
-        }
-      )
+      // 2. Preparação
+      setError('')
+      setSugestao('')
+      setLoading(true)
+
+      // 3. Chamar Server Action
+      const result = await joinTeamWithCode(teamCode.trim())
       
-      console.log("Resposta da função join_team_with_code:", data, rpcError);
-      
-      if (rpcError) {
-        console.error('Erro ao aderir à equipa:', rpcError);
+      // 4. Validar e tratar resultado
+      if (!result) {
+        throw new Error('Não foi possível processar a solicitação')
+      }
+
+      if (!result.success) {
+        const errorMessage = result.error || 'Erro desconhecido'
         
-        // Tratamento de erros específicos
-        if (rpcError.message?.includes('Equipa não encontrada')) {
-          setError('Código da equipa inválido ou equipa não encontrada.');
-          setSugestao('Certifique-se de que o código está no formato TEAM-XXXXX e foi fornecido pelo líder da equipa.');
-        } else if (rpcError.message?.includes('já é membro')) {
-          setError('Você já faz parte desta equipa.');
+        // Tratamento específico de mensagens de erro
+        if (errorMessage.includes('não encontrada') || errorMessage.includes('inválido')) {
+          setError('Código da equipa inválido ou equipa não encontrada.')
+          setSugestao('Verifique se o código está correto e tente novamente.')
+        } else if (errorMessage.includes('já é membro')) {
+          setError('Você já faz parte desta equipa.')
+          setSugestao('Escolha outra equipa ou acesse seu dashboard.')
         } else {
-          setError(`Não foi possível aderir à equipa: ${rpcError.message || 'Erro desconhecido'}`);
-          setSugestao('Se o problema persistir, entre em contato com o administrador da plataforma.');
+          setError(errorMessage)
+          setSugestao('Se o problema persistir, entre em contato com o suporte.')
         }
-        toast.error('Falha ao aderir à equipa.');
-        return;
+        
+        toast.error('Falha ao aderir à equipa')
+        return
       }
       
-      if (!data || data.success === false) {
-        console.error('Erro retornado pela função:', data);
-        setError('Ocorreu um erro ao processar sua solicitação. Tente novamente mais tarde.');
-        return;
-      }
+      // 5. Processar sucesso - O papel será atualizado automaticamente pelo AuthProvider
+      const teamName = result.data?.team_name || 'selecionada'
+      toast.success(`Você aderiu com sucesso à equipa ${teamName}!`)
+          
+      // 6. Redirecionar
+      setRedirecting(true)
+
+    } catch (error) {
+      console.error('Erro ao processar adesão:', error)
       
-      // Atualizar a sessão para refletir as mudanças
-      console.log("Atualizando sessão após aderição bem-sucedida.");
-      
-      // Forçar atualização da sessão para obter os novos metadados
-      await supabase.auth.refreshSession();
-      
-      // Mostrar mensagem de sucesso
-      const teamName = data.team_name || 'selecionada';
-      toast.success(`Você aderiu com sucesso à equipa ${teamName}!`);
-      
-      // Pequeno atraso para permitir que o toast seja visto
-      setTimeout(() => {
-        router.push('/app/promotor/dashboard');
-      }, 1500);
-      
-    } catch (error: any) {
-      console.error('Erro geral ao aderir à equipa:', error);
-      setError(`Ocorreu um erro ao processar seu pedido: ${error.message || 'Tente novamente mais tarde'}`);
-      toast.error('Ocorreu um erro inesperado.');
+      setError('Ocorreu um erro inesperado ao processar sua solicitação.')
+      setSugestao('Por favor, tente novamente. Se o problema persistir, contate o suporte.')
+      toast.error('Falha ao aderir à equipa')
+
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
+  }
+  
+  // Se estiver redirecionando, mostrar loader
+  if (redirecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Redirecionando para o dashboard...</p>
+        </div>
+      </div>
+    )
   }
   
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <Link href="/app/promotor/equipes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
+      <Link href="/app/promotor/equipes/escolha" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Voltar para minhas equipas
+        Voltar para escolha
       </Link>
       
       <Card className="max-w-md mx-auto">
@@ -171,7 +179,14 @@ export default function IngressarEquipePage() {
               type="submit"
               disabled={loading || !teamCode.trim()}
             >
-              {loading ? 'A Aderir...' : 'Aderir à Equipa'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Aderir à Equipa'
+              )}
             </Button>
             
             <div className="text-center text-sm text-muted-foreground">
