@@ -51,7 +51,11 @@ export const ClientAuthProvider = ({
   // Referência ao cliente Supabase
   const supabaseClientRef = useRef(createClient())
   
-  console.log('ClientAuthProvider montado - modo sem persistência de sessão');
+  // REDUZIDO: Log apenas uma vez por sessão
+  if (process.env.NODE_ENV === 'development' && !sessionStorage.getItem('auth_provider_mounted')) {
+    console.log('ClientAuthProvider montado - modo sem persistência de sessão');
+    sessionStorage.setItem('auth_provider_mounted', 'true');
+  }
   
   // Efeito para carregar o usuário da sessão ao montar o componente
   useEffect(() => {
@@ -71,48 +75,43 @@ export const ClientAuthProvider = ({
           return;
         }
         
-        // Se existe sessão, verificar se tem user_id nos metadados
+        // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
         if (session && session.user) {
-          // Tentar obter o user_id do usuário autenticado
-          const clientUserId = session.user.user_metadata?.client_user_id as string;
-          
-          if (clientUserId) {
-            // Buscar dados do usuário do banco
-            const { data, error: clientError } = await supabaseClientRef.current
-              .from('client_users')
-              .select('*')
-              .eq('id', clientUserId)
-              .single();
-              
-            if (clientError) {
-              console.error('Erro ao buscar dados do usuário:', clientError);
-              setAuthState({
-                user: null,
-                isLoading: false,
-                error: clientError.message
-              });
-              return;
-            }
+          // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+          const { data, error: clientError } = await supabaseClientRef.current
+            .from('client_users')
+            .select('*')
+            .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+            .single();
             
-            if (data) {
-              // Normalizar o objeto de usuário
-              const clientUser: ClientUser = {
-                id: data.id,
-                firstName: data.first_name,
-                lastName: data.last_name,
-                email: data.email || '',
-                phone: data.phone || ''
-              };
-              
-              console.log('Usuário carregado da sessão:', clientUser);
-              
-              setAuthState({
-                user: clientUser,
-                isLoading: false,
-                error: null
-              });
-              return;
-            }
+          if (clientError) {
+            console.error('Erro ao buscar dados do usuário:', clientError);
+            setAuthState({
+              user: null,
+              isLoading: false,
+              error: clientError.message
+            });
+            return;
+          }
+          
+          if (data) {
+            // Normalizar o objeto de usuário
+            const clientUser: ClientUser = {
+              id: data.id,
+              firstName: data.first_name,
+              lastName: data.last_name,
+              email: data.email || '',
+              phone: data.phone || ''
+            };
+            
+            console.log('Usuário carregado da sessão:', clientUser);
+            
+            setAuthState({
+              user: clientUser,
+              isLoading: false,
+              error: null
+            });
+            return;
           }
         }
         
@@ -142,45 +141,40 @@ export const ClientAuthProvider = ({
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session && session.user) {
-            // Tentar obter o user_id do usuário autenticado
-            const clientUserId = session.user.user_metadata?.client_user_id as string;
-            
-            if (clientUserId) {
-              // Buscar dados do usuário do banco
-              const { data, error: clientError } = await supabaseClientRef.current
-                .from('client_users')
-                .select('*')
-                .eq('id', clientUserId)
-                .single();
-                
-              if (clientError) {
-                console.error('Erro ao buscar dados do usuário após auth change:', clientError);
-                setAuthState(prev => ({
-                  ...prev,
-                  error: clientError.message
-                }));
-                return;
-              }
+            // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+            const { data, error: clientError } = await supabaseClientRef.current
+              .from('client_users')
+              .select('*')
+              .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+              .single();
               
-              if (data) {
-                // Normalizar o objeto de usuário
-                const clientUser: ClientUser = {
-                  id: data.id,
-                  firstName: data.first_name,
-                  lastName: data.last_name,
-                  email: data.email || '',
-                  phone: data.phone || ''
-                };
-                
-                console.log('Usuário atualizado após auth change:', clientUser);
-                
-                setAuthState({
-                  user: clientUser,
-                  isLoading: false,
-                  error: null
-                });
-                return;
-              }
+            if (clientError) {
+              console.error('Erro ao buscar dados do usuário após auth change:', clientError);
+              setAuthState(prev => ({
+                ...prev,
+                error: clientError.message
+              }));
+              return;
+            }
+            
+            if (data) {
+              // Normalizar o objeto de usuário
+              const clientUser: ClientUser = {
+                id: data.id,
+                firstName: data.first_name,
+                lastName: data.last_name,
+                email: data.email || '',
+                phone: data.phone || ''
+              };
+              
+              console.log('Usuário atualizado após auth change:', clientUser);
+              
+              setAuthState({
+                user: clientUser,
+                isLoading: false,
+                error: null
+              });
+              return;
             }
           }
         } else if (event === 'SIGNED_OUT') {
@@ -239,44 +233,40 @@ export const ClientAuthProvider = ({
         return null;
       }
       
-      // Se existe sessão, verificar se tem user_id nos metadados
+      // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
       if (session && session.user) {
-        const clientUserId = session.user.user_metadata?.client_user_id as string;
+        // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+        const { data, error: clientError } = await supabaseClientRef.current
+          .from('client_users')
+          .select('*')
+          .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+          .single();
       
-        if (clientUserId) {
-          // Buscar dados do usuário do banco
-          const { data, error: clientError } = await supabaseClientRef.current
-        .from('client_users')
-            .select('*')
-        .eq('id', clientUserId)
-        .single();
+        if (clientError) {
+          console.error('Erro ao buscar dados do usuário:', clientError);
+          return null;
+        }
       
-          if (clientError) {
-            console.error('Erro ao buscar dados do usuário:', clientError);
-        return null;
-      }
-      
-          if (data) {
-            // Normalizar o objeto de usuário
-      const clientUser: ClientUser = {
-              id: data.id,
-              firstName: data.first_name,
-              lastName: data.last_name,
-              email: data.email || '',
-              phone: data.phone || ''
-            };
-            
-            console.log('Usuário verificado e atualizado:', clientUser);
-            
-            // Atualizar o estado no contexto
-            setAuthState({
-              user: clientUser,
-          isLoading: false,
-              error: null
-            });
-            
-      return clientUser;
-          }
+        if (data) {
+          // Normalizar o objeto de usuário
+          const clientUser: ClientUser = {
+            id: data.id,
+            firstName: data.first_name,
+            lastName: data.last_name,
+            email: data.email || '',
+            phone: data.phone || ''
+          };
+          
+          console.log('Usuário verificado e atualizado:', clientUser);
+          
+          // Atualizar o estado no contexto
+          setAuthState({
+            user: clientUser,
+            isLoading: false,
+            error: null
+          });
+          
+          return clientUser;
         }
       }
       

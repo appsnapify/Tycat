@@ -74,15 +74,15 @@ export default function ClientRegistrationForm({
     setIsLoading(true);
     setError(null);
     
-    // Remover campos em branco ou não necessários para a API
+    // CORRIGIR: Mapear nomes dos campos para corresponder ao backend
     const apiData = {
       phone: data.phone,
       email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      birthDate: data.birthDate || undefined,
-      postalCode: data.postalCode,
-      gender: data.gender,
+      first_name: data.firstName, // CORRIGIDO: firstName -> first_name
+      last_name: data.lastName,   // CORRIGIDO: lastName -> last_name
+      birth_date: data.birthDate || null, // CORRIGIDO: undefined -> null para opcional
+      postal_code: data.postalCode, // CORRIGIDO: postalCode -> postal_code
+      gender: data.gender || null, // CORRIGIDO: undefined -> null para opcional
       password: data.password
     };
     
@@ -103,6 +103,11 @@ export default function ClientRegistrationForm({
       if (!response.ok) {
         console.error('Erro na resposta do servidor:', result);
         
+        // Mostrar detalhes da validação para debug se disponível
+        if (result.details) {
+          console.error('Detalhes da validação:', result.details);
+        }
+        
         // Mensagens de erro mais específicas baseadas no erro retornado
         if (result.error === 'Número de telefone já registrado' || result.error === 'Este telefone já está registrado') {
           throw new Error('Este número de telefone já está registrado. Tente fazer login.');
@@ -116,7 +121,11 @@ export default function ClientRegistrationForm({
           throw new Error('Erro de permissão no servidor. Por favor, contacte o suporte.');
         }
         
-        throw new Error(result.error || 'Erro ao registar');
+        // Mostrar detalhes de validação se disponível
+        const errorMessage = result.details ? 
+          `${result.error}: ${result.details}` : 
+          (result.error || 'Erro ao registar');
+        throw new Error(errorMessage);
       }
       
       console.log('Registro bem-sucedido:', result);

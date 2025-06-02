@@ -24,7 +24,10 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
     notFound();
   }
 
-  console.log('[DEBUG] PromoterGuestListPage - Parâmetros recebidos:', urlParams);
+  // Debug apenas em development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DEBUG] PromoterGuestListPage - Parâmetros recebidos:', urlParams);
+  }
 
   try {
     // Processar parâmetros e buscar dados
@@ -35,11 +38,14 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
       notFound();
     }
 
-    console.log('[DEBUG] Dados processados com sucesso:', {
-      hasEvent: !!data.event,
-      hasPromoter: !!data.promoter,
-      hasAssociation: data.hasAssociation
-    });
+    // Debug apenas em development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DEBUG] Dados processados com sucesso:', {
+        hasEvent: !!data.event,
+        hasPromoter: !!data.promoter,
+        hasAssociation: data.hasAssociation
+      });
+    }
 
     return (
       <ClientAuthProvider>

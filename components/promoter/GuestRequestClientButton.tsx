@@ -257,13 +257,16 @@ export function GuestRequestClient({
       // Marcar step de auth como completo
       setCompletedSteps(['phone', 'auth']);
       
+      // CORRIGIDO: Extrair dados do user que vem dentro de userData
+      const user = userData.user || userData; // userData.user se a API retorna { success: true, user: {...} }
+      
       // Normalizar dados do usuário
       const normalizedUser = {
-        id: userData.id || userData.user_id || '',
-        firstName: userData.firstName || userData.first_name || '',
-        lastName: userData.lastName || userData.last_name || '',
-        email: userData.email || '',
-        phone: userData.phone || phone
+        id: user.id || user.user_id || '',
+        firstName: user.firstName || user.first_name || '',
+        lastName: user.lastName || user.last_name || '',
+        email: user.email || '',
+        phone: user.phone || phone
       };
       
       // Atualizar contexto de autenticação

@@ -24,13 +24,13 @@ AS $$
 DECLARE
   v_user_id UUID;
 BEGIN
-  -- Verificar se telefone já existe
-  IF EXISTS (SELECT 1 FROM client_users WHERE phone = p_phone) THEN
+  -- Verificar se telefone já existe (CORRIGIDO: especificar alias da tabela)
+  IF EXISTS (SELECT 1 FROM client_users cu WHERE cu.phone = p_phone) THEN
     RAISE EXCEPTION 'Telefone já registrado';
   END IF;
   
-  -- Verificar se email já existe (se fornecido)
-  IF p_email IS NOT NULL AND EXISTS (SELECT 1 FROM client_users WHERE email = p_email) THEN
+  -- Verificar se email já existe (se fornecido) (CORRIGIDO: especificar alias da tabela)
+  IF p_email IS NOT NULL AND EXISTS (SELECT 1 FROM client_users cu WHERE cu.email = p_email) THEN
     RAISE EXCEPTION 'Email já registrado';
   END IF;
   

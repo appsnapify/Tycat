@@ -66,67 +66,65 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
   const isPhoneValid = phone && isValidPhoneNumber(phone)
 
   const verifyPhone = async (normalizedPhone: string): Promise<{exists: boolean, userId: string | null} | null> => {
-    console.log('Verificando telefone:', normalizedPhone);
-    
-    // SOLUÇÃO: Não reutilizar controllerRef.current, criar um novo controller para esta requisição específica
-    const controller = new AbortController();
-    
     try {
-      console.log('Iniciando fetch de verificação de telefone');
+      // REDUZIDO: Log apenas essencial em development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Verificando telefone:', phone);
+      }
       
+      setIsSubmitting(true);
+      setError(null);
+      
+      const normalizedPhone = normalizePhoneNumber(phone);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Iniciando fetch de verificação de telefone');
+      }
+
       const response = await fetch('/api/client-auth-v2/check-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ phone: normalizedPhone }),
-        signal: controller.signal
       });
-      
-      console.log('Resposta recebida da API de verificação:', response.status);
-      
-      if (!response.ok) {
-        // Tentar obter detalhes do erro do corpo da resposta
-        try {
-          const errorData = await response.json();
-          console.error('Erro de verificação:', errorData);
-          throw new Error(errorData.error || translations['Por favor, insira um número de telemóvel válido']);
-        } catch (e) {
-          // Se não conseguir processar o JSON, use a informação de status
-          throw new Error(`Erro de verificação (${response.status}): ${response.statusText}`);
-        }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Resposta recebida da API de verificação:', response.status);
       }
-      
-      // Tratar possíveis erros no parse do JSON
-      let data;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erro na verificação: ${response.status}`);
+      }
+
+      let responseData;
       try {
         const responseText = await response.text();
-        console.log('Resposta em texto:', responseText.substring(0, 100));
-        
-        // Verificar se a resposta não está vazia
-        if (!responseText || responseText.trim() === '') {
-          throw new Error('Resposta vazia do servidor');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Resposta em texto:', responseText);
         }
-        
-        data = JSON.parse(responseText);
-      } catch (jsonError) {
-        console.error('Erro ao parsear JSON:', jsonError);
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Erro ao fazer parse da resposta JSON:', parseError);
         throw new Error('Erro ao processar resposta do servidor');
       }
-      
-      console.log('Resposta da verificação de telefone:', data);
-      console.log('Verificando userId retornado:', data.userId || 'não encontrado');
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Resposta da verificação de telefone:', responseData);
+        console.log('Verificando userId retornado:', responseData.userId || 'não encontrado');
+      }
       
       // Garantir que exists seja um booleano válido
-      if (typeof data.exists !== 'boolean') {
-        console.warn('Resposta da API com formato inválido (exists não é boolean):', data);
+      if (typeof responseData.exists !== 'boolean') {
+        console.warn('Resposta da API com formato inválido (exists não é boolean):', responseData);
         // Converter para booleano explicitamente
-        data.exists = !!data.exists;
+        responseData.exists = !!responseData.exists;
       }
       
       return {
-        exists: data.exists,
-        userId: data.userId || null
+        exists: responseData.exists,
+        userId: responseData.userId || null
       };
     } catch (error) {
       // Não registrar o erro se foi um abort deliberado
