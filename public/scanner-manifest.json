@@ -1,0 +1,28 @@
+{
+  "name": "SNAP Scanner",
+  "short_name": "Scanner",
+  "description": "Sistema de entrada para funcionários - SNAP",
+  "start_url": "/scanner/login",
+  "display": "standalone",
+  "background_color": "#4f46e5",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "scope": "/scanner/",
+  "categories": ["productivity", "business"],
+  "lang": "pt-PT",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32",
+      "type": "image/x-icon"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Login Scanner",
+      "short_name": "Login",
+      "description": "Acesso rápido ao scanner",
+      "url": "/scanner/login"
+    }
+  ]
+} 

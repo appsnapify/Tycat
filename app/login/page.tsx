@@ -29,6 +29,35 @@ interface FormData {
   password: string
 }
 
+// FUNÇÃO CRÍTICA: Redirecionamento baseado no role
+const getRedirectUrlByRole = (role: string, userMetadata?: any): string => {
+  console.log('[LOGIN] Determinando redirect para role:', role, 'metadata:', userMetadata)
+  
+  const normalizedRole = role?.toLowerCase() || 'desconhecido'
+  
+  switch (normalizedRole) {
+    case 'organizador':
+    case 'organizer':
+      return '/app/organizador/dashboard'
+    
+    case 'chefe-equipe':
+    case 'team-leader':
+      return '/app/chefe-equipe/dashboard'
+    
+    case 'promotor':
+    case 'promoter':
+      // Se tem equipe, vai para dashboard, senão para escolha de equipes
+      if (userMetadata?.team_id) {
+        return '/app/promotor/dashboard'
+      }
+      return '/app/promotor/equipes/escolha'
+    
+    default:
+      console.warn('[LOGIN] Role desconhecido:', role, '- Redirecionando para página inicial')
+      return '/app'
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -46,8 +75,10 @@ export default function LoginPage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
-          // Usuário já está logado, redirecionar para o dashboard
-          router.push('/app/organizador/dashboard')
+          const userRole = session.user.user_metadata?.role
+          const redirectUrl = getRedirectUrlByRole(userRole, session.user.user_metadata)
+          console.log('[LOGIN] Usuário já logado, redirecionando para:', redirectUrl)
+          router.push(redirectUrl)
         }
       } catch (error) {
         console.error('Erro ao verificar sessão:', error)
@@ -88,9 +119,11 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        console.log('[LoginPage] Login successful, redirecting to dashboard')
-        // Redirecionar para o dashboard
-        router.push('/app/organizador/dashboard')
+        const userRole = data.user.user_metadata?.role
+        const redirectUrl = getRedirectUrlByRole(userRole, data.user.user_metadata)
+        
+        console.log('[LOGIN] Login successful for role:', userRole, 'redirecting to:', redirectUrl)
+        router.push(redirectUrl)
       }
 
     } catch (error: any) {

@@ -1,106 +1,119 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-// Criar cliente Admin para migrations (bypass RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xejpwdpumzalewamttjv.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
-
-/**
- * API para aplicar migrações SQL no banco de dados
- * Só deve ser usada em desenvolvimento ou por administradores
- */
 export async function POST(request: NextRequest) {
   try {
-    // Extrair dados do corpo da requisição
-    const data = await request.json();
-    const { migration_name } = data;
+    const supabase = await createClient()
     
-    console.log(`Aplicando migração: ${migration_name}`);
-    
-    // Verificar se a migração é permitida
-    const allowedMigrations = [
-      'add_qr_code_url_column'
-    ];
-    
-    if (!allowedMigrations.includes(migration_name)) {
-      return NextResponse.json({
-        success: false,
-        error: 'Migração não permitida'
-      }, { status: 400 });
+    // Verificar autenticação de admin
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
-    
-    let sql = '';
-    
-    // SQL para adicionar coluna qr_code_url
-    if (migration_name === 'add_qr_code_url_column') {
-      sql = `
-        DO $$
-        BEGIN
-            -- Verifica se a coluna já existe
-            IF NOT EXISTS (
-                SELECT 1 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'guests' 
-                AND column_name = 'qr_code_url'
-            ) THEN
-                -- Adiciona a coluna
-                ALTER TABLE guests ADD COLUMN qr_code_url TEXT;
-                
-                -- Log da alteração
-                RAISE NOTICE 'Coluna qr_code_url adicionada à tabela guests';
-            ELSE
-                RAISE NOTICE 'Coluna qr_code_url já existe na tabela guests';
-            END IF;
-        END $$;
-      `;
+
+    // Verificar se é admin/organizador
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'organizador'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Permissão insuficiente' }, { status: 403 })
     }
-    
-    // Executar a migração SQL
-    const { data: result, error } = await supabaseAdmin.rpc('exec_sql', {
-      sql: sql
-    });
-    
-    if (error) {
-      console.error('Erro ao aplicar migração:', error);
-      return NextResponse.json({
-        success: false,
-        error: `Erro ao aplicar migração: ${error.message}`
-      }, { status: 500 });
-    }
-    
-    // Verificar se a migração foi aplicada com sucesso
-    const { data: columnCheck, error: checkError } = await supabaseAdmin.rpc('exec_sql', {
+
+    console.log('Iniciando criação de tabelas do sistema scanner...')
+
+    // Criar tabela event_scanners
+    await supabase.rpc('exec_sql', {
       sql: `
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_schema = 'public' 
-        AND table_name = 'guests' 
-        AND column_name = 'qr_code_url'
+        CREATE TABLE IF NOT EXISTS event_scanners (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+          created_by UUID NOT NULL REFERENCES profiles(id),
+          scanner_name VARCHAR(100) NOT NULL,
+          username VARCHAR(50) NOT NULL,
+          password_hash TEXT NOT NULL,
+          access_token TEXT UNIQUE NOT NULL,
+          is_active BOOLEAN DEFAULT true,
+          max_concurrent_sessions INTEGER DEFAULT 1,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          last_activity TIMESTAMPTZ,
+          device_info JSONB DEFAULT '{}',
+          CONSTRAINT unique_event_username UNIQUE(event_id, username)
+        );
       `
-    });
-    
-    if (checkError) {
-      console.error('Erro ao verificar coluna:', checkError);
-    }
-    
-    console.log('Migração aplicada com sucesso:', result);
-    console.log('Verificação de coluna:', columnCheck);
+    })
+
+    console.log('Tabela event_scanners criada')
+
+    // Criar tabela scanner_sessions
+    await supabase.rpc('exec_sql', {
+      sql: `
+        CREATE TABLE IF NOT EXISTS scanner_sessions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          scanner_id UUID NOT NULL REFERENCES event_scanners(id) ON DELETE CASCADE,
+          start_time TIMESTAMPTZ DEFAULT NOW(),
+          end_time TIMESTAMPTZ,
+          session_token TEXT UNIQUE NOT NULL,
+          device_fingerprint TEXT,
+          ip_address INET,
+          user_agent TEXT,
+          total_scans INTEGER DEFAULT 0,
+          successful_scans INTEGER DEFAULT 0,
+          offline_scans INTEGER DEFAULT 0,
+          last_sync TIMESTAMPTZ DEFAULT NOW(),
+          is_active BOOLEAN DEFAULT true
+        );
+      `
+    })
+
+    console.log('Tabela scanner_sessions criada')
+
+    // Criar tabela scan_logs
+    await supabase.rpc('exec_sql', {
+      sql: `
+        CREATE TABLE IF NOT EXISTS scan_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_id UUID NOT NULL REFERENCES scanner_sessions(id) ON DELETE CASCADE,
+          guest_id UUID REFERENCES guests(id),
+          scan_time TIMESTAMPTZ DEFAULT NOW(),
+          scan_method VARCHAR(20) NOT NULL,
+          scan_result VARCHAR(20) NOT NULL,
+          qr_code_raw TEXT,
+          search_query TEXT,
+          was_offline BOOLEAN DEFAULT false,
+          sync_time TIMESTAMPTZ,
+          scanner_notes TEXT,
+          error_details TEXT
+        );
+      `
+    })
+
+    console.log('Tabela scan_logs criada')
+
+    // Criar índices
+    await supabase.rpc('exec_sql', {
+      sql: `
+        CREATE INDEX IF NOT EXISTS idx_event_scanners_event_id ON event_scanners(event_id);
+        CREATE INDEX IF NOT EXISTS idx_scanner_sessions_scanner_id ON scanner_sessions(scanner_id);
+        CREATE INDEX IF NOT EXISTS idx_scanner_sessions_token ON scanner_sessions(session_token);
+        CREATE INDEX IF NOT EXISTS idx_scan_logs_session_id ON scan_logs(session_id);
+      `
+    })
+
+    console.log('Índices criados')
     
     return NextResponse.json({
       success: true,
-      message: 'Migração aplicada com sucesso',
-      verification: columnCheck
-    });
+      message: 'Tabelas do sistema scanner criadas com sucesso' 
+    })
     
   } catch (error) {
-    console.error('Erro não tratado:', error);
-    
+    console.error('Erro ao criar tabelas:', error)
     return NextResponse.json({
-      success: false,
-      error: 'Erro interno no servidor: ' + (error instanceof Error ? error.message : String(error))
-    }, { status: 500 });
+      error: 'Erro interno do servidor',
+      details: error
+    }, { status: 500 })
   }
 } 

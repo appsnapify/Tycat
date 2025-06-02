@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { v4 as uuidv4 } from 'uuid'
 import QRCode from 'qrcode'
+import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 
 // Criar cliente Supabase com service role (acesso administrativo)
 // Isso permite contornar as restrições de RLS
@@ -596,52 +597,42 @@ export async function PUT(request: NextRequest) {
 // GET: Obter lista de convidados para um evento
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createSupabaseClient()
     const { searchParams } = new URL(request.url)
-    const eventId = searchParams.get('eventId')
-    
-    if (!eventId) {
-      return NextResponse.json(
-        { error: 'EventId não fornecido.' },
-        { status: 400 }
-      )
+    const event_id = searchParams.get('event_id')
+
+    if (!event_id) {
+      return NextResponse.json({ 
+        error: 'event_id é obrigatório' 
+      }, { status: 400 })
     }
-    
-    // Buscar todos os convidados do evento
+
+    // Buscar todos os guests do evento
     const { data: guests, error } = await supabase
       .from('guests')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: false })
-    
+      .select('id, name, phone, checked_in, check_in_time, qr_code_url')
+      .eq('event_id', event_id)
+      .order('name')
+
     if (error) {
-      console.error('Erro ao buscar convidados:', error)
-      return NextResponse.json(
-        { error: 'Erro ao buscar lista de convidados.' },
-        { status: 500 }
-      )
+      console.error('❌ Erro ao buscar guests:', error)
+      return NextResponse.json({ 
+        error: 'Erro ao carregar convidados' 
+      }, { status: 500 })
     }
-    
-    // Calcular estatísticas
-    const total = guests?.length || 0
-    const checkedIn = guests?.filter(g => g.is_checked_in)?.length || 0
-    const approved = guests?.filter(g => g.is_approved)?.length || 0
-    const pending = guests?.filter(g => g.requires_approval && !g.is_approved)?.length || 0
-    
+
+    console.log('📋 Guests carregados para evento:', event_id, '- Total:', guests?.length || 0)
+
     return NextResponse.json({
-      success: true,
-      guests,
-      stats: {
-        total,
-        checkedIn,
-        approved,
-        pending
-      }
+      guests: guests || [],
+      total: guests?.length || 0,
+      event_id
     })
+
   } catch (error) {
-    console.error('Erro no servidor:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor.' },
-      { status: 500 }
-    )
+    console.error('❌ Erro interno:', error)
+    return NextResponse.json({ 
+      error: 'Erro interno do servidor' 
+    }, { status: 500 })
   }
 } 

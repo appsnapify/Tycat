@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/singleton-client';
+import { createClient } from '@/lib/supabase/client';
 import { ClientUser } from '@/types/client';
 
 // Interface para o contexto de autenticação do cliente

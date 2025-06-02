@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/app/app/_providers/auth-provider'
+import { useOrganization } from '@/app/contexts/organization-context'
 import Link from 'next/link'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
 
@@ -102,7 +103,8 @@ const activityIcons = {
 
 export default function OrganizadorDashboardPage() {
   const router = useRouter()
-  const { user, selectedOrganization } = useAuth()
+  const { user } = useAuth()
+  const { currentOrganization } = useOrganization()
   const supabase = createClient()
   
   const [loading, setLoading] = useState(true)
@@ -126,13 +128,13 @@ export default function OrganizadorDashboardPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   
   useEffect(() => {
-    console.log('Dashboard useEffect', { user })
+    console.log('Dashboard useEffect', { user, currentOrganization })
     
-    if (user) {
-      console.log('Dashboard: Usuário logado mas sem organização, buscando...')
+    if (user && currentOrganization) {
+      console.log('Dashboard: Usuário e organização disponíveis, carregando dados...')
       loadOrganizationAndData()
     }
-  }, [user])
+  }, [user, currentOrganization])
   
   const loadOrganizationAndData = async () => {
     if (!user) return
@@ -140,7 +142,41 @@ export default function OrganizadorDashboardPage() {
     console.log('Iniciando loadOrganizationAndData')
     
     try {
-      // Buscar organização do usuário
+      // Se currentOrganization já está disponível, usar ela
+      if (currentOrganization) {
+        console.log('Usando organização do contexto:', currentOrganization.id)
+        const organizationId = currentOrganization.id
+        
+        // Carregar dados em paralelo com tratamento individual de erros
+        try {
+          loadKpis(organizationId)
+        } catch (e) {
+          console.error('Erro ao iniciar loadKpis:', e)
+        }
+        
+        try {
+          loadEvents(organizationId)
+        } catch (e) {
+          console.error('Erro ao iniciar loadEvents:', e)
+        }
+        
+        try {
+          loadTeams(organizationId)
+        } catch (e) {
+          console.error('Erro ao iniciar loadTeams:', e)
+        }
+        
+        try {
+          loadActivities(organizationId)
+        } catch (e) {
+          console.error('Erro ao iniciar loadActivities:', e)
+        }
+        
+        setLoading(false)
+        return
+      }
+      
+      // Buscar organização do usuário (código de fallback mantido)
       console.log('Buscando organizações do usuário:', user.id)
       const { data: orgDataArray, error: orgError } = await supabase
         .from('user_organizations')

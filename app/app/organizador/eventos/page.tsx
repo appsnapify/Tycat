@@ -31,7 +31,7 @@ import {
 import Image from 'next/image'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useToast } from '@/components/ui/use-toast'
-import { createClient } from '@/lib/supabase/singleton-client'
+import { createClient } from '@/lib/supabase'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import NextLink from 'next/link'
 import { Badge } from '@/components/ui/badge'
