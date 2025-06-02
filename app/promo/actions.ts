@@ -33,11 +33,6 @@ const isValidUUID = (id: string): boolean => {
 
 // Server Action para processar parâmetros e buscar dados
 export async function processPromoParams(params: string[]): Promise<PromoData | null> {
-  // Debug apenas em development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[DEBUG] processPromoParams - Parâmetros recebidos:', JSON.stringify(params));
-  }
-
   try {
     // Validação básica dos parâmetros
     if (!Array.isArray(params)) {
@@ -51,46 +46,21 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
     }
 
     const [eventId, promoterId, teamId] = params;
-    
-    // Debug apenas em development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DEBUG] IDs extraídos:', { eventId, promoterId, teamId });
-    }
 
     // Validação individual de cada ID
-    if (!eventId) {
-      console.error('[ERROR] eventId está vazio ou undefined');
+    if (!eventId || !promoterId || !teamId) {
+      console.error('[ERROR] Parâmetros vazios detectados');
       return null;
     }
 
-    if (!promoterId) {
-      console.error('[ERROR] promoterId está vazio ou undefined');
-      return null;
-    }
-
-    if (!teamId) {
-      console.error('[ERROR] teamId está vazio ou undefined');
-      return null;
-    }
-
-    if (!isValidUUID(eventId)) {
-      console.error('[ERROR] eventId não é um UUID válido:', eventId);
-      return null;
-    }
-
-    if (!isValidUUID(promoterId)) {
-      console.error('[ERROR] promoterId não é um UUID válido:', promoterId);
-      return null;
-    }
-
-    if (!isValidUUID(teamId)) {
-      console.error('[ERROR] teamId não é um UUID válido:', teamId);
+    if (!isValidUUID(eventId) || !isValidUUID(promoterId) || !isValidUUID(teamId)) {
+      console.error('[ERROR] UUIDs inválidos detectados');
       return null;
     }
 
     const supabase = await createReadOnlyClient();
 
-    // Buscar dados do evento com validação de timezone
+    // Buscar dados do evento
     const { data: eventData, error: eventError } = await supabase
       .from('events')
       .select(`
@@ -133,10 +103,6 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
     }
 
     // Verificar associação - PRIORIDADE 1: Associação direta na tabela event_promoters
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DEBUG] Verificando associação direta...');
-    }
-    
     const { data: directAssociation, error: directError } = await supabase
       .from('event_promoters')
       .select('id')
@@ -151,15 +117,7 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
 
     let hasAssociation = !!directAssociation;
     
-    if (hasAssociation) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[DEBUG] Associação direta encontrada');
-      }
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[DEBUG] Associação direta não encontrada, verificando via equipa...');
-      }
-      
+    if (!hasAssociation) {
       // PRIORIDADE 2: Verificar associação via equipa
       // 1. Verificar se o promotor é membro da equipa
       const { data: teamMember, error: teamMemberError } = await supabase
@@ -173,33 +131,7 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
         console.error('[ERROR] Erro ao verificar membro da equipa:', teamMemberError);
       }
 
-      // Remover todos os DEBUG logs massivos - apenas manter em development quando necessário
-      if (process.env.NODE_ENV === 'development' && process.env.ENABLE_VERBOSE_DEBUG === 'true') {
-        // DEBUG: Log detalhado para entender o problema
-        console.log('[DEBUG] Query team_members:', { 
-          user_id: promoterId, 
-          team_id: teamId, 
-          result: teamMember,
-          error: teamMemberError 
-        });
-
-        // DEBUG: Verificar se o promoter existe em alguma equipe
-        const { data: allTeamsForUser, error: allTeamsError } = await supabase
-          .from('team_members')
-          .select('team_id, role')
-          .eq('user_id', promoterId);
-        
-        console.log('[DEBUG] Todas as equipas do promotor:', allTeamsForUser);
-
-        // Todos os outros DEBUG logs verbosos continuam aqui mas só se ENABLE_VERBOSE_DEBUG=true
-        // ... resto do código de debug fica igual mas dentro desta condição
-      }
-
       if (teamMember) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[DEBUG] Promotor é membro da equipa, verificando se equipa está associada ao evento...');
-        }
-        
         // 2. Verificar se a equipa está associada ao evento via event_promoters
         const { data: teamEventAssociation, error: teamEventError } = await supabase
           .from('event_promoters')
@@ -214,20 +146,9 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
 
         if (teamEventAssociation && teamEventAssociation.length > 0) {
           hasAssociation = true;
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[DEBUG] Associação via equipa encontrada');
-          }
         } else {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[DEBUG] Equipa não está associada ao evento, verificando via organização...');
-          }
-          
           // 3. Verificar se a equipa está vinculada à organização do evento
-          if (!eventData.organization_id) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[DEBUG] Evento não tem organization_id definido');
-            }
-          } else {
+          if (eventData.organization_id) {
             const { data: orgAssociation, error: orgError } = await supabase
               .from('organization_teams')
               .select('organization_id')
@@ -241,19 +162,8 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
 
             if (orgAssociation) {
               hasAssociation = true;
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[DEBUG] Associação via organização encontrada');
-              }
-            } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[DEBUG] Equipa não está vinculada à organização do evento');
-              }
             }
           }
-        }
-      } else {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[DEBUG] Promotor não é membro da equipa especificada');
         }
       }
     }
@@ -263,15 +173,6 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
       promoter: promoterData || null,
       hasAssociation
     };
-
-    // Log final simplificado apenas em development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DEBUG] processPromoParams - Resultado final:', { 
-        eventTitle: result.event.title,
-        promoterName: result.promoter ? `${result.promoter.first_name} ${result.promoter.last_name}` : 'null',
-        hasAssociation: result.hasAssociation 
-      });
-    }
     
     return result;
 

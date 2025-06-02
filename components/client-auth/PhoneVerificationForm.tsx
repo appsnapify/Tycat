@@ -65,7 +65,7 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
   // Validação do telefone em tempo real
   const isPhoneValid = phone && isValidPhoneNumber(phone)
 
-  const verifyPhone = async (normalizedPhone: string): Promise<{exists: boolean, userId: string | null} | null> => {
+  const verifyPhone = async (): Promise<{exists: boolean, userId: string | null} | null> => {
     try {
       // REDUZIDO: Log apenas essencial em development
       if (process.env.NODE_ENV === 'development') {
@@ -75,26 +75,27 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
       setIsSubmitting(true);
       setError(null);
       
-      const normalizedPhone = normalizePhoneNumber(phone);
+      // Usar o telefone diretamente (já vem formatado do react-phone-number-input)
+      const phoneToVerify = phone;
       
       if (process.env.NODE_ENV === 'development') {
         console.log('Iniciando fetch de verificação de telefone');
       }
-
+      
       const response = await fetch('/api/client-auth-v2/check-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone: normalizedPhone }),
+        body: JSON.stringify({ phone: phoneToVerify }),
       });
-
+      
       if (process.env.NODE_ENV === 'development') {
-        console.log('Resposta recebida da API de verificação:', response.status);
+      console.log('Resposta recebida da API de verificação:', response.status);
       }
-
+      
       if (!response.ok) {
-        const errorData = await response.json();
+          const errorData = await response.json();
         throw new Error(errorData.error || `Erro na verificação: ${response.status}`);
       }
 
@@ -109,7 +110,7 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
         console.error('Erro ao fazer parse da resposta JSON:', parseError);
         throw new Error('Erro ao processar resposta do servidor');
       }
-
+      
       if (process.env.NODE_ENV === 'development') {
         console.log('Resposta da verificação de telefone:', responseData);
         console.log('Verificando userId retornado:', responseData.userId || 'não encontrado');
@@ -208,7 +209,7 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
           }, 10000); // 10 segundos
           
           // Chamar a função de verificação
-          data = await verifyPhone(phone);
+          data = await verifyPhone();
           
           // Limpar o timeout se a requisição completou
           clearTimeout(timeoutId);

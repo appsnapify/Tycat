@@ -32,6 +32,9 @@ interface ClientAuthProviderProps {
   persistSession?: boolean;
 }
 
+// Flag global para evitar logs repetitivos
+let providerMounted = false;
+
 // Componente Provider para o contexto de autenticação
 export const ClientAuthProvider = ({
   children,
@@ -51,10 +54,10 @@ export const ClientAuthProvider = ({
   // Referência ao cliente Supabase
   const supabaseClientRef = useRef(createClient())
   
-  // REDUZIDO: Log apenas uma vez por sessão
-  if (process.env.NODE_ENV === 'development' && !sessionStorage.getItem('auth_provider_mounted')) {
+  // Log apenas uma vez por carregamento da aplicação
+  if (process.env.NODE_ENV === 'development' && !providerMounted) {
     console.log('ClientAuthProvider montado - modo sem persistência de sessão');
-    sessionStorage.setItem('auth_provider_mounted', 'true');
+    providerMounted = true;
   }
   
   // Efeito para carregar o usuário da sessão ao montar o componente
@@ -104,7 +107,10 @@ export const ClientAuthProvider = ({
               phone: data.phone || ''
             };
             
-            console.log('Usuário carregado da sessão:', clientUser);
+            // Log apenas quando necessário
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Usuário carregado da sessão:', clientUser);
+            }
             
             setAuthState({
               user: clientUser,
@@ -137,7 +143,10 @@ export const ClientAuthProvider = ({
     // Configurar listener para mudanças na autenticação
     const { data: authListener } = supabaseClientRef.current.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Evento de autenticação:', event);
+        // Log apenas para eventos importantes
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          console.log('Evento de autenticação:', event);
+        }
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session && session.user) {
@@ -167,7 +176,10 @@ export const ClientAuthProvider = ({
                 phone: data.phone || ''
               };
               
-              console.log('Usuário atualizado após auth change:', clientUser);
+              // Log apenas quando necessário
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Usuário atualizado após auth change:', clientUser);
+              }
               
               setAuthState({
                 user: clientUser,
@@ -195,21 +207,17 @@ export const ClientAuthProvider = ({
 
   // Função para atualizar o usuário no contexto
   const updateUser = (user: ClientUser): Promise<ClientUser> => {
-    console.log('Atualizando estado do usuário:', user);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Atualizando estado do usuário:', user);
+    }
     return new Promise((resolve) => {
       setAuthState(prevState => ({
         ...prevState,
         user
       }));
-      console.log('Estado atualizado para:', {
-        user,
-        isLoading: false,
-        error: null
-      });
       
       // Pequeno timeout para garantir que o estado foi atualizado antes de resolver a Promise
       setTimeout(() => {
-        console.log('Estado atual após atualização:', authState);
         resolve(user);
       }, 50);
     });
@@ -217,7 +225,9 @@ export const ClientAuthProvider = ({
   
   // Verificar e renovar autenticação
   const checkAuth = async (): Promise<ClientUser | null> => {
-    console.log('Verificando autenticação atual');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Verificando autenticação atual');
+    }
     try {
       // Verificar sessão atual
       const { data: { session }, error } = await supabaseClientRef.current.auth.getSession();
@@ -229,7 +239,9 @@ export const ClientAuthProvider = ({
       
       // Se não há sessão, o usuário não está autenticado
       if (!session) {
-        console.log('Nenhuma sessão ativa encontrada');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Nenhuma sessão ativa encontrada');
+        }
         return null;
       }
       
@@ -257,7 +269,9 @@ export const ClientAuthProvider = ({
             phone: data.phone || ''
           };
           
-          console.log('Usuário verificado e atualizado:', clientUser);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Usuário verificado e atualizado:', clientUser);
+          }
           
           // Atualizar o estado no contexto
           setAuthState({

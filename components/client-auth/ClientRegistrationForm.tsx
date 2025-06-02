@@ -143,9 +143,7 @@ export default function ClientRegistrationForm({
         
         if (loginError) {
           console.warn('Aviso: Login automático falhou após registro', loginError);
-          // Tentar uma vez mais após um pequeno delay
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
+          // Tentar uma vez mais mas sem delay excessivo
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
             email: data.email,
             password: data.password
@@ -161,8 +159,8 @@ export default function ClientRegistrationForm({
           console.log('Login automático após registro bem-sucedido');
         }
         
-        // Garantir que a sessão está atualizada antes de continuar
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Pequeno delay apenas para garantir que a sessão está disponível
+        await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (loginErr) {
         console.warn('Falha ao tentar login automático após registro:', loginErr);

@@ -13,7 +13,7 @@ const getCookieSafe = async (name: string) => {
     const cookie = cookieStore.get(name);
     return cookie?.value;
   } catch (e) {
-    console.error(`Erro ao acessar cookie ${name}:`, e);
+    // Silenciosamente ignorar erros de cookie no servidor
     return undefined;
   }
 };
@@ -33,7 +33,7 @@ const setCookieSafe = async (name: string, value: string, options: any = {}) => 
     });
     return true;
   } catch (e) {
-    console.error(`Erro ao definir cookie ${name}:`, e);
+    // Silenciosamente ignorar erros de cookie no servidor
     return false;
   }
 };
@@ -50,7 +50,7 @@ const deleteCookieSafe = async (name: string, options: any = {}) => {
     });
     return true;
   } catch (e) {
-    console.error(`Erro ao excluir cookie ${name}:`, e);
+    // Silenciosamente ignorar erros de cookie no servidor
     return false;
   }
 };
@@ -86,8 +86,8 @@ export const createReadOnlyClient = async () => {
     {
       cookies: {
         get: getCookieSafe,
-        set: () => { console.log("Aviso: tentativa de modificar cookie em Server Component (ignorado)"); },
-        remove: () => { console.log("Aviso: tentativa de remover cookie em Server Component (ignorado)"); },
+        set: () => {}, // Silenciosamente ignorar modificações em Server Components
+        remove: () => {}, // Silenciosamente ignorar remoções em Server Components
       },
     }
   )
