@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar cliente Supabase
-    const supabase = createClient();
+    // Criar cliente Supabase (API routes podem usar createClient com await)
+    const supabase = await createClient();
 
     // Verificar se o usuário existe
     const { data: user, error: userError } = await supabase

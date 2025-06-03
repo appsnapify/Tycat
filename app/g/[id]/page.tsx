@@ -2,7 +2,7 @@
 // O [id] na URL é tratado como o eventId.
 
 import { notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createReadOnlyClient } from '@/lib/supabase/server';
 import OrganizadorGuestListContent from './OrganizadorGuestListContent';
 import { ClientAuthProvider } from '@/hooks/useClientAuth';
 
@@ -28,8 +28,8 @@ export default async function GuestListPage({ params }: PageProps) {
   }
 
   try {
-    // Criar cliente Supabase no servidor
-    const supabase = createClient();
+    // Criar cliente Supabase no servidor (READ-ONLY para Server Components)
+    const supabase = await createReadOnlyClient();
 
     // Buscar dados do evento
     const { data: event, error: eventError } = await supabase
@@ -76,6 +76,4 @@ export default async function GuestListPage({ params }: PageProps) {
     console.error('[ERROR] Erro ao processar página da organização:', error);
     notFound();
   }
-}
-
-// REMOVER toda a definição antiga de GuestListPageContent e código associado (interfaces, schema, countries, etc.) que agora está em GuestListPageClient.tsx 
+} 
