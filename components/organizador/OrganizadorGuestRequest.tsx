@@ -90,9 +90,9 @@ export function OrganizadorGuestRequest({
             setCompletedSteps(['phone', 'auth', 'qr']);
             
             if (result.isExisting) {
-              toast.info('Você já está na Guest List da Organização!');
+              toast.info('Você já está na Guest List deste evento!');
             } else {
-              toast.success(result.message || 'QR Code da Organização gerado com sucesso!');
+              toast.success(result.message || 'QR Code gerado com sucesso!');
             }
           } else {
             console.log('[ORGANIZADOR-AUTO-CHECK] Resposta inesperada:', result);
@@ -117,7 +117,7 @@ export function OrganizadorGuestRequest({
     }
     
     setIsSubmitting(true);
-    setLoadingMessage('Gerando seu QR Code da Organização...');
+    setLoadingMessage('Gerando seu QR Code...');
     setLoadingSubmessage('Validando dados e criando acesso');
     
     try {
@@ -171,9 +171,9 @@ export function OrganizadorGuestRequest({
         setShowQRCode(true);
         
         if (result.isExisting) {
-          toast.success(result.message || 'Você já está na Guest List da Organização! Aqui está seu QR Code.');
+          toast.success(result.message || 'Você já está na Guest List! Aqui está seu QR Code.');
         } else {
-          toast.success(result.message || 'Acesso confirmado pela Organização! Seu QR code está pronto.');
+          toast.success(result.message || 'Acesso confirmado! Seu QR code está pronto.');
         }
       } else {
         throw new Error('QR Code não retornado pela API');
@@ -214,18 +214,19 @@ export function OrganizadorGuestRequest({
     setAuthStep(exists ? 'login' : 'register');
   };
   
-  const handleLoginSuccess = async () => {
-    console.log('[ORGANIZADOR] Login bem-sucedido');
-    setCompletedSteps(['phone', 'auth']);
-    
-    // ✅ NOVO: Normalizar dados do usuário após login
-    if (user) {
+  const handleLoginSuccess = async (userData: any) => {
+    console.log('[ORGANIZADOR] Login bem-sucedido:', userData);
+    try {
+      // Marcar step de auth como completo
+      setCompletedSteps(['phone', 'auth']);
+      
+      // Normalizar dados do usuário (igual ao sistema /promo)
       const normalizedUser = {
-        id: user.id,
-        firstName: user.firstName || user.first_name || '',
-        lastName: user.lastName || user.last_name || '',
-        email: user.email || '',
-        phone: user.phone || ''
+        id: userData.id || userData.user_id || '',
+        firstName: userData.firstName || userData.first_name || '',
+        lastName: userData.lastName || userData.last_name || '',
+        email: userData.email || '',
+        phone: userData.phone || phone
       };
       
       console.log('📝 Dados normalizados do usuário:', {
@@ -235,27 +236,37 @@ export function OrganizadorGuestRequest({
         phone: normalizedUser.phone?.substring(0, 3) + '****'
       });
       
-      // Atualizar contexto com dados normalizados
-      updateUser(normalizedUser);
+      // ✅ CRÍTICO: Usar await para garantir que o contexto seja atualizado
+      await updateUser(normalizedUser);
       console.log('✅ Usuário atualizado no contexto');
+      
+      // Fechar o diálogo de autenticação
+      setDialogOpen(false);
+      console.log('✅ Diálogo fechado - useEffect deveria disparar agora');
+      
+      toast.success('Login realizado com sucesso');
+    } catch (error) {
+      console.error('Erro ao processar login:', error);
+      toast.error('Ocorreu um erro ao processar o login. Tente novamente.');
     }
-    
-    setDialogOpen(false);
-    console.log('✅ Diálogo fechado - useEffect deveria disparar agora');
   };
   
   const handleRegisterSuccess = async (userData: any) => {
     console.log('[ORGANIZADOR] Registro bem-sucedido:', userData);
-    setCompletedSteps(['phone', 'auth']);
-    
-    // ✅ NOVO: Normalizar dados do usuário após registro
-    if (userData.success && userData.user) {
+    try {
+      // Marcar step de auth como completo
+      setCompletedSteps(['phone', 'auth']);
+      
+      // CORRIGIDO: Extrair dados do user que vem dentro de userData
+      const user = userData.user || userData; // userData.user se a API retorna { success: true, user: {...} }
+      
+      // Normalizar dados do usuário
       const normalizedUser = {
-        id: userData.user.id,
-        firstName: userData.user.first_name || '',
-        lastName: userData.user.last_name || '',
-        email: userData.user.email || '',
-        phone: userData.user.phone || phone
+        id: user.id || user.user_id || '',
+        firstName: user.firstName || user.first_name || '',
+        lastName: user.lastName || user.last_name || '',
+        email: user.email || '',
+        phone: user.phone || phone
       };
       
       console.log('📝 Dados normalizados do usuário:', {
@@ -265,12 +276,18 @@ export function OrganizadorGuestRequest({
         phone: normalizedUser.phone?.substring(0, 3) + '****'
       });
       
-      // Atualizar contexto
-      updateUser(normalizedUser);
+      // ✅ CRÍTICO: Usar await para garantir que o contexto seja atualizado
+      await updateUser(normalizedUser);
       console.log('✅ Usuário atualizado no contexto');
       
+      // Fechar o diálogo de autenticação
       setDialogOpen(false);
       console.log('✅ Diálogo fechado - useEffect deveria disparar agora');
+      
+      toast.success('Registro realizado com sucesso');
+    } catch (error) {
+      console.error('Erro ao processar registro:', error);
+      toast.error('Ocorreu um erro ao processar o registro. Tente novamente.');
     }
   };
   
@@ -285,7 +302,7 @@ export function OrganizadorGuestRequest({
           <CardTitle className="text-xl text-center">
             {user 
               ? `Olá, ${user.firstName || 'Convidado'}!` 
-              : 'Acesse a lista de convidados da organização'}
+              : 'Acesse a lista de convidados'}
           </CardTitle>
         </CardHeader>
         
@@ -295,7 +312,7 @@ export function OrganizadorGuestRequest({
             <div className="bg-white p-4 rounded-lg shadow-lg">
               <Image 
                 src={qrCodeUrl} 
-                alt="QR Code de acesso da organização" 
+                alt="QR Code de acesso" 
                 width={250} 
                 height={250} 
                 priority
@@ -303,7 +320,7 @@ export function OrganizadorGuestRequest({
               />
             </div>
             <div className="text-center">
-              <p className="text-green-600 font-medium">Acesso aprovado pela Organização!</p>
+              <p className="text-green-600 font-medium">Acesso aprovado!</p>
               <p className="text-sm text-muted-foreground">
                 Apresente este QR code na entrada do evento
               </p>
@@ -315,61 +332,51 @@ export function OrganizadorGuestRequest({
               Esconder QR
             </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {user ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <UserCheck className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-green-800">Autenticado como {user.firstName}</p>
-                    <p className="text-sm text-green-600">{user.phone}</p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={requestAccess} 
-                  disabled={isSubmitting}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Gerando QR Code...
-                    </>
-                  ) : (
-                    <>
-                      Obter QR Code da Organização
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4 text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Phone className="h-5 w-5" />
-                  <span>Faça login para acessar a lista</span>
-                </div>
-                <Button 
-                  onClick={() => setDialogOpen(true)}
-                  className="w-full"
-                  size="lg"
-                >
-                  Entrar na Lista da Organização
+        ) : user ? (
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-2 text-green-600">
+              <UserCheck className="h-6 w-6" />
+              <span className="font-medium">Autenticado</span>
+            </div>
+            <Button 
+              onClick={requestAccess} 
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  Solicitar QR Code
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            )}
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Phone className="h-5 w-5" />
+              <span>Informe seu número para acessar</span>
+            </div>
+            <Button
+              onClick={() => setDialogOpen(true)}
+              className="w-full"
+            >
+              Entrar com telefone
+            </Button>
           </div>
         )}
         </CardContent>
         
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="w-full max-w-md p-0 mx-auto max-h-[80vh] overflow-y-auto">
-            <DialogTitle className="sr-only">Acesso à Guest List da Organização</DialogTitle>
+            <DialogTitle className="sr-only">Acesso à Guest List</DialogTitle>
             <DialogDescription className="sr-only">
-              Processo de autenticação para acesso à lista de convidados da organização. Siga as etapas para verificar seu telefone e obter seu QR code de entrada.
+              Processo de autenticação para acesso à lista de convidados. Siga as etapas para verificar seu telefone e obter seu QR code de entrada.
             </DialogDescription>
             
             {/* Progress Steps */}
