@@ -19,14 +19,16 @@ DECLARE
   v_qr_code_url TEXT;
   v_existing_guest_id UUID;
 BEGIN
-  -- Verificar se já existe um convidado com essas informações
+  -- ✅ VERIFICAÇÃO DUPLA DE DUPLICATAS: Verificar ambas as condições
+  
+  -- 1. Verificar se já existe um convidado com mesmo client_user_id + event_id
   SELECT id INTO v_existing_guest_id
   FROM guests
   WHERE event_id = p_event_id
     AND client_user_id = p_client_user_id
   LIMIT 1;
   
-  -- Se o convidado já existe, retornar suas informações
+  -- Se encontrou por client_user_id, retornar
   IF v_existing_guest_id IS NOT NULL THEN
     RETURN QUERY
     SELECT g.id, g.qr_code_url
@@ -35,7 +37,25 @@ BEGIN
     RETURN;
   END IF;
   
-  -- Gerar novo UUID e URL do QR code
+  -- 2. NOVA VERIFICAÇÃO: Verificar se já existe um convidado com mesmo phone + event_id
+  IF p_phone IS NOT NULL AND p_phone != '' THEN
+    SELECT id INTO v_existing_guest_id
+    FROM guests
+    WHERE event_id = p_event_id
+      AND phone = p_phone
+    LIMIT 1;
+    
+    -- Se encontrou por telefone, retornar o guest existente
+    IF v_existing_guest_id IS NOT NULL THEN
+      RETURN QUERY
+      SELECT g.id, g.qr_code_url
+      FROM guests g
+      WHERE g.id = v_existing_guest_id;
+      RETURN;
+    END IF;
+  END IF;
+  
+  -- Se chegou aqui, não há duplicatas - criar novo guest
   v_guest_id := gen_random_uuid();
   v_qr_code_url := 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' || v_guest_id::text;
   

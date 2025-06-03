@@ -50,7 +50,17 @@ export function GuestRequestClient({
   // 🔍 VERIFICAÇÃO AUTOMÁTICA: Verificar se usuário já é guest quando fizer login
   useEffect(() => {
     const checkExistingGuest = async () => {
-      if (!user?.id || showQRCode) return; // Não verificar se já está mostrando QR ou sem user
+      console.log('[AUTO-CHECK] useEffect disparado:', { 
+        hasUser: !!user?.id, 
+        userId: user?.id?.substring(0, 8) + '...', 
+        showQRCode, 
+        eventId: eventId?.substring(0, 8) + '...' 
+      });
+      
+      if (!user?.id || showQRCode) {
+        console.log('[AUTO-CHECK] Saindo: usuário não logado ou QR já mostrado');
+        return; // Não verificar se já está mostrando QR ou sem user
+      }
       
       try {
         console.log('[AUTO-CHECK] Verificando se usuário já é guest...');
@@ -64,6 +74,13 @@ export function GuestRequestClient({
           team_id: teamId
         };
         
+        console.log('[AUTO-CHECK] Enviando dados:', {
+          event_id: userData.event_id?.substring(0, 8) + '...',
+          client_user_id: userData.client_user_id?.substring(0, 8) + '...',
+          name: userData.name,
+          phone: userData.phone?.substring(0, 3) + '****'
+        });
+        
         const response = await fetch('/api/client-auth/guests/create', {
           method: 'POST',
           headers: {
@@ -72,8 +89,11 @@ export function GuestRequestClient({
           body: JSON.stringify(userData),
         });
         
+        console.log('[AUTO-CHECK] Resposta recebida:', response.status);
+        
         if (response.ok) {
           const result = await response.json();
+          console.log('[AUTO-CHECK] Resultado:', result);
           
           // Se retornou um guest existente, mostrar QR automaticamente
           if (result.success && result.isExisting && result.data?.qr_code_url) {
@@ -82,7 +102,19 @@ export function GuestRequestClient({
             setShowQRCode(true);
             setCompletedSteps(['phone', 'auth', 'qr']);
             toast.info('Você já está na Guest List deste evento!');
+          } else if (result.success && result.data?.qr_code_url) {
+            // ✅ NOVO: Se criou um guest novo, também mostrar QR
+            console.log('[AUTO-CHECK] Novo guest criado, mostrando QR...');
+            setQrCodeUrl(result.data.qr_code_url);
+            setShowQRCode(true);
+            setCompletedSteps(['phone', 'auth', 'qr']);
+            toast.success(result.message || 'QR Code gerado com sucesso!');
+          } else {
+            console.log('[AUTO-CHECK] Resposta inesperada:', result);
           }
+        } else {
+          const errorData = await response.text();
+          console.error('[AUTO-CHECK] Erro na resposta:', response.status, errorData);
         }
       } catch (error) {
         console.error('[AUTO-CHECK] Erro ao verificar guest existente:', error);
@@ -269,11 +301,20 @@ export function GuestRequestClient({
         phone: user.phone || phone
       };
       
+      console.log('📝 Dados normalizados do usuário:', {
+        id: normalizedUser.id?.substring(0, 8) + '...',
+        firstName: normalizedUser.firstName,
+        lastName: normalizedUser.lastName,
+        phone: normalizedUser.phone?.substring(0, 3) + '****'
+      });
+      
       // Atualizar contexto de autenticação
       await updateUser(normalizedUser);
+      console.log('✅ Usuário atualizado no contexto');
       
       // Fechar o diálogo de autenticação
       setDialogOpen(false);
+      console.log('✅ Diálogo fechado - useEffect deveria disparar agora');
       
       toast.success('Registro realizado com sucesso');
     } catch (error) {
