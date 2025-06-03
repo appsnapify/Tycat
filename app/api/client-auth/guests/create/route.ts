@@ -195,7 +195,8 @@ export async function POST(request: NextRequest) {
         p_promoter_id: promoter_id || null,
         p_team_id: team_id || null,
         p_name: name || 'Convidado',
-        p_phone: phone || ''
+        p_phone: phone || '',
+        p_source: 'PROMOTER'
       });
       
       if (createError) {
