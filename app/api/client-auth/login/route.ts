@@ -67,88 +67,96 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Verificar senha
+    // Verificar senha - SOLUÇÃO HÍBRIDA SEGURA
     console.log('Verificando senha para usuário:', userData.id);
     
-    // Comparação direta de senha - em produção usar bcrypt ou similar
-    if (userData.password !== password) {
-      console.log('Senha incorreta para o usuário:', userData.id);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Telefone ou senha incorretos' 
-      }, { status: 401 });
-    }
-    
-    // Criar email temporário para o Supabase Auth se não existir
+    // MÉTODO 1: Tentar Supabase Auth primeiro (para utilizadores novos e migrados)
+    let authSuccess = false;
     let userEmail = userData.email;
     if (!userEmail) {
       userEmail = `client_${userData.id}@temp.snap.com`;
     }
     
-    // Tentar fazer login no Supabase Auth
-    console.log('Tentando criar sessão Supabase Auth para:', userData.id);
-    
     try {
-      // Primeiro, verificar se já existe uma conta auth para este email
-      const { data: existingAuthUser } = await supabase.auth.admin.getUserByEmail(userEmail);
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: password
+      });
       
-      if (existingAuthUser.user) {
-        console.log('Usuário auth já existe, fazendo login...');
-        
-        // Tentar login com email e senha
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: userEmail,
-          password: password
-        });
-        
-        if (authError) {
-          console.error('Erro no login Supabase Auth:', authError);
-          // Se der erro, criar nova conta
-          throw authError;
-        }
-        
-        console.log('Login Supabase Auth bem-sucedido');
-        
-      } else {
-        console.log('Criando nova conta auth...');
-        
-        // Criar nova conta no Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-          email: userEmail,
-          password: password,
-          user_metadata: {
-            client_user_id: userData.id,
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            phone: userData.phone
-          },
-          email_confirm: true
-        });
-        
-        if (authError) {
-          console.error('Erro ao criar usuário auth:', authError);
-          throw authError;
-        }
-        
-        console.log('Conta auth criada com sucesso');
-        
-        // Agora fazer login
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-          email: userEmail,
-          password: password
-        });
-        
-        if (loginError) {
-          console.error('Erro no login após criação:', loginError);
-          throw loginError;
-        }
-        
-        console.log('Login após criação bem-sucedido');
+      if (!authError && authData.user) {
+        console.log('Login bem-sucedido via Supabase Auth');
+        authSuccess = true;
       }
+    } catch (authAttemptError) {
+      console.log('Falha no login via Auth, tentando método tabela...');
+    }
+    
+    // MÉTODO 2: Se Auth falhou, tentar password da tabela (utilizadores antigos)
+    if (!authSuccess && userData.password) {
+      console.log('Tentando login via password da tabela (utilizador antigo)');
       
-    } catch (authError) {
-      console.error('Erro na autenticação Supabase:', authError);
-      // Continuar sem sessão Supabase por agora
+      if (userData.password === password) {
+        console.log('Password da tabela correcta, migrando para Auth...');
+        
+        // MIGRAÇÃO AUTOMÁTICA: Criar/actualizar no Supabase Auth
+        try {
+          // Tentar criar no Auth se não existir
+          const { data: migrationData, error: migrationError } = await supabase.auth.admin.createUser({
+            email: userEmail,
+            password: password,
+            email_confirm: true,
+            user_metadata: {
+              client_user_id: userData.id,
+              first_name: userData.first_name,
+              last_name: userData.last_name,
+              phone: userData.phone
+            }
+          });
+          
+          if (!migrationError) {
+            console.log('Utilizador migrado com sucesso para Auth');
+            
+            // Limpar password da tabela após migração bem-sucedida
+            await supabase
+              .from('client_users')
+              .update({ password: null })
+              .eq('id', userData.id);
+              
+            authSuccess = true;
+          } else if (migrationError.message.includes('already been registered')) {
+            // Se já existe no Auth, apenas fazer login
+            const { data: existingAuthData, error: existingAuthError } = await supabase.auth.signInWithPassword({
+              email: userEmail,
+              password: password
+            });
+            
+            if (!existingAuthError) {
+              console.log('Login com Auth existente bem-sucedido');
+              
+              // Limpar password da tabela
+              await supabase
+                .from('client_users')
+                .update({ password: null })
+                .eq('id', userData.id);
+                
+              authSuccess = true;
+            }
+          }
+        } catch (migrationError) {
+          console.error('Erro na migração automática:', migrationError);
+          // Continuar com método tabela se migração falhou
+          authSuccess = true; // Temporariamente aceitar login por tabela
+        }
+      }
+    }
+    
+    // VERIFICAÇÃO FINAL
+    if (!authSuccess) {
+      console.log('Falha na autenticação - password incorrecta');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Telefone ou senha incorretos' 
+      }, { status: 401 });
     }
     
     console.log('Login realizado com sucesso:', { id: userData.id });

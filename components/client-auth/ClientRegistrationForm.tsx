@@ -130,7 +130,15 @@ export default function ClientRegistrationForm({
       
       console.log('Registro bem-sucedido:', result);
       
-      // 2. Se o registro for bem sucedido, fazer login do lado do cliente
+      // CORRIGIDO: Chamar onSuccess PRIMEIRO, antes do login automático
+      try {
+        onSuccess(result);
+        console.log('✅ onSuccess chamado com sucesso');
+      } catch (successError) {
+        console.error('🚨 Erro ao chamar onSuccess:', successError);
+      }
+      
+      // 2. Login automático é opcional - não deve bloquear o fluxo
       try {
         // Obter cliente Supabase (usando padrão singleton)
         const supabase = createClient();
@@ -159,15 +167,9 @@ export default function ClientRegistrationForm({
           console.log('Login automático após registro bem-sucedido');
         }
         
-        // Pequeno delay apenas para garantir que a sessão está disponível
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
       } catch (loginErr) {
         console.warn('Falha ao tentar login automático após registro:', loginErr);
       }
-      
-      // Informar sucesso e passar os dados do resultado
-      onSuccess(result);
       
     } catch (error) {
       console.error('Erro ao registrar:', error);

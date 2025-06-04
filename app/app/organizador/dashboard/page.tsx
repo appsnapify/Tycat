@@ -111,7 +111,8 @@ export default function OrganizadorDashboardPage() {
   const [kpis, setKpis] = useState({
     totalEvents: 0,
     upcomingEvents: 0,
-    teamsCount: 0
+    teamsCount: 0,
+    promotersCount: 0
   })
   const [teams, setTeams] = useState<Team[]>([])
   const [events, setEvents] = useState<Event[]>([])
@@ -293,7 +294,7 @@ export default function OrganizadorDashboardPage() {
     setOrganizationCode(generatedOrgCode)
   }
   
-  // Função de KPIs simplificada (apenas eventos e equipes)
+  // Função de KPIs atualizada para buscar dados corretos
   const loadKpis = async (organizationId: string) => {
     setLoadingKpis(true);
     
@@ -305,43 +306,44 @@ export default function OrganizadorDashboardPage() {
         setKpis({
           totalEvents: 0,
           upcomingEvents: 0,
-          teamsCount: 0
+          teamsCount: 0,
+          promotersCount: 0
         });
         setLoadingKpis(false);
         return;
       }
       
-      // 1. Buscar contagem de eventos com verificação de tabela
-      let eventsCount = 0;
+      // 1. Buscar eventos da organização para calcular corretamente
+      let completedEvents = 0;
+      let upcomingEvents = 0;
+      
       const eventsTableExists = await checkTableExists('events');
       
       if (eventsTableExists) {
         try {
-          // Tentar buscar eventos com filtro de organização
+          // Buscar todos os eventos da organização
           const eventsResponse = await supabase
             .from('events')
-            .select('id')
+            .select('id, date')
             .eq('organization_id', organizationId);
             
           if (eventsResponse.error) {
-            if (eventsResponse.error.code === '42703') {
-              console.error('A coluna organization_id não existe na tabela events:', eventsResponse.error);
-              
-              // Tentar buscar todos os eventos sem filtro
-              const allEventsResponse = await supabase
-                .from('events')
-                .select('id');
-                
-              if (!allEventsResponse.error) {
-                eventsCount = allEventsResponse.data?.length || 0;
-                console.log(`Contagem de todos os eventos (sem filtro): ${eventsCount}`);
-              }
-            } else {
-              console.error('Erro ao buscar eventos:', eventsResponse.error);
-            }
+            console.error('Erro ao buscar eventos:', eventsResponse.error);
           } else {
-            eventsCount = eventsResponse.data?.length || 0;
-            console.log(`Contagem de eventos filtrados: ${eventsCount}`);
+            const events = eventsResponse.data || [];
+            const now = new Date();
+            
+            // Separar eventos passados e futuros
+            events.forEach(event => {
+              const eventDate = new Date(event.date);
+              if (eventDate < now) {
+                completedEvents++;
+              } else {
+                upcomingEvents++;
+              }
+            });
+            
+            console.log(`Eventos completos: ${completedEvents}, Eventos próximos: ${upcomingEvents}`);
           }
         } catch (eventError) {
           console.error('Exceção ao contar eventos:', eventError);
@@ -350,7 +352,7 @@ export default function OrganizadorDashboardPage() {
         console.log('A tabela events não existe. Usando contagem zero.');
       }
       
-      // 2. Buscar contagem de equipes correta pela relação
+      // 2. Buscar contagem de equipes (já estava correto)
       let teamsCount = 0;
       const orgTeamsTableExists = await checkTableExists('organization_teams');
       
@@ -358,7 +360,7 @@ export default function OrganizadorDashboardPage() {
         try {
           console.log(`Contando equipes vinculadas à organização ${organizationId}...`);
           const { count, error: countError } = await supabase
-        .from('organization_teams')
+            .from('organization_teams')
             .select('team_id', { count: 'exact', head: true })
             .eq('organization_id', organizationId);
             
@@ -375,11 +377,46 @@ export default function OrganizadorDashboardPage() {
         console.log('A tabela organization_teams não existe. Usando contagem zero.');
       }
       
+      // 3. Buscar contagem de promotores únicos nas equipes da organização
+      let promotersCount = 0;
+      const teamMembersTableExists = await checkTableExists('team_members');
+      
+      if (teamMembersTableExists && orgTeamsTableExists) {
+        try {
+          console.log(`Contando promotores únicos nas equipes da organização ${organizationId}...`);
+          
+          // Query para contar promotores únicos nas equipes vinculadas à organização
+          const { data: promotersData, error: promotersError } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .in('team_id', 
+              supabase
+                .from('organization_teams')
+                .select('team_id')
+                .eq('organization_id', organizationId)
+            );
+            
+          if (promotersError) {
+            console.error('Erro ao contar promotores:', promotersError);
+          } else {
+            // Contar promotores únicos (remover duplicatas)
+            const uniquePromoters = new Set(promotersData?.map(p => p.user_id) || []);
+            promotersCount = uniquePromoters.size;
+            console.log(`Contagem de promotores únicos: ${promotersCount}`);
+          }
+        } catch (promotersError) {
+          console.error('Exceção ao contar promotores:', promotersError);
+        }
+      } else {
+        console.log('Tabelas necessárias para contar promotores não existem. Usando contagem zero.');
+      }
+      
       // Atualizar estados com os dados obtidos
       setKpis({
-        totalEvents: eventsCount,
-        upcomingEvents: 0, // Por enquanto, deixamos como zero
-        teamsCount: teamsCount
+        totalEvents: completedEvents,
+        upcomingEvents: upcomingEvents,
+        teamsCount: teamsCount,
+        promotersCount: promotersCount
       });
       
       console.log('KPIs carregados com sucesso');
@@ -391,7 +428,8 @@ export default function OrganizadorDashboardPage() {
       setKpis({
         totalEvents: 0,
         upcomingEvents: 0,
-        teamsCount: 0
+        teamsCount: 0,
+        promotersCount: 0
       });
     } finally {
       setLoadingKpis(false);

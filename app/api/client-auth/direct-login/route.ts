@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/adminClient';
 // import { cookies } from 'next/headers'; // Comentado
 // import { sign } from 'jsonwebtoken'; // Comentado
 
@@ -38,19 +38,8 @@ export async function POST(request: Request) {
     
     const { userId, password } = result.data;
     
-    // Inicializar cliente Supabase com a chave anônima
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Variáveis de ambiente do Supabase não configuradas');
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Configuração inválida do servidor' 
-      }, { status: 500 });
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Inicializar cliente Supabase Admin (seguindo padrão do projeto)
+    const supabase = createAdminClient();
     
     console.log('Buscando usuário pelo ID:', userId.substring(0, 8) + '...');
     
@@ -77,15 +66,95 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Verificar senha
+    // Verificar senha - SOLUÇÃO HÍBRIDA SEGURA
     console.log('Verificando senha para usuário:', userData.id);
     
-    // Comparação direta de senha - em produção usar bcrypt ou similar
-    if (userData.password !== password) {
-      console.log('Senha incorreta para o usuário:', userData.id);
+    // MÉTODO 1: Tentar Supabase Auth primeiro (para utilizadores novos e migrados)
+    let authSuccess = false;
+    let userEmail = userData.email;
+    if (!userEmail) {
+      userEmail = `client_${userData.id}@temp.snap.com`;
+    }
+    
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: password
+      });
+      
+      if (!authError && authData.user) {
+        console.log('Login bem-sucedido via Supabase Auth');
+        authSuccess = true;
+      }
+    } catch (authAttemptError) {
+      console.log('Falha no login via Auth, tentando método tabela...');
+    }
+    
+    // MÉTODO 2: Se Auth falhou, tentar password da tabela (utilizadores antigos)
+    if (!authSuccess && userData.password) {
+      console.log('Tentando login via password da tabela (utilizador antigo)');
+      
+      if (userData.password === password) {
+        console.log('Password da tabela correcta, migrando para Auth...');
+        
+        // MIGRAÇÃO AUTOMÁTICA: Criar/actualizar no Supabase Auth
+        try {
+          // Tentar criar no Auth se não existir
+          const { data: migrationData, error: migrationError } = await supabase.auth.admin.createUser({
+            email: userEmail,
+            password: password,
+            email_confirm: true,
+            user_metadata: {
+              client_user_id: userData.id,
+              first_name: userData.first_name,
+              last_name: userData.last_name,
+              phone: userData.phone
+            }
+          });
+          
+          if (!migrationError) {
+            console.log('Utilizador migrado com sucesso para Auth');
+            
+            // Limpar password da tabela após migração bem-sucedida
+            await supabase
+              .from('client_users')
+              .update({ password: null })
+              .eq('id', userData.id);
+              
+            authSuccess = true;
+          } else if (migrationError.message.includes('already been registered')) {
+            // Se já existe no Auth, apenas fazer login
+            const { data: existingAuthData, error: existingAuthError } = await supabase.auth.signInWithPassword({
+              email: userEmail,
+              password: password
+            });
+            
+            if (!existingAuthError) {
+              console.log('Login com Auth existente bem-sucedido');
+              
+              // Limpar password da tabela
+              await supabase
+                .from('client_users')
+                .update({ password: null })
+                .eq('id', userData.id);
+                
+              authSuccess = true;
+            }
+          }
+        } catch (migrationError) {
+          console.error('Erro na migração automática:', migrationError);
+          // Continuar com método tabela se migração falhou
+          authSuccess = true; // Temporariamente aceitar login por tabela
+        }
+      }
+    }
+    
+    // VERIFICAÇÃO FINAL
+    if (!authSuccess) {
+      console.log('Falha na autenticação - password incorrecta');
       return NextResponse.json({ 
         success: false, 
-        error: 'Usuário não encontrado ou senha incorreta' 
+        error: 'Telefone ou senha incorretos' 
       }, { status: 401 });
     }
     

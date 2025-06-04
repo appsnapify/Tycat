@@ -70,13 +70,13 @@ export function StatCard({
         </div>
         <div className="flex flex-col gap-1">
           {loading ? (
-            <div className="h-8 bg-gray-200 animate-pulse rounded-md w-16"></div>
+            <div className="h-8 bg-gray-200 animate-pulse rounded-md w-16 mx-auto"></div>
           ) : (
-            <p className="text-2xl font-bold text-gray-800">{value}</p>
+            <p className="text-2xl font-bold text-gray-800 text-center">{value}</p>
           )}
           {change && (
             <p className={cn(
-              "text-xs font-medium",
+              "text-xs font-medium text-center",
               change.startsWith('+') ? 'text-green-600' : 'text-red-600'
             )}>
               {change} desde último período

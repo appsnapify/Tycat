@@ -2,23 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { useClientAuth } from '@/hooks/useClientAuth';
-import { createClient } from '@/lib/supabase/client';
-import { Loader2, UserCheck, ArrowRight, Phone } from 'lucide-react';
+import { Loader2, ArrowRight, Phone } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { ClientUser } from '@/types/client';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PhoneVerificationForm } from '@/components/client-auth/PhoneVerificationForm';
 import ClientLoginForm from '@/components/client-auth/ClientLoginForm';
 import ClientRegistrationForm from '@/components/client-auth/ClientRegistrationForm';
 import { ProgressSteps } from '@/components/ui/progress-steps';
 import { LoadingOverlay } from '@/components/ui/loading-overlay';
-
-// Valores para acesso direto à API do Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xejpwdpumzalewamttjv.supabase.co';
 
 interface GuestRequestProps {
   eventId: string;
@@ -33,7 +27,7 @@ export function GuestRequestClient({
   teamId,
   className = ''
 }: GuestRequestProps) {
-  const { user, updateUser } = useClientAuth();
+  const [currentUser, setCurrentUser] = useState<ClientUser | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [phone, setPhone] = useState('');
@@ -47,87 +41,18 @@ export function GuestRequestClient({
   const [loadingMessage, setLoadingMessage] = useState('');
   const [loadingSubmessage, setLoadingSubmessage] = useState('');
   
-  // 🔍 VERIFICAÇÃO AUTOMÁTICA: Verificar se usuário já é guest quando fizer login
+  // 🔧 DEBUG: Monitor state changes
   useEffect(() => {
-    const checkExistingGuest = async () => {
-      console.log('[AUTO-CHECK] useEffect disparado:', { 
-        hasUser: !!user?.id, 
-        userId: user?.id?.substring(0, 8) + '...', 
-        showQRCode, 
-        eventId: eventId?.substring(0, 8) + '...' 
-      });
-      
-      if (!user?.id || showQRCode) {
-        console.log('[AUTO-CHECK] Saindo: usuário não logado ou QR já mostrado');
-        return; // Não verificar se já está mostrando QR ou sem user
-      }
-      
-      try {
-        console.log('[AUTO-CHECK] Verificando se usuário já é guest...');
-        
-        const userData = {
-          event_id: eventId,
-          client_user_id: user.id,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          phone: user.phone || '',
-          promoter_id: promoterId,
-          team_id: teamId
-        };
-        
-        console.log('[AUTO-CHECK] Enviando dados:', {
-          event_id: userData.event_id?.substring(0, 8) + '...',
-          client_user_id: userData.client_user_id?.substring(0, 8) + '...',
-          name: userData.name,
-          phone: userData.phone?.substring(0, 3) + '****'
-        });
-        
-        const response = await fetch('/api/client-auth/guests/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(userData),
-        });
-        
-        console.log('[AUTO-CHECK] Resposta recebida:', response.status);
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log('[AUTO-CHECK] Resultado:', result);
-          
-          // Se retornou um guest existente, mostrar QR automaticamente
-          if (result.success && result.isExisting && result.data?.qr_code_url) {
-            console.log('[AUTO-CHECK] Guest existente encontrado, mostrando QR...');
-            setQrCodeUrl(result.data.qr_code_url);
-            setShowQRCode(true);
-            setCompletedSteps(['phone', 'auth', 'qr']);
-            toast.info('Você já está na Guest List deste evento!');
-          } else if (result.success && result.data?.qr_code_url) {
-            // ✅ NOVO: Se criou um guest novo, também mostrar QR
-            console.log('[AUTO-CHECK] Novo guest criado, mostrando QR...');
-            setQrCodeUrl(result.data.qr_code_url);
-            setShowQRCode(true);
-            setCompletedSteps(['phone', 'auth', 'qr']);
-            toast.success(result.message || 'QR Code gerado com sucesso!');
-          } else {
-            console.log('[AUTO-CHECK] Resposta inesperada:', result);
-          }
-        } else {
-          const errorData = await response.text();
-          console.error('[AUTO-CHECK] Erro na resposta:', response.status, errorData);
-        }
-      } catch (error) {
-        console.error('[AUTO-CHECK] Erro ao verificar guest existente:', error);
-        // Não mostrar erro para o usuário aqui, é verificação silenciosa
-      }
-    };
-    
-    checkExistingGuest();
-  }, [user, eventId, promoterId, teamId, showQRCode]);
+    console.log('🔧 [DEBUG] STATE CHANGE - currentUser:', currentUser?.firstName || 'null');
+  }, [currentUser]);
+  
+  useEffect(() => {
+    console.log('🔧 [DEBUG] STATE CHANGE - dialogOpen:', dialogOpen);
+  }, [dialogOpen]);
   
   // Função para solicitar acesso ao evento (gerar QR code)
   const requestAccess = async () => {
-    if (!user) {
+    if (!currentUser) {
       toast.error('Você precisa estar autenticado para solicitar acesso');
       return;
     }
@@ -141,7 +66,7 @@ export function GuestRequestClient({
       if (!eventId) throw new Error('ID do evento não fornecido');
       if (!promoterId) throw new Error('ID do promotor não fornecido');
       if (!teamId) throw new Error('ID da equipe não fornecido');
-      if (!user.id) throw new Error('ID do usuário não fornecido');
+      if (!currentUser.id) throw new Error('ID do usuário não fornecido');
       
       console.log('Solicitando acesso para o evento');
       setLoadingSubmessage('Conectando com o servidor...');
@@ -149,9 +74,9 @@ export function GuestRequestClient({
       // Dados do usuário para enviar para a API
       const userData = {
         event_id: eventId,
-        client_user_id: user.id,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        phone: user.phone || '',
+        client_user_id: currentUser.id,
+        name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
+        phone: currentUser.phone || '',
         promoter_id: promoterId,
         team_id: teamId
       };
@@ -269,8 +194,8 @@ export function GuestRequestClient({
         phone: userData.phone || phone
       };
       
-      // Atualizar contexto de autenticação
-      await updateUser(normalizedUser);
+      // Atualizar state local (sem useClientAuth)
+      setCurrentUser(normalizedUser);
       
       // Fechar o diálogo de autenticação
       setDialogOpen(false);
@@ -284,13 +209,15 @@ export function GuestRequestClient({
 
   // Handler para sucesso no registro
   const handleRegisterSuccess = async (userData: any) => {
-    console.log('Registro bem-sucedido:', userData);
+    console.log('🔧 [DEBUG] Registro bem-sucedido - INÍCIO:', userData);
     try {
       // Marcar step de auth como completo
       setCompletedSteps(['phone', 'auth']);
+      console.log('🔧 [DEBUG] Steps marcados como completos');
       
       // CORRIGIDO: Extrair dados do user que vem dentro de userData
       const user = userData.user || userData; // userData.user se a API retorna { success: true, user: {...} }
+      console.log('🔧 [DEBUG] User extraído:', user);
       
       // Normalizar dados do usuário
       const normalizedUser = {
@@ -301,28 +228,35 @@ export function GuestRequestClient({
         phone: user.phone || phone
       };
       
-      console.log('📝 Dados normalizados do usuário:', {
+      console.log('🔧 [DEBUG] Dados normalizados do usuário:', {
         id: normalizedUser.id?.substring(0, 8) + '...',
         firstName: normalizedUser.firstName,
         lastName: normalizedUser.lastName,
         phone: normalizedUser.phone?.substring(0, 3) + '****'
       });
       
-      // Atualizar contexto de autenticação
-      await updateUser(normalizedUser);
-      console.log('✅ Usuário atualizado no contexto');
+      // Atualizar state local (sem useClientAuth)
+      console.log('🔧 [DEBUG] ANTES setCurrentUser - currentUser atual:', currentUser);
+      setCurrentUser(normalizedUser);
+      console.log('🔧 [DEBUG] DEPOIS setCurrentUser chamado');
       
       // Fechar o diálogo de autenticação
+      console.log('🔧 [DEBUG] ANTES setDialogOpen(false) - dialogOpen atual:', dialogOpen);
       setDialogOpen(false);
-      console.log('✅ Diálogo fechado - useEffect deveria disparar agora');
+      console.log('🔧 [DEBUG] DEPOIS setDialogOpen(false) chamado');
+      
+      // Resetar authStep para evitar problemas
+      console.log('🔧 [DEBUG] Resetando authStep para phone');
+      setAuthStep('phone');
       
       toast.success('Registro realizado com sucesso');
+      console.log('🔧 [DEBUG] Toast mostrado - FIM handleRegisterSuccess');
     } catch (error) {
-      console.error('Erro ao processar registro:', error);
+      console.error('🔧 [DEBUG] ERRO ao processar registro:', error);
       toast.error('Ocorreu um erro ao processar o registro. Tente novamente.');
     }
   };
-  
+
   // Função para iniciar verificação de telefone
   const startPhoneVerification = () => {
     setAuthStep('phone');
@@ -338,8 +272,8 @@ export function GuestRequestClient({
       <Card className={`w-full ${className}`}>
         <CardHeader>
           <CardTitle className="text-xl text-center">
-            {user 
-              ? `Olá, ${user.firstName || 'Convidado'}!` 
+            {currentUser 
+              ? `Olá, ${currentUser.firstName || 'Convidado'}!` 
               : 'Acesse a lista de convidados'}
           </CardTitle>
         </CardHeader>
@@ -370,11 +304,11 @@ export function GuestRequestClient({
               Esconder QR
             </Button>
           </div>
-          ) : user ? (
+          ) : currentUser ? (
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2 text-green-600">
-                <UserCheck className="h-6 w-6" />
-                <span className="font-medium">Autenticado</span>
+                <Phone className="h-6 w-6" />
+                <span className="font-medium">Autenticado como {currentUser.firstName}</span>
               </div>
         <Button 
                 onClick={requestAccess} 

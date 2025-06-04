@@ -31,6 +31,7 @@ interface DashboardContentProps {
     totalEvents: number
     upcomingEvents: number
     teamsCount: number
+    promotersCount: number
   }
   events: Array<{
     id: string
@@ -124,10 +125,9 @@ export function DashboardContent({
       {/* KPIs / Métricas principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard
-          title="Total de Eventos"
+          title="Eventos Completos"
           value={loadingKpis ? "..." : kpis.totalEvents}
           icon={<CalendarDays size={18} />}
-          change="+12%"
           color="lime"
           loading={loadingKpis}
         />
@@ -135,7 +135,6 @@ export function DashboardContent({
           title="Eventos Próximos"
           value={loadingKpis ? "..." : kpis.upcomingEvents} 
           icon={<TicketCheck size={18} />}
-          change="+5%"
           color="fuchsia"
           loading={loadingKpis}
         />
@@ -143,15 +142,13 @@ export function DashboardContent({
           title="Equipes"
           value={loadingKpis ? "..." : kpis.teamsCount}
           icon={<Users size={18} />}
-          change="-2%"
           color="fuchsia"
           loading={loadingKpis}
         />
         <StatCard
-          title="Taxa de Ocupação"
-          value={loadingKpis ? "..." : "87%"}
-          icon={<Percent size={18} />}
-          change="+9%"
+          title="Promotores"
+          value={loadingKpis ? "..." : kpis.promotersCount}
+          icon={<Users size={18} />}
           color="lime"
           loading={loadingKpis}
         />
