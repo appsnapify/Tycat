@@ -385,24 +385,40 @@ export default function OrganizadorDashboardPage() {
         try {
           console.log(`Contando promotores únicos nas equipes da organização ${organizationId}...`);
           
-          // Query para contar promotores únicos nas equipes vinculadas à organização
-          const { data: promotersData, error: promotersError } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .in('team_id', 
-              supabase
-                .from('organization_teams')
-                .select('team_id')
-                .eq('organization_id', organizationId)
-            );
+          // CORRIGIDO: Primeiro buscar IDs das equipes da organização
+          const { data: orgTeamIds, error: orgTeamsError } = await supabase
+            .from('organization_teams')
+            .select('team_id')
+            .eq('organization_id', organizationId);
             
-          if (promotersError) {
-            console.error('Erro ao contar promotores:', promotersError);
+          if (orgTeamsError) {
+            console.error('Erro ao buscar equipes da organização:', orgTeamsError);
+            throw orgTeamsError;
+          }
+          
+          // Extrair array de team_ids
+          const teamIdArray = orgTeamIds?.map(ot => ot.team_id) || [];
+          console.log(`Encontradas ${teamIdArray.length} equipes para a organização`);
+          
+          if (teamIdArray.length === 0) {
+            console.log('Nenhuma equipe encontrada para esta organização');
+            promotersCount = 0;
           } else {
-            // Contar promotores únicos (remover duplicatas)
-            const uniquePromoters = new Set(promotersData?.map(p => p.user_id) || []);
-            promotersCount = uniquePromoters.size;
-            console.log(`Contagem de promotores únicos: ${promotersCount}`);
+            // Agora buscar promotores únicos usando array de IDs
+            const { data: promotersData, error: promotersError } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .in('team_id', teamIdArray);
+              
+            if (promotersError) {
+              console.error('Erro ao contar promotores:', promotersError);
+              throw promotersError;
+            } else {
+              // Contar promotores únicos (remover duplicatas)
+              const uniquePromoters = new Set(promotersData?.map(p => p.user_id) || []);
+              promotersCount = uniquePromoters.size;
+              console.log(`Contagem de promotores únicos: ${promotersCount}`);
+            }
           }
         } catch (promotersError) {
           console.error('Exceção ao contar promotores:', promotersError);
