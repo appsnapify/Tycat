@@ -1,24 +1,36 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useVibrate } from '@/hooks/useVibrate'
+import { useScannerSounds } from '@/hooks/useScannerSounds'
+import { Scanner } from '@yudiel/react-qr-scanner'
+import ScannerFeedback from '../components/ScannerFeedback'
+import ViewFinder from '../components/ViewFinder'
 import { Badge } from '@/components/ui/badge'
-import { Camera, Search, Settings, Wifi, WifiOff, Users, CheckCircle2, Clock, Phone, QrCode } from 'lucide-react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
+import { AlertCircle, CheckCircle2, Clock, Phone, QrCode, Users, Wifi, WifiOff, LogOut, Settings } from 'lucide-react'
+import { formatPortugalTime, isValidTimestamp } from '@/lib/utils/time'
 
 interface ScannerData {
-  scanner_name: string
-  username: string
-  event_id: string
-}
-
-interface EventData {
-  id: string
-  title: string
-  date: string
-  location: string
+  scanner: {
+    id: string
+    event_id: string
+    scanner_name: string
+    username: string
+    is_active: boolean
+    events: {
+      id: string
+      title: string
+      date: string
+      organization_id: string
+    }
+  }
+  event: {
+    id: string
+    title: string
+    date: string
+    organization_id: string
+  }
 }
 
 interface ScanResult {
@@ -28,492 +40,535 @@ interface ScanResult {
   timestamp: string
   method: 'qr_code' | 'name_search'
   success: boolean
+  status: 'success' | 'error' | 'already-checked' | 'processing'
+  message: string
+}
+
+interface ApiResponse {
+  success: boolean
+  error?: string
+  message?: string
+  guest_id?: string
+  guest_name?: string
+  guest_phone?: string
+  check_in_time?: string
+  check_in_display_time?: string // 🕐 Novo campo formatado da API
+  scan_method?: string
+  already_checked_in?: boolean
 }
 
 export default function ScannerDashboard() {
-  const [scannerData, setScannerData] = useState<ScannerData | null>(null)
-  const [eventData, setEventData] = useState<EventData | null>(null)
-  const [isOnline, setIsOnline] = useState(true)
-  const [lastScan, setLastScan] = useState<ScanResult | null>(null)
-  const [stats, setStats] = useState({
-    total: 0,
-    checkedIn: 0,
-    pendingSync: 0
-  })
-  const [isScanning, setIsScanning] = useState(false)
-  const [scannerReady, setScannerReady] = useState(false)
-  const [error, setError] = useState('')
-  const [mounted, setMounted] = useState(false)
-  
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const router = useRouter()
+  const vibrate = useVibrate()
+  const playSound = useScannerSounds()
 
-  // Garantir hidratação correta
+  const [isOnline, setIsOnline] = useState(true)
+  const [scannerData, setScannerData] = useState<ScannerData | null>(null)
+  const [currentScan, setCurrentScan] = useState<ScanResult | null>(null)
+  const [recentScans, setRecentScans] = useState<ScanResult[]>([])
+  const [stats, setStats] = useState({ total: 0, checkedIn: 0, pendingSync: 0 })
+
+  const DEBOUNCE_DELAY = 1000 // 1 segundo (reduzido para melhor UX)
+  const lastScannedCodeRef = useRef('')
+  const lastScanTimeRef = useRef(0)
+
   useEffect(() => {
-    setMounted(true)
-    
-    // Carregar dados do localStorage após mount
+    // Verifica se tem token
     const token = localStorage.getItem('scanner_token')
-    const scannerDataStr = localStorage.getItem('scanner_data')
-    const eventDataStr = localStorage.getItem('event_data')
-
-    if (!token || !scannerDataStr || !eventDataStr) {
+    if (!token) {
       router.push('/scanner/login')
       return
     }
 
-    const scannerInfo = JSON.parse(scannerDataStr)
-    const eventInfo = JSON.parse(eventDataStr)
-    
-    setScannerData(scannerInfo)
-    setEventData(eventInfo)
-    
-    // Verificar conectividade
-    setIsOnline(navigator.onLine)
-    
-    // Carregar dados essenciais
-    loadGuestsCache(eventInfo.id)
-    loadStats(eventInfo.id)
-  }, [router])
+    // Carrega dados do scanner
+    const loadScannerData = async () => {
+      try {
+        const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`
 
-  // Monitor conexão apenas após mount
-  useEffect(() => {
-    if (!mounted) return
+        const response = await fetch('/api/scanners/auth/check', {
+          headers: {
+            'Authorization': formattedToken
+          }
+        })
 
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [mounted])
-
-  const loadGuestsCache = async (eventId: string) => {
-    try {
-      const token = localStorage.getItem('scanner_token')
-      console.log('🔍 Carregando guests para evento:', eventId)
-      
-      // Tentar carregar guests do servidor
-      const response = await fetch(`/api/guests?event_id=${eventId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+        if (!response.ok) {
+          throw new Error('Não autorizado')
         }
-      })
 
-      console.log('📡 Response guests:', response.status, response.statusText)
-
-      if (response.ok) {
         const data = await response.json()
-        console.log('📋 Dados recebidos:', data)
-        console.log('📋 Guests carregados:', data.guests?.length || data.length || 0)
-        
-        // Salvar no cache local - verificar se data.guests ou data diretamente
-        const guestsList = data.guests || data || []
-        localStorage.setItem('cached_guests', JSON.stringify(guestsList))
-        
-        // Atualizar stats com total correto
-        setStats(prev => ({
-          ...prev,
-          total: guestsList.length
-        }))
-      } else {
-        console.log('⚠️ Erro ao carregar guests:', response.status, 'usando cache local')
-        
-        // Tentar carregar do cache local
-        const cached = localStorage.getItem('cached_guests')
-        if (cached) {
-          const guestsList = JSON.parse(cached)
-          setStats(prev => ({
-            ...prev,
-            total: guestsList.length
-          }))
-        }
-      }
-    } catch (error) {
-      console.log('⚠️ Offline - usando cache local para guests')
-      
-      // Carregar do cache se disponível
-      const cached = localStorage.getItem('cached_guests')
-      if (cached) {
-        const guestsList = JSON.parse(cached)
-        setStats(prev => ({
-          ...prev,
-          total: guestsList.length
-        }))
+        setScannerData(data)
+
+        // Carrega stats iniciais
+        loadStats(data.scanner.event_id)
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do scanner:', error)
+        router.push('/scanner/login')
       }
     }
-  }
 
-  const loadStats = async (eventId: string) => {
-    try {
-      console.log('📊 Carregando stats para evento:', eventId)
-      const response = await fetch(`/api/guest-count?eventId=${eventId}`)
+    // Carrega stats do evento
+    const loadStats = async (eventId: string) => {
+      try {
+        const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+
+        console.log('📊 Carregando stats para evento:', eventId)
+        const response = await fetch(`/api/scanners/stats?event_id=${eventId}`, {
+          headers: {
+            'Authorization': formattedToken
+          }
+        })
       
-      console.log('📡 Response stats:', response.status, response.statusText)
-      
-      if (response.ok) {
+        console.log('📡 Response stats:', response.status, response.statusText)
         const data = await response.json()
         console.log('📊 Stats recebidas:', data)
         
-        setStats(prev => ({
-          total: data.total || data.count || prev.total, // Tentar diferentes campos
-          checkedIn: data.checkedIn || data.checked_in || 0,
-          pendingSync: JSON.parse(localStorage.getItem('pending_scans') || '[]').length
-        }))
-        
-        console.log('📊 Stats atualizadas:', { 
-          total: data.total || data.count, 
-          checkedIn: data.checkedIn || data.checked_in 
-        })
-      } else {
-        console.log('⚠️ Erro ao carregar stats:', response.status)
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar stats:', error)
-    }
-  }
-
-  const startScanner = async () => {
-    if (scannerRef.current) {
-      await stopScanner()
-    }
-
-    try {
-      setError('')
-      
-      // ✅ CORREÇÃO: Renderizar elemento PRIMEIRO
-      setScannerReady(true)
-      setIsScanning(true)
-      
-      // ✅ Aguardar renderização do DOM
-      await new Promise(resolve => setTimeout(resolve, 150))
-      
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        videoConstraints: {
-          facingMode: "environment" // Câmera traseira
+        if (response.ok && data.success) {
+          setStats(prev => ({
+            ...prev,
+            total: data.count,
+            checkedIn: data.checkedIn
+          }))
+          console.log('📊 Stats atualizadas:', { total: data.count, checkedIn: data.checkedIn })
+        } else if (response.status === 401) {
+          // Sessão expirada - fazer logout automático
+          console.log('🚨 Sessão expirada detectada - fazendo logout automático')
+          handleLogout()
         }
-      }
-
-      scannerRef.current = new Html5QrcodeScanner('qr-scanner', config, false)
-      
-      scannerRef.current.render(
-        (decodedText) => {
-          console.log('📷 QR Scaneado:', decodedText)
-          handleQRScan(decodedText)
-        },
-        (error) => {
-          // Ignorar erros de scan contínuos
-        }
-      )
-      
-      console.log('📷 Scanner iniciado com sucesso')
-      
-    } catch (error) {
-      console.error('❌ Erro ao iniciar scanner:', error)
-      setError('Erro ao aceder à câmera. Verifique as permissões.')
-      setScannerReady(false)
-      setIsScanning(false)
-    }
-  }
-
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.clear()
-        scannerRef.current = null
-        setIsScanning(false)
-        setScannerReady(false)
-        console.log('📷 Scanner parado')
       } catch (error) {
-        console.error('Erro ao parar scanner:', error)
+        console.error('❌ Erro ao carregar stats:', error)
       }
+    }
+
+    // Monitora status online/offline
+    const checkOnlineStatus = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', checkOnlineStatus)
+    window.addEventListener('offline', checkOnlineStatus)
+
+    // Carrega scans recentes do localStorage
+    const savedScans = localStorage.getItem('recent_scans')
+    if (savedScans) {
+      try {
+        const parsedScans = JSON.parse(savedScans)
+        // 🧹 LIMPEZA: Filtrar scans com timestamps inválidos para evitar loops de erro
+        const validScans = parsedScans.filter((scan: ScanResult) => isValidTimestamp(scan.timestamp))
+        setRecentScans(validScans)
+        
+        // 💾 Salvar scans limpos de volta no localStorage
+        if (validScans.length !== parsedScans.length) {
+          localStorage.setItem('recent_scans', JSON.stringify(validScans))
+          console.log('🧹 Limpeza: Removidos', parsedScans.length - validScans.length, 'scans com timestamps inválidos')
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar scans do localStorage:', error)
+        // 🗑️ Se há erro no parse, limpar o localStorage
+        localStorage.removeItem('recent_scans')
+        setRecentScans([])
+      }
+    }
+
+    loadScannerData()
+
+    return () => {
+      window.removeEventListener('online', checkOnlineStatus)
+      window.removeEventListener('offline', checkOnlineStatus)
+    }
+  }, [router])
+
+  const processScan = async (qrCode: string, method: 'qr_code' | 'name_search') => {
+    console.log('🔍 Processando scan:', { qrCode, method })
+    
+    const token = localStorage.getItem('scanner_token')
+    if (!token) {
+      throw new Error('Não autorizado')
+    }
+
+    // Garantir que o token está formatado corretamente
+    const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+
+    const response = await fetch('/api/scanners/scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': formattedToken
+      },
+      body: JSON.stringify({
+        qr_code: qrCode,
+        scan_method: method
+      })
+    })
+
+    console.log('📡 Response scan:', response.status, response.statusText)
+    
+    let data: ApiResponse
+    try {
+      data = await response.json()
+      console.log('📡 Response data:', data)
+    } catch (jsonError) {
+      console.error('❌ Erro ao parsear JSON da resposta:', jsonError)
+      throw new Error('Resposta inválida do servidor')
+    }
+
+    // ✅ Tratar 409 como "sucesso especial" ANTES de verificar erros
+    if (response.status === 409) {
+      console.log('✅ Check-in já realizado (409):', {
+        guest: data.guest_name,
+        check_in_time: data.check_in_time,
+        check_in_display_time: data.check_in_display_time
+      })
+      return {
+        success: false,
+        already_checked_in: true,
+        guest_name: data.guest_name,
+        guest_phone: data.guest_phone,
+        check_in_time: data.check_in_time,
+        check_in_display_time: data.check_in_display_time, // 🕐 Passar horário formatado
+        status: 'already-checked' as const,
+        error: data.error || 'Check-in já realizado anteriormente'
+      }
+    }
+
+    // Agora só entram erros REAIS
+    if (!response.ok) {
+      console.error('❌ Erro real na resposta:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: data || 'Response vazio',
+        url: response.url
+      })
+      throw new Error(data.error || 'Erro ao processar QR code')
+    }
+
+    return {
+      success: true,
+      already_checked_in: false,
+      guest_name: data.guest_name,
+      guest_phone: data.guest_phone,
+      check_in_time: data.check_in_time,
+      check_in_display_time: data.check_in_display_time, // 🕐 Incluir horário formatado
+      status: 'success' as const
     }
   }
 
-  const handleQRScan = async (qrCode: string) => {
+  const handleScan = async (detectedCodes: Array<{ format: string; rawValue: string }>) => {
+    if (!detectedCodes.length) return
+    
+    const qrCode = detectedCodes[0].rawValue
+    const now = Date.now()
+    
+    // Debounce para evitar scans duplicados
+    if (qrCode === lastScannedCodeRef.current && (now - lastScanTimeRef.current) < DEBOUNCE_DELAY) {
+      return
+    }
+    
+    lastScannedCodeRef.current = qrCode
+    lastScanTimeRef.current = now
+    
     try {
-      setError('')
-      
+      setCurrentScan({
+        id: qrCode,
+        name: 'Processando...',
+        phone: '',
+        timestamp: new Date().toISOString(),
+        method: 'qr_code',
+        success: false,
+        status: 'processing',
+        message: 'Verificando QR code...'
+      })
+
       const result = await processScan(qrCode, 'qr_code')
       
+      // Usar timestamp do check-in real quando disponível
+      const actualTimestamp = result.check_in_time || new Date().toISOString()
+      
+      // 🕐 Usar horário formatado da API quando disponível, senão formatar localmente
+      const displayTime = result.check_in_display_time || formatPortugalTime(actualTimestamp)
+      
+      const finalScan: ScanResult = {
+        id: qrCode,
+        name: result.guest_name || 'QR Code Inválido',
+        phone: result.guest_phone || '-',
+        timestamp: actualTimestamp,
+        method: 'qr_code',
+        success: result.success,
+        status: result.status,
+        message: result.error || (result.already_checked_in ? 
+          `Check-in já realizado às ${displayTime}` : 
+          'Check-in realizado com sucesso')
+      }
+
+      setCurrentScan(finalScan)
+      setRecentScans(prev => {
+        // 🛡️ VALIDAÇÃO: Garantir que o novo scan tem timestamp válido
+        if (isValidTimestamp(finalScan.timestamp)) {
+          const updated = [finalScan, ...prev].slice(0, 50) // 🔧 Limite de 50 scans para evitar memory leak
+          localStorage.setItem('recent_scans', JSON.stringify(updated))
+          return updated
+        } else {
+          console.warn('⚠️ Scan com timestamp inválido não foi salvo:', finalScan.timestamp)
+          return prev
+        }
+      })
+
+      // Auto-clear feedback após 4 segundos para permitir novo scan
+      setTimeout(() => {
+        setCurrentScan(null)
+        // Reset debounce para permitir re-scan mais rápido
+        lastScannedCodeRef.current = ''
+        lastScanTimeRef.current = 0
+      }, 4000)
+
       if (result.success) {
-        setLastScan({
-          id: result.guest_id,
-          name: result.guest_name,
-          phone: result.guest_phone,
-          timestamp: new Date().toLocaleTimeString('pt-PT'),
-          method: 'qr_code',
-          success: true
-        })
-        
         setStats(prev => ({
           ...prev,
           checkedIn: prev.checkedIn + 1
         }))
-        
-        // Feedback visual/sonoro
-        console.log('✅ Check-in realizado:', result.guest_name)
-        
+        vibrate([200])
+        playSound('success')
+      } else if (result.already_checked_in) {
+        vibrate([100, 100, 100])
+        playSound('already-checked')
       } else {
-        setError(result.error || 'QR Code inválido')
-        console.log('❌ Scan falhou:', result.error)
+        vibrate([100, 100, 100])
+        playSound('error')
       }
-    } catch (error) {
-      console.error('❌ Erro no scan:', error)
-      setError('Erro ao processar QR code')
+
+    } catch (error: any) {
+      console.error('❌ Erro ao processar scan:', error)
+      const errorScan: ScanResult = {
+        id: qrCode,
+        name: 'Erro no Scan',
+        phone: '-',
+        timestamp: new Date().toISOString(),
+        method: 'qr_code',
+        success: false,
+        status: 'error',
+        message: error.message || 'Erro ao processar QR code'
+      }
+      
+      setCurrentScan(errorScan)
+      setRecentScans(prev => {
+        // 🛡️ VALIDAÇÃO: Garantir que o erro scan tem timestamp válido
+        if (isValidTimestamp(errorScan.timestamp)) {
+          const updated = [errorScan, ...prev].slice(0, 50) // 🔧 Limite de 50 scans para evitar memory leak
+          localStorage.setItem('recent_scans', JSON.stringify(updated))
+          return updated
+        } else {
+          console.warn('⚠️ Error scan com timestamp inválido não foi salvo:', errorScan.timestamp)
+          return prev
+        }
+      })
+
+      // Auto-clear feedback de erro após 4 segundos
+      setTimeout(() => {
+        setCurrentScan(null)
+        lastScannedCodeRef.current = ''
+        lastScanTimeRef.current = 0
+      }, 4000)
+
+      vibrate([100, 100, 100])
+      playSound('error')
     }
   }
 
-  const processScan = async (qrCode: string, method: 'qr_code' | 'name_search') => {
+  const handleError = (error: unknown) => {
+    console.error('❌ Erro no scanner:', error)
+    
+    let errorMessage = 'Erro ao acessar a câmera'
+    
+    // Tratamento específico para erros de permissão
+    if (error instanceof Error) {
+      if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
+        errorMessage = 'Permissão da câmera negada. Por favor, permita o acesso à câmera.'
+      } else if (error.name === 'NotFoundError' || error.message.includes('Requested device not found')) {
+        errorMessage = 'Câmera não encontrada. Verifique se seu dispositivo tem uma câmera disponível.'
+      } else if (error.name === 'NotReadableError' || error.message.includes('Could not start video source')) {
+        errorMessage = 'Não foi possível acessar a câmera. Ela pode estar sendo usada por outro aplicativo.'
+      }
+    }
+
+    setCurrentScan({
+      id: '',
+      name: 'Erro na Câmera',
+      phone: '-',
+      timestamp: new Date().toISOString(),
+      method: 'qr_code',
+      success: false,
+      status: 'error',
+      message: errorMessage
+    })
+
+    // Tenta reiniciar a câmera após 3 segundos
+    setTimeout(() => {
+      setCurrentScan(null)
+    }, 3000)
+  }
+
+  const clearCurrentScan = () => {
+    setCurrentScan(null)
+    // Reset debounce para permitir novo scan do mesmo QR code
+    lastScannedCodeRef.current = ''
+    lastScanTimeRef.current = 0
+  }
+
+  const handleLogout = async () => {
     const token = localStorage.getItem('scanner_token')
     
-    try {
-      const response = await fetch('/api/scanners/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          qr_code: qrCode,
-          scan_method: method
+    if (token) {
+      try {
+        // Chamar API de logout para invalidar sessão no servidor
+        const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+        await fetch('/api/scanners/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': formattedToken
+          }
         })
-      })
-
-      return await response.json()
-    } catch (error) {
-      if (!isOnline) {
-        return processOfflineScan(qrCode, method)
-      }
-      throw error
-    }
-  }
-
-  const processOfflineScan = (qrCode: string, method: 'qr_code' | 'name_search') => {
-    const cachedGuests = JSON.parse(localStorage.getItem('cached_guests') || '[]')
-    const guest = cachedGuests.find((g: any) => 
-      g.qr_code_url?.includes(qrCode) || g.id === qrCode
-    )
-
-    if (guest && !guest.checked_in) {
-      guest.checked_in = true
-      guest.check_in_time = new Date().toISOString()
-      
-      const pendingScans = JSON.parse(localStorage.getItem('pending_scans') || '[]')
-      pendingScans.push({
-        guest_id: guest.id,
-        scan_time: new Date().toISOString(),
-        method,
-        qr_code: qrCode
-      })
-      localStorage.setItem('pending_scans', JSON.stringify(pendingScans))
-      
-      setStats(prev => ({
-        ...prev,
-        pendingSync: prev.pendingSync + 1
-      }))
-
-      return {
-        success: true,
-        guest_id: guest.id,
-        guest_name: guest.name,
-        guest_phone: guest.phone
+      } catch (error) {
+        console.error('❌ Erro ao fazer logout no servidor:', error)
+        // Continua com logout local mesmo se servidor falhar
       }
     }
-
-    return {
-      success: false,
-      error: guest ? 'Já fez check-in' : 'Convidado não encontrado'
-    }
-  }
-
-  const goToNameSearch = () => {
-    router.push('/scanner/search')
-  }
-
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-PT')
-  }
-
-  // Loading state enquanto não carregou
-  if (!mounted || !scannerData || !eventData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-lg font-medium">Carregando scanner...</p>
-        </div>
-      </div>
-    )
+    
+    // Limpar dados locais
+    localStorage.removeItem('scanner_token')
+    localStorage.removeItem('recent_scans')
+    
+    // Redirecionar para login
+    router.push('/scanner/login')
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Mobile Optimized */}
-      <div className="bg-indigo-600 text-white p-4 shadow-lg sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-lg">🎫 {scannerData.scanner_name}</h1>
-            <p className="text-indigo-200 text-sm truncate max-w-[200px]">{eventData.title}</p>
+      {/* Header - Status e Stats */}
+      <div className="sticky top-0 z-10 bg-white border-b">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant={isOnline ? "success" : "destructive"} className="h-8 px-3">
+              {isOnline ? (
+                <><Wifi className="h-4 w-4 mr-1" /> Online</>
+              ) : (
+                <><WifiOff className="h-4 w-4 mr-1" /> Offline</>
+              )}
+            </Badge>
+            {stats.pendingSync > 0 && (
+              <Badge variant="secondary" className="h-8">
+                {stats.pendingSync} pendente(s)
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {isOnline ? (
-              <Wifi className="h-5 w-5 text-green-300" />
-            ) : (
-              <WifiOff className="h-5 w-5 text-red-300" />
-            )}
-            <span className="text-sm font-medium">
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
+            <Badge variant="outline" className="h-8">
+              <Users className="h-4 w-4 mr-1" />
+              {stats.checkedIn}/{stats.total}
+            </Badge>
+            <button 
+              onClick={handleLogout}
+              className="h-8 px-3 flex items-center gap-1 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              title="Sair"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-4 space-y-4">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+      {/* Scanner Section */}
+      <div className="w-full max-w-md mx-auto p-4">
+        <div className="mb-4 overflow-hidden rounded-lg bg-white shadow-lg">
+          <div className="relative aspect-square">
+            <Scanner
+              onScan={handleScan}
+              onError={handleError}
+              constraints={{
+                facingMode: 'environment',
+                aspectRatio: 1,
+                width: { ideal: 1080 },
+                height: { ideal: 1080 }
+              }}
+              scanDelay={500}
+              formats={['qr_code']}
+              styles={{
+                container: {
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative'
+                },
+                video: {
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }
+              }}
+            />
+            <ViewFinder />
           </div>
-        )}
-
-        {/* Scanner Card */}
-        <Card className="shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Camera className="h-5 w-5" />
-              Scanner QR
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!scannerReady ? (
-              <div className="text-center py-12">
-                <QrCode className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">Toque para ativar o scanner</p>
-                <Button 
-                  onClick={startScanner}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Ativar Scanner
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div 
-                  id="qr-scanner" 
-                  className="w-full rounded-lg overflow-hidden bg-black min-h-[300px] relative"
-                >
-                  {/* Overlay será adicionado pelo html5-qrcode */}
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={stopScanner}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Parar Scanner
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      stopScanner()
-                      setTimeout(startScanner, 500)
-                    }}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Reiniciar
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Last Scan */}
-        {lastScan && (
-          <Card className="border-green-200 bg-green-50 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-8 w-8 text-green-600 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-green-800 text-lg truncate">{lastScan.name}</p>
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <Phone className="h-3 w-3" />
-                    <span>{lastScan.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-green-600 mt-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{lastScan.timestamp}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stats */}
-        <Card className="shadow-lg">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-3xl font-bold text-indigo-600">{stats.checkedIn}</p>
-                <p className="text-sm text-gray-600 font-medium">Check-ins</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-gray-700">{stats.total}</p>
-                <p className="text-sm text-gray-600 font-medium">Total</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-orange-600">{stats.pendingSync}</p>
-                <p className="text-sm text-gray-600 font-medium">Pendentes</p>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <Badge variant={isOnline ? "default" : "secondary"} className="text-sm px-3 py-1">
-                {isOnline ? "🟢 Online" : "🔄 Offline"}
-              </Badge>
-              {stats.pendingSync > 0 && (
-                <Badge variant="outline" className="text-orange-600 text-sm px-3 py-1">
-                  {stats.pendingSync} pendentes
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 gap-3">
-          <Button 
-            onClick={goToNameSearch} 
-            variant="outline" 
-            className="h-14 flex items-center justify-center gap-3 text-lg font-medium"
-          >
-            <Search className="h-5 w-5" />
-            Pesquisar por Nome
-          </Button>
         </div>
+      </div>
 
-        {/* Event Info */}
-        <Card className="shadow-lg">
-          <CardContent className="p-4">
-            <h3 className="font-bold mb-3 text-lg">Informações do Evento</h3>
-            <div className="space-y-2 text-sm">
-              <p><strong>Data:</strong> {formatTime(eventData.date)}</p>
-              <p><strong>Local:</strong> {eventData.location}</p>
-              <p><strong>Scanner:</strong> {scannerData.username}</p>
+      {/* Feedback de Scan */}
+      {currentScan && (
+        <ScannerFeedback
+          success={currentScan.success}
+          error={currentScan.success ? null : currentScan.message}
+          status={currentScan.status}
+          guest_name={currentScan.name}
+          guest_phone={currentScan.phone}
+          check_in_time={currentScan.timestamp}
+          already_checked_in={currentScan.status === 'already-checked'}
+        />
+      )}
+
+      {/* Recent Scans - Lista Deslizante */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg md:relative md:mt-6 md:shadow-none md:border-t-0">
+        <div className="px-4 py-3 flex items-center justify-between border-b">
+          <h3 className="font-medium">Scans Recentes</h3>
+          <Badge variant="outline">{recentScans.length}</Badge>
+        </div>
+        
+        <div className="max-h-[40vh] overflow-y-auto overscroll-contain">
+          {recentScans.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <QrCode className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>Nenhum scan realizado</p>
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="divide-y">
+              {recentScans.map((scan, index) => (
+                <div key={scan.id + index} className="p-4 flex items-center gap-4">
+                  <div className="flex-shrink-0">
+                    {scan.success ? (
+                      <CheckCircle2 className="h-6 w-6 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-6 w-6 text-red-500" />
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{scan.name}</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Phone className="h-4 w-4" />
+                      <span className="truncate">{scan.phone}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-shrink-0 text-right">
+                    <div className="text-sm text-gray-500 flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {formatPortugalTime(scan.timestamp)}
+                    </div>
+                    <Badge 
+                      variant={scan.success ? "success" : "destructive"} 
+                      className="mt-1"
+                    >
+                      {scan.method === 'qr_code' ? 'QR Code' : 'Busca'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

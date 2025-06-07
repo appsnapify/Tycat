@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Pesquisa por nome (usando ILIKE para case-insensitive)
     let searchQuery = supabase
       .from('guests')
-      .select('id, name, phone, checked_in, check_in_time')
+      .select('id, name, phone, checked_in, checked_in_at')
       .eq('event_id', event_id)
 
     // Se for número, pesquisar também por telefone

@@ -24,12 +24,27 @@ export default function ScannerLoginPage() {
     setError('')
 
     try {
+      // Gerar device info
+      const deviceInfo = {
+        id: localStorage.getItem('device_id') || crypto.randomUUID(),
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        timestamp: new Date().toISOString()
+      }
+
+      // Salvar device ID para reutilização
+      localStorage.setItem('device_id', deviceInfo.id)
+
       const response = await fetch('/api/scanners/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify({
+          ...credentials,
+          device_info: deviceInfo
+        })
       })
 
       const data = await response.json()
@@ -38,8 +53,11 @@ export default function ScannerLoginPage() {
         throw new Error(data.error || 'Erro ao fazer login')
       }
 
+      // Garantir que o token é armazenado sem o prefixo Bearer
+      const token = data.session_token.replace('Bearer ', '')
+      
       // Armazenar dados no localStorage
-      localStorage.setItem('scanner_token', data.session_token)
+      localStorage.setItem('scanner_token', token)
       localStorage.setItem('scanner_data', JSON.stringify(data.scanner))
       localStorage.setItem('event_data', JSON.stringify(data.event))
 

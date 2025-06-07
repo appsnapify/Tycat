@@ -1,0 +1,4 @@
+// Este é um arquivo binário (MP3).
+// Por favor, adicione um arquivo de som curto (0.5-1s) com um "beep" grave ou "buzz" para indicar erro.
+// Recomendo usar um som de 44.1kHz, 128kbps, mono.
+// O arquivo deve ser pequeno (< 50KB) para não impactar o carregamento. 

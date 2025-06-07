@@ -63,7 +63,16 @@ export async function GET(request: NextRequest) {
       const { password_hash, ...scannerData } = scanner
       
       // Calcular estatísticas das sessões
-      const activeSessions = scanner.scanner_sessions?.filter(s => s.status === 'active').length || 0
+      const now = new Date()
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
+      
+      // Contar APENAS sessões realmente ativas (não expiradas + atividade recente)
+      const realActiveSessions = scanner.scanner_sessions?.filter(s => 
+        s.status === 'active' && 
+        new Date(s.last_activity) > fiveMinutesAgo &&
+        new Date(s.expires_at || s.created_at) > now
+      ).length || 0
+      
       const totalScans = scanner.scanner_sessions?.reduce((sum, s) => sum + (s.total_scans || 0), 0) || 0
       const successfulScans = scanner.scanner_sessions?.reduce((sum, s) => sum + (s.successful_scans || 0), 0) || 0
       const lastActivity = scanner.scanner_sessions?.reduce((latest, s) => {
@@ -74,7 +83,7 @@ export async function GET(request: NextRequest) {
       return {
         ...scannerData,
         stats: {
-          active_sessions: activeSessions,
+          active_sessions: realActiveSessions,
           total_scans: totalScans,
           successful_scans: successfulScans,
           last_activity: lastActivity

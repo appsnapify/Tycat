@@ -57,24 +57,87 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    // Verificar se já existem sessões ativas e limite
-    const { data: activeSessions, error: sessionsError } = await supabase
+    // ✅ LIMPEZA AUTOMÁTICA DE SESSÕES EXPIRADAS (mantido para limpeza da BD)
+    const now = new Date().toISOString()
+    console.log('🧹 Limpando sessões expiradas...')
+    
+    const { data: expiredSessions, error: cleanupError } = await supabase
       .from('scanner_sessions')
-      .select('id')
+      .update({ status: 'expired' })
       .eq('scanner_id', scanner.id)
+      .lt('expires_at', now)
       .eq('status', 'active')
+      .select('id')
 
-    console.log('🔍 ACTIVE SESSIONS:', { count: activeSessions?.length || 0, limit: scanner.max_concurrent_sessions })
-
-    if (sessionsError) {
-      console.error('Erro ao verificar sessões:', sessionsError)
+    if (cleanupError) {
+      console.warn('⚠️ Erro na limpeza de sessões (continuando):', cleanupError)
+    } else {
+      console.log(`🧹 ${expiredSessions?.length || 0} sessões expiradas removidas`)
     }
 
-    // Permitir apenas uma sessão ativa por scanner (simplificado)
-    if (activeSessions && activeSessions.length >= scanner.max_concurrent_sessions) {
-      console.log('❌ Session limit exceeded')
+    // ✅ LIMPEZA ADICIONAL EM DESENVOLVIMENTO (mantido para debugging)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 MODO DEV: Limpeza adicional para debugging...')
+      
+      // Limpar sessões muito antigas (mais de 24h sem atividade)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      
+      const { data: oldSessions } = await supabase
+        .from('scanner_sessions')
+        .update({ status: 'expired' })
+        .eq('scanner_id', scanner.id)
+        .lt('last_activity', oneDayAgo)
+        .eq('status', 'active')
+        .select('id')
+
+      if (oldSessions && oldSessions.length > 0) {
+        console.log(`🔧 DEV: ${oldSessions.length} sessões órfãs removidas`)
+      }
+    }
+
+    // 🧠 LIMITE INTELIGENTE - Baseado no horário do evento
+    const eventData = scanner.events
+    const currentTime = new Date()
+    let isActiveEvent = false
+    
+    if (eventData) {
+      const eventDate = new Date(eventData.date)
+      // Considerar evento ativo 2h antes até 2h depois da data
+      const eventStart = new Date(eventDate.getTime() - 2 * 60 * 60 * 1000)
+      const eventEnd = new Date(eventDate.getTime() + 4 * 60 * 60 * 1000) // Assumindo 4h de duração
+      isActiveEvent = currentTime >= eventStart && currentTime <= eventEnd
+    }
+
+    // Verificar sessões realmente ativas (não apenas marcadas como ativas)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    const { data: activeSessions } = await supabase
+      .from('scanner_sessions')
+      .select('id, created_at, last_activity, expires_at')
+      .eq('scanner_id', scanner.id)
+      .eq('status', 'active')
+      .gt('last_activity', fiveMinutesAgo.toISOString())
+      .gt('expires_at', currentTime.toISOString())
+
+    // Limite flexível: mais alto durante eventos, moderado fora de eventos
+    const baseLimit = scanner.max_concurrent_sessions || 5
+    const effectiveLimit = isActiveEvent 
+      ? Math.max(baseLimit, 10)  // Durante eventos: mín 10 sessões
+      : Math.max(baseLimit, 3)   // Fora de eventos: mín 3 sessões
+
+    console.log('📊 SMART SESSION CHECK:', { 
+      marked_active: (activeSessions?.length || 0),
+      really_active: activeSessions?.length || 0,
+      is_event_time: isActiveEvent,
+      limit: effectiveLimit,
+      event_date: eventData?.date
+    })
+
+    if (activeSessions && activeSessions.length >= effectiveLimit) {
+      console.log('❌ Smart session limit exceeded')
       return NextResponse.json({ 
-        error: 'Limite de sessões ativas excedido' 
+        error: `Limite de sessões atingido (${activeSessions.length}/${effectiveLimit})`,
+        is_event_time: isActiveEvent,
+        note: isActiveEvent ? 'Durante eventos o limite é mais flexível' : 'Fora de eventos o limite é mais restrito'
       }, { status: 429 })
     }
 

@@ -185,12 +185,12 @@ export function DashboardContent({
             <div className="grid grid-cols-2 gap-3">
               <div 
                 className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push('/app/organizador/eventos/checkin')}
+                onClick={() => router.push('/app/organizador/check-in')}
               >
                 <span className="flex-shrink-0">
                   <TicketCheck className="h-6 w-6 text-lime-600" />
                 </span>
-                <span className="font-medium">Modo Check-in</span>
+                <span className="font-medium">Gestão Check-in</span>
               </div>
               <div 
                 className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
