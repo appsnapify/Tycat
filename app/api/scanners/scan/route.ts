@@ -144,20 +144,18 @@ export async function POST(request: NextRequest) {
     // Verificar se já fez check-in (usando campo checked_in)
     console.log(`🔍 [${requestId}] Verificando status de check-in:`, {
       checked_in: guest.checked_in,
-      checked_in_at: guest.checked_in_at,
-      check_in_time: guest.check_in_time
+      check_in_time: guest.check_in_time,
+      created_at: guest.created_at
     })
     
     if (guest.checked_in) {
-      // 🕐 Tentar múltiplos campos possíveis para o timestamp do check-in
-      const previousCheckIn = guest.checked_in_at || guest.check_in_time || guest.updated_at || guest.created_at
-      console.log(`⚠️ [${requestId}] Check-in já realizado. Timestamps:`, {
-        checked_in_at: guest.checked_in_at,
-        check_in_time: guest.check_in_time,
-        updated_at: guest.updated_at,
-        created_at: guest.created_at,
-        chosen: previousCheckIn
-      })
+      // 🕐 Usar o campo correto para o timestamp do check-in
+      const previousCheckIn = guest.check_in_time || guest.created_at
+              console.log(`⚠️ [${requestId}] Check-in já realizado. Timestamps:`, {
+          check_in_time: guest.check_in_time,
+          created_at: guest.created_at,
+          chosen: previousCheckIn
+        })
       
       let formattedTime
       try {
@@ -192,7 +190,7 @@ export async function POST(request: NextRequest) {
       name: guest.name,
       event_id: guest.event_id,
       created_at: guest.created_at,
-      updated_at: guest.updated_at
+      check_in_time: guest.check_in_time
     })
     
     // 🛡️ ABORDAGEM ROBUSTA: Tentar diferentes strategies para update
@@ -205,9 +203,7 @@ export async function POST(request: NextRequest) {
       console.log(`🔄 [${requestId}] Tentativa 1: Update com todos os campos`)
       const updateFields = {
         checked_in: true,
-        checked_in_at: checkInTime,
-        check_in_time: checkInTime,
-        updated_at: checkInTime
+        check_in_time: checkInTime
       }
       console.log(`📝 [${requestId}] Campos para update:`, updateFields)
       
@@ -294,7 +290,7 @@ export async function POST(request: NextRequest) {
             if (result.data.checked_in === true) {
               console.log(`⚠️ [${requestId}] Guest já tinha check-in, mas conseguimos atualizar`)
               // Se já estava true, pode ser race condition - retornar 409
-              const existingTime = result.data.checked_in_at || result.data.check_in_time || result.data.updated_at || checkInTime
+              const existingTime = result.data.check_in_time || checkInTime
               finalCheckInTime = existingTime
               
               console.log(`🔄 [${requestId}] Retornando 409 por race condition`)

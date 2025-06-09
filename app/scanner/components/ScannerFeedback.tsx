@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { formatPortugalTime } from '@/lib/utils/time'
 
 type ScannerFeedbackProps = {
@@ -13,6 +13,7 @@ type ScannerFeedbackProps = {
   guest_phone: string
   check_in_time: string | null
   already_checked_in?: boolean
+  onClear?: () => void
 }
 
 export default function ScannerFeedback({
@@ -22,7 +23,8 @@ export default function ScannerFeedback({
   guest_name,
   guest_phone,
   check_in_time,
-  already_checked_in
+  already_checked_in,
+  onClear
 }: ScannerFeedbackProps) {
   const [visible, setVisible] = useState(false)
   const [message, setMessage] = useState('')
@@ -85,23 +87,46 @@ export default function ScannerFeedback({
         )}
       >
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            {currentStatus === 'processing' && (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            )}
-            <p
-              className={cn(
-                "text-sm font-medium",
-                {
-                  'text-green-800': currentStatus === 'success',
-                  'text-red-800': currentStatus === 'error',
-                  'text-yellow-800': currentStatus === 'already-checked',
-                  'text-blue-800': currentStatus === 'processing'
-                }
+          <div className="flex items-center gap-2 justify-between">
+            <div className="flex items-center gap-2">
+              {currentStatus === 'processing' && (
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               )}
-            >
-              {message}
-            </p>
+              <p
+                className={cn(
+                  "text-sm font-medium",
+                  {
+                    'text-green-800': currentStatus === 'success',
+                    'text-red-800': currentStatus === 'error',
+                    'text-yellow-800': currentStatus === 'already-checked',
+                    'text-blue-800': currentStatus === 'processing'
+                  }
+                )}
+              >
+                {message}
+              </p>
+            </div>
+            
+            {/* Botão de fechar - só mostra se não está processando */}
+            {currentStatus !== 'processing' && onClear && (
+              <button
+                onClick={() => {
+                  setVisible(false)
+                  onClear()
+                }}
+                className={cn(
+                  "flex-shrink-0 p-1 rounded-full transition-colors",
+                  {
+                    'hover:bg-green-200': currentStatus === 'success',
+                    'hover:bg-red-200': currentStatus === 'error',
+                    'hover:bg-yellow-200': currentStatus === 'already-checked'
+                  }
+                )}
+                title="Fechar e permitir novo scan"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           
           {/* Informações adicionais do convidado */}

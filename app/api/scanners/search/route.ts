@@ -44,42 +44,88 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar query
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 1) {
       return NextResponse.json({ 
-        error: 'Termo de pesquisa deve ter pelo menos 2 caracteres' 
+        error: 'Termo de pesquisa é obrigatório' 
       }, { status: 400 })
     }
 
     const searchTerm = query.trim().toLowerCase()
     console.log('🔍 Pesquisando:', { event_id, searchTerm })
 
-    // Pesquisa por nome (usando ILIKE para case-insensitive)
-    let searchQuery = supabase
+    // Primeiro, verificar quantos guests existem neste evento
+    const { data: totalGuests, error: countError } = await supabase
       .from('guests')
-      .select('id, name, phone, checked_in, checked_in_at')
+      .select('id', { count: 'exact' })
       .eq('event_id', event_id)
+
+    console.log('📊 Total guests no evento:', {
+      count: totalGuests?.length || 0,
+      error: countError
+    })
 
     // Se for número, pesquisar também por telefone
     const isPhoneSearch = /^\d+$/.test(searchTerm)
     
+    console.log('🔍 Tipo de pesquisa:', { isPhoneSearch, searchTerm })
+    
+    // Buscar guests primeiro
+    let guestQuery = supabase
+      .from('guests')
+      .select('id, name, phone, checked_in, check_in_time, promoter_id')
+      .eq('event_id', event_id)
+    
     if (isPhoneSearch) {
-      // Pesquisa por telefone
-      searchQuery = searchQuery.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      // Pesquisa por telefone ou nome
+      guestQuery = guestQuery.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      console.log('📞 Pesquisando por telefone/nome:', `%${searchTerm}%`)
     } else {
       // Pesquisa por nome
-      searchQuery = searchQuery.ilike('name', `%${searchTerm}%`)
+      guestQuery = guestQuery.ilike('name', `%${searchTerm}%`)
+      console.log('👤 Pesquisando por nome:', `%${searchTerm}%`)
     }
 
-    const { data: guests, error } = await searchQuery
+    const { data: guestResults, error } = await guestQuery
       .order('name')
       .limit(10)
 
     if (error) {
-      console.error('❌ Erro na pesquisa:', error)
+      console.error('❌ Erro na pesquisa de guests:', error)
       return NextResponse.json({ 
         error: 'Erro ao pesquisar convidados' 
       }, { status: 500 })
     }
+
+    // Buscar promotores para os guests encontrados
+    const promoterIds = [...new Set(guestResults?.map(g => g.promoter_id).filter(Boolean))]
+    let promoters: any[] = []
+    
+    if (promoterIds.length > 0) {
+      const { data: promoterData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', promoterIds)
+      
+      promoters = promoterData || []
+    }
+
+    // Combinar dados
+    const guests = guestResults?.map(guest => {
+      const promoter = promoters.find(p => p.id === guest.promoter_id)
+      const promoter_name = promoter 
+        ? `${promoter.first_name} ${promoter.last_name || ''}`.trim()
+        : 'Sem promotor'
+      
+      return {
+        ...guest,
+        promoter_name
+      }
+    }) || []
+
+    console.log('🔍 Query executada. Resultados:', {
+      found: guests?.length || 0,
+      sampleResults: guests?.slice(0, 3).map(g => ({ id: g.id, name: g.name, promoter: g.promoter_name }))
+    })
 
     // Calcular relevância e ordenar
     const results = guests?.map(guest => {

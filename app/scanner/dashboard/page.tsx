@@ -8,7 +8,7 @@ import { Scanner } from '@yudiel/react-qr-scanner'
 import ScannerFeedback from '../components/ScannerFeedback'
 import ViewFinder from '../components/ViewFinder'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, CheckCircle2, Clock, Phone, QrCode, Users, Wifi, WifiOff, LogOut, Settings } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, QrCode, Users, Wifi, WifiOff, LogOut, Settings, Search } from 'lucide-react'
 import { formatPortugalTime, isValidTimestamp } from '@/lib/utils/time'
 
 interface ScannerData {
@@ -68,7 +68,7 @@ export default function ScannerDashboard() {
   const [recentScans, setRecentScans] = useState<ScanResult[]>([])
   const [stats, setStats] = useState({ total: 0, checkedIn: 0, pendingSync: 0 })
 
-  const DEBOUNCE_DELAY = 1000 // 1 segundo (reduzido para melhor UX)
+  const DEBOUNCE_DELAY = 200 // 200ms - só para evitar múltiplas detecções acidentais
   const lastScannedCodeRef = useRef('')
   const lastScanTimeRef = useRef(0)
 
@@ -309,13 +309,13 @@ export default function ScannerDashboard() {
         }
       })
 
-      // Auto-clear feedback após 4 segundos para permitir novo scan
+      // Auto-clear feedback após 3 segundos para permitir novo scan
       setTimeout(() => {
         setCurrentScan(null)
-        // Reset debounce para permitir re-scan mais rápido
+        // Reset debounce imediatamente para permitir re-scan do mesmo QR
         lastScannedCodeRef.current = ''
         lastScanTimeRef.current = 0
-      }, 4000)
+      }, 3000)
 
       if (result.success) {
         setStats(prev => ({
@@ -358,12 +358,13 @@ export default function ScannerDashboard() {
         }
       })
 
-      // Auto-clear feedback de erro após 4 segundos
+      // Auto-clear feedback de erro após 3 segundos
       setTimeout(() => {
         setCurrentScan(null)
+        // Reset debounce imediatamente para permitir re-scan do mesmo QR
         lastScannedCodeRef.current = ''
         lastScanTimeRef.current = 0
-      }, 4000)
+      }, 3000)
 
       vibrate([100, 100, 100])
       playSound('error')
@@ -410,6 +411,14 @@ export default function ScannerDashboard() {
     lastScanTimeRef.current = 0
   }
 
+  // Nova função para forçar reset do scanner
+  const forceResetScanner = () => {
+    console.log('🔄 Reset forçado do scanner')
+    setCurrentScan(null)
+    lastScannedCodeRef.current = ''
+    lastScanTimeRef.current = 0
+  }
+
   const handleLogout = async () => {
     const token = localStorage.getItem('scanner_token')
     
@@ -441,29 +450,41 @@ export default function ScannerDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header - Status e Stats */}
       <div className="sticky top-0 z-10 bg-white border-b">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant={isOnline ? "success" : "destructive"} className="h-8 px-3">
+        <div className="px-3 sm:px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+            <Badge variant={isOnline ? "success" : "destructive"} className="h-8 px-2 sm:px-3 text-xs">
               {isOnline ? (
-                <><Wifi className="h-4 w-4 mr-1" /> Online</>
+                <><Wifi className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Online</>
               ) : (
-                <><WifiOff className="h-4 w-4 mr-1" /> Offline</>
+                <><WifiOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Offline</>
               )}
             </Badge>
+            {scannerData?.event?.title && (
+              <Badge variant="outline" className="h-8 px-1 sm:px-2 text-xs max-w-32 sm:max-w-none">
+                <span className="truncate">📅 {scannerData.event.title}</span>
+              </Badge>
+            )}
+            <button
+              onClick={() => router.push('/scanner/search')}
+              className="h-8 w-8 sm:w-auto sm:px-2 flex items-center justify-center sm:gap-1 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-colors border border-indigo-200 hover:border-indigo-300"
+              title="Pesquisar convidado"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             {stats.pendingSync > 0 && (
-              <Badge variant="secondary" className="h-8">
-                {stats.pendingSync} pendente(s)
+              <Badge variant="secondary" className="h-8 px-2 text-xs">
+                {stats.pendingSync}
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="h-8">
-              <Users className="h-4 w-4 mr-1" />
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Badge variant="outline" className="h-8 px-2 text-xs">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               {stats.checkedIn}/{stats.total}
             </Badge>
             <button 
               onClick={handleLogout}
-              className="h-8 px-3 flex items-center gap-1 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              className="h-8 w-8 sm:w-auto sm:px-3 flex items-center justify-center sm:gap-1 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />
@@ -474,9 +495,13 @@ export default function ScannerDashboard() {
       </div>
 
       {/* Scanner Section */}
-      <div className="w-full max-w-md mx-auto p-4">
+      <div className="w-full max-w-md mx-auto p-3 sm:p-4">
         <div className="mb-4 overflow-hidden rounded-lg bg-white shadow-lg">
-          <div className="relative aspect-square">
+          <div 
+            className="relative aspect-square cursor-pointer" 
+            onClick={forceResetScanner}
+            title="Toque para resetar scanner"
+          >
             <Scanner
               onScan={handleScan}
               onError={handleError}
@@ -502,6 +527,14 @@ export default function ScannerDashboard() {
               }}
             />
             <ViewFinder />
+            
+            {/* Indicador visual para reset */}
+            {currentScan && (
+              <div className="absolute top-3 right-3 bg-black/70 text-white text-xs px-3 py-2 rounded-md shadow-lg">
+                <span className="hidden sm:inline">Toque para ler novamente</span>
+                <span className="sm:hidden">Toque para resetar</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -516,52 +549,49 @@ export default function ScannerDashboard() {
           guest_phone={currentScan.phone}
           check_in_time={currentScan.timestamp}
           already_checked_in={currentScan.status === 'already-checked'}
+          onClear={forceResetScanner}
         />
       )}
 
       {/* Recent Scans - Lista Deslizante */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg md:relative md:mt-6 md:shadow-none md:border-t-0">
-        <div className="px-4 py-3 flex items-center justify-between border-b">
-          <h3 className="font-medium">Scans Recentes</h3>
-          <Badge variant="outline">{recentScans.length}</Badge>
+        <div className="px-3 sm:px-4 py-3 flex items-center justify-between border-b">
+          <h3 className="font-medium text-sm sm:text-base">Scans Recentes</h3>
+          <Badge variant="outline" className="text-xs">{recentScans.length}</Badge>
         </div>
         
         <div className="max-h-[40vh] overflow-y-auto overscroll-contain">
           {recentScans.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <QrCode className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Nenhum scan realizado</p>
+            <div className="p-6 sm:p-8 text-center text-gray-500">
+              <QrCode className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Nenhum scan realizado</p>
             </div>
           ) : (
             <div className="divide-y">
               {recentScans.map((scan, index) => (
-                <div key={scan.id + index} className="p-4 flex items-center gap-4">
+                <div key={scan.id + index} className="px-3 sm:px-4 py-3 flex items-center gap-3 min-h-[48px]">
                   <div className="flex-shrink-0">
                     {scan.success ? (
-                      <CheckCircle2 className="h-6 w-6 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                     ) : (
-                      <AlertCircle className="h-6 w-6 text-red-500" />
+                      <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
                     )}
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{scan.name}</p>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Phone className="h-4 w-4" />
-                      <span className="truncate">{scan.phone}</span>
-                    </div>
+                    <p className="font-medium truncate text-sm sm:text-base">{scan.name}</p>
                   </div>
                   
                   <div className="flex-shrink-0 text-right">
-                    <div className="text-sm text-gray-500 flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
+                    <div className="text-xs text-gray-500 flex items-center gap-1 mb-1">
+                      <Clock className="h-3 w-3" />
                       {formatPortugalTime(scan.timestamp)}
                     </div>
                     <Badge 
                       variant={scan.success ? "success" : "destructive"} 
-                      className="mt-1"
+                      className="text-xs"
                     >
-                      {scan.method === 'qr_code' ? 'QR Code' : 'Busca'}
+                      {scan.method === 'qr_code' ? 'QR' : 'Busca'}
                     </Badge>
                   </div>
                 </div>

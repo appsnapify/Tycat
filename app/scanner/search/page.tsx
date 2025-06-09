@@ -1,12 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+
+// Hook useDebounce
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Search, User, Phone, CheckCircle2, AlertCircle, Wifi, WifiOff } from 'lucide-react'
+import { ArrowLeft, Search, User, CheckCircle2, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 
 interface SearchResult {
   id: string
@@ -14,6 +31,7 @@ interface SearchResult {
   phone: string
   checked_in: boolean
   check_in_time?: string
+  promoter_name: string
   relevance_score: number
 }
 
@@ -25,6 +43,9 @@ export default function ScannerSearchPage() {
   const [isOnline, setIsOnline] = useState(true)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+
+  // Debounce da pesquisa por 500ms
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
   // Garantir hidratação correta
   useEffect(() => {
@@ -57,9 +78,20 @@ export default function ScannerSearchPage() {
     }
   }, [mounted])
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!searchTerm.trim()) return
+  // Pesquisa automática quando debouncedSearchTerm muda
+  useEffect(() => {
+    if (!mounted) return
+    if (!debouncedSearchTerm.trim()) {
+      setSearchResults([])
+      return
+    }
+    if (debouncedSearchTerm.trim().length >= 1) {
+      performSearch(debouncedSearchTerm.trim())
+    }
+  }, [debouncedSearchTerm, mounted])
+
+  const performSearch = async (query: string) => {
+    if (!query.trim()) return
 
     setLoading(true)
     setError('')
@@ -69,6 +101,8 @@ export default function ScannerSearchPage() {
       
       if (isOnline) {
         // Pesquisa online
+        console.log('🔍 Enviando pesquisa:', { searchTerm: query })
+        
         const response = await fetch('/api/scanners/search', {
           method: 'POST',
           headers: {
@@ -76,20 +110,28 @@ export default function ScannerSearchPage() {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ 
-            query: searchTerm.trim() 
+            query: query 
           })
         })
 
+        console.log('📡 Response pesquisa:', { 
+          status: response.status, 
+          statusText: response.statusText 
+        })
+
         const data = await response.json()
+        console.log('📊 Dados recebidos:', data)
 
         if (!response.ok) {
+          console.error('❌ Erro na resposta:', data)
           throw new Error(data.error || 'Erro na pesquisa')
         }
 
+        console.log('✅ Resultados encontrados:', data.results?.length || 0)
         setSearchResults(data.results || [])
       } else {
         // Pesquisa offline
-        const results = searchOffline(searchTerm.trim())
+        const results = searchOffline(query)
         setSearchResults(results)
       }
 
@@ -98,6 +140,13 @@ export default function ScannerSearchPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchTerm.trim()) return
+    // A pesquisa já será feita automaticamente pelo debounce
+    performSearch(searchTerm.trim())
   }
 
   const searchOffline = (query: string): SearchResult[] => {
@@ -119,6 +168,7 @@ export default function ScannerSearchPage() {
         phone: guest.phone,
         checked_in: guest.checked_in || false,
         check_in_time: guest.check_in_time,
+        promoter_name: guest.promoter_name || 'Sem promotor',
         relevance_score: 1
       }))
       .slice(0, 10)
@@ -140,7 +190,7 @@ export default function ScannerSearchPage() {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            guest_id: guest.id,
+            qr_code: guest.id,
             scan_method: 'name_search'
           })
         })
@@ -151,11 +201,12 @@ export default function ScannerSearchPage() {
           throw new Error(data.error || 'Erro no check-in')
         }
 
-        // Atualizar resultado local
+        // Atualizar resultado local - usar timestamp do servidor se disponível
+        const newCheckInTime = data.check_in_time || new Date().toISOString()
         setSearchResults(prev => 
           prev.map(g => 
             g.id === guest.id 
-              ? { ...g, checked_in: true, check_in_time: new Date().toISOString() }
+              ? { ...g, checked_in: true, check_in_time: newCheckInTime }
               : g
           )
         )
@@ -255,7 +306,12 @@ export default function ScannerSearchPage() {
         {/* Search Form */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Pesquise pelo nome</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Pesquisa Automática
+              {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />}
+            </CardTitle>
+            <p className="text-sm text-gray-600">Digite para pesquisar automaticamente</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSearch} className="space-y-3">
@@ -268,17 +324,6 @@ export default function ScannerSearchPage() {
                   className="flex-1 h-12 text-lg"
                   disabled={loading}
                 />
-                <Button 
-                  type="submit" 
-                  disabled={loading || !searchTerm.trim()}
-                  className="h-12 px-6 bg-indigo-600 hover:bg-indigo-700"
-                >
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                </Button>
               </div>
 
               {!isOnline && (
@@ -320,8 +365,8 @@ export default function ScannerSearchPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{guest.name}</h3>
                       <div className="flex items-center gap-2 text-gray-600 mt-1">
-                        <Phone className="h-4 w-4" />
-                        <span>{guest.phone}</span>
+                        <User className="h-4 w-4" />
+                        <span className="text-sm">Promotor: {guest.promoter_name}</span>
                       </div>
                       
                       {guest.checked_in && guest.check_in_time && (
@@ -356,7 +401,7 @@ export default function ScannerSearchPage() {
         )}
 
         {/* No Results */}
-        {searchTerm && !loading && searchResults.length === 0 && (
+        {searchTerm && !loading && searchResults.length === 0 && searchTerm.length >= 2 && (
           <Card>
             <CardContent className="p-8 text-center">
               <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
