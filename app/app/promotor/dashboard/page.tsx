@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, Dialog
 import { Users, Loader2, AlertCircle, ShieldCheck, LogIn, Building } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useRouter } from 'next/navigation'
+import PromoterPublicLinkCard from './PromoterPublicLinkCard'
 
 // Interface Atualizada
 interface OrganizationInfo {
@@ -172,27 +173,34 @@ export default function PromotorDashboardPage() {
          </p>
       </div>
       
-      {/* --- Secção da Equipa Associada --- */} 
-      <div className="flex flex-col items-center"> {/* Centraliza o card na página */} 
-        <h2 className="text-xl font-semibold tracking-tight mb-4 self-start">Equipa Associada</h2> {/* Mantém título alinhado à esquerda */} 
-        {teams.length === 0 ? (
-          // --- Estado Sem Equipas (Mantido, ligeiramente ajustado) --- 
-          <Card className="border-dashed bg-muted/50 max-w-xs w-full"> {/* Mais pequeno e full width dentro do container flex */} 
-            <CardContent className="flex flex-col items-center justify-center py-10 px-4 text-center"> {/* Centralizado e padding */} 
-              <Users className="h-10 w-10 text-muted-foreground mb-3" />
-              <h3 className="text-base font-medium mb-1">Nenhuma equipa associada</h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                Adira a uma equipa existente usando o código.
-              </p>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/app/promotor/equipes/ingressar">
-                  <Users className="mr-1.5 h-3.5 w-3.5" />
-                  Aderir
-                </Link>
-              </Button>
-          </CardContent>
-        </Card>
-        ) : (
+      {/* --- Secção Cards do Dashboard --- */} 
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold tracking-tight">Dashboard</h2>
+        
+                 {/* Container para os cards */}
+         <div className="flex flex-wrap gap-6 justify-center md:justify-start">
+           {/* Card de Links Públicos - PRIMEIRO */}
+           <PromoterPublicLinkCard userId={user.id} />
+           
+           {/* Card da Equipa */}
+           {teams.length === 0 ? (
+            // --- Estado Sem Equipas (Mantido, ligeiramente ajustado) --- 
+            <Card className="border-dashed bg-muted/50 w-52"> 
+              <CardContent className="flex flex-col items-center justify-center py-10 px-4 text-center"> 
+                <Users className="h-10 w-10 text-muted-foreground mb-3" />
+                <h3 className="text-base font-medium mb-1">Nenhuma equipa associada</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Adira a uma equipa existente usando o código.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/app/promotor/equipes/ingressar">
+                    <Users className="mr-1.5 h-3.5 w-3.5" />
+                    Aderir
+                  </Link>
+                </Button>
+            </CardContent>
+          </Card>
+          ) : (
           // --- Estado Com Equipa (Card Moderno) --- 
           <Dialog>
             <DialogTrigger asChild>
@@ -265,7 +273,8 @@ export default function PromotorDashboardPage() {
               </div>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
