@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { LogOut, Loader2, Building, AlertCircle, Calendar, Settings } from 'lucide-react'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { TeamType, TeamMemberType } from '@/lib/database.types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
@@ -75,7 +75,7 @@ async function loadTeamData(userData: any) {
   }
 
   try {
-    const supabase = createClientComponentClient();
+    const supabase = createClient();
     console.log("[loadTeamData] Cliente Supabase criado.");
 
     let teamResponse: any = { data: null, error: null };
@@ -147,7 +147,7 @@ async function loadTeamMembersAlternative(teamId: string, userId: string) {
 
   try {
     console.log(`Tentando carregar membros alternativamente para equipe: ${teamId}`)
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
     
     // Tentar carregar diretamente da tabela
     try {
@@ -244,7 +244,6 @@ interface LeaderDashboardData {
 export default function TeamLeaderDashboard() {
   const { user, isLoading: isLoadingAuth } = useAuth()
   const router = useRouter()
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
   
   const [loading, setLoading] = useState(true)
@@ -271,6 +270,7 @@ export default function TeamLeaderDashboard() {
 
         console.log(`Dashboard Chefe: Chamando RPC get_team_leader_dashboard_data para team_id: ${teamId}`);
 
+        const supabase = createClient();
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_team_leader_dashboard_data', { p_team_id: teamId });
 
@@ -330,7 +330,7 @@ export default function TeamLeaderDashboard() {
 
     fetchDashboardData();
     
-  }, [user, isLoadingAuth, supabase]); // Dependências corretas
+  }, [user, isLoadingAuth]); // Dependências corretas - removido supabase para evitar loops
   
   if (loading || isLoadingAuth) {
     return (
