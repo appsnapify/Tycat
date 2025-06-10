@@ -207,7 +207,7 @@ export default async function EventosPromotorPage(props: {
       <div>
          <h2 className="text-xl font-semibold tracking-tight mb-4">Eventos Ativos</h2>
          {activeEvents.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="flex flex-wrap justify-center gap-4 md:gap-6">
                {activeEvents.map((evento) => (
                   <EventCardPromotor key={`active-${evento.id}`} event={evento} />
                ))}
@@ -226,7 +226,7 @@ export default async function EventosPromotorPage(props: {
       {pastEvents.length > 0 && (
           <div>
              <h2 className="text-xl font-semibold tracking-tight mb-4">Eventos Terminados</h2>
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+             <div className="flex flex-wrap justify-center gap-4 md:gap-6">
                  {pastEvents.map((evento) => (
                     <EventCardPromotor key={`past-${evento.id}`} event={evento} isPastEvent={true} />
                  ))}

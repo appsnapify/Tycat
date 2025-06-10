@@ -77,7 +77,8 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
             const { data, error } = await supabase
                 .from('guests')
                 .select('id, check_in_time')
-                .eq('event_id', event.id);
+                .eq('event_id', event.id)
+                .eq('promoter_id', user?.id);
 
             if (error) {
                 console.error(`[EventCard] Erro ao buscar stats para ${event.title}:`, error);
@@ -187,7 +188,7 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
                                 src={event.flyer_url}
                                 alt={event.title}
                                 fill
-                                sizes="230px"
+                                sizes="280px"
                                 priority
                                 className="object-cover"
                             />
@@ -290,24 +291,25 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
             </Dialog>
 
             <style jsx>{`
-                .event-card-modern {
-                    width: 230px;
-                    border-radius: 20px;
-                    background: white;
-                    border: 1px solid #000;
-                    padding: 5px;
-                    overflow: hidden;
-                    box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px 0px;
-                }
+                        .event-card-modern {
+          width: 280px;
+          border-radius: 20px;
+          background: white;
+          border: 1px solid #000;
+          padding: 5px;
+          overflow: hidden;
+          box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px 0px;
+          flex-shrink: 0;
+        }
 
-                .top-section {
-                    height: 150px;
-                    border-radius: 15px;
-                    display: flex;
-                    flex-direction: column;
-                    position: relative;
-                    overflow: hidden;
-                }
+                        .top-section {
+          height: 180px;
+          border-radius: 15px;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+        }
 
                 .event-image-container {
                     position: absolute;
@@ -417,9 +419,33 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
                     border-left: 1px solid rgba(0, 0, 0, 0.2);
                 }
 
-                .item:nth-child(4) {
-                    border-left: 1px solid rgba(0, 0, 0, 0.2);
-                }
+                        .item:nth-child(4) {
+          border-left: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        /* Mobile optimization */
+        @media (max-width: 640px) {
+          .event-card-modern {
+            width: 300px;
+            margin: 0 auto;
+          }
+          
+          .top-section {
+            height: 200px;
+          }
+          
+          .title {
+            font-size: 18px;
+          }
+          
+          .big-text {
+            font-size: 14px;
+          }
+          
+          .regular-text {
+            font-size: 8px;
+          }
+        }
             `}</style>
         </>
     );

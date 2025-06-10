@@ -268,19 +268,13 @@ export default function TeamLeaderDashboard() {
           return;
         }
 
-        console.log(`Dashboard Chefe: Chamando RPC get_team_leader_dashboard_data para team_id: ${teamId}`);
-
         const supabase = createClient();
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_team_leader_dashboard_data', { p_team_id: teamId });
 
-        // LOG ADICIONADO PARA VER O RESULTADO BRUTO DA RPC
-        console.log("Dashboard Chefe: Dados BRUTOS recebidos da RPC:", JSON.stringify(rpcData, null, 2));
-
         // Tratamento de erro aprimorado
         if (rpcError) {
           console.error("Dashboard Chefe: Erro ao chamar RPC:", rpcError);
-          console.log("Detalhes completos do erro:", JSON.stringify(rpcError));
           
           if (rpcError.message && rpcError.message.includes('Permissão negada')) {
              setError("Acesso negado. Apenas o chefe de equipa pode ver este dashboard.");
@@ -312,7 +306,6 @@ export default function TeamLeaderDashboard() {
              setError(`Erro ao processar dados: ${rpcData[0].error}`);
              setDashboardInfo(null);
         } else {
-            console.log("Dashboard Chefe: Definindo estado com o primeiro objeto da RPC:", rpcData[0]);
             // Definir o estado com o PRIMEIRO objeto do array
             setDashboardInfo(rpcData[0] as LeaderDashboardData); 
             setError(null); // Limpar erro se dados foram carregados com sucesso
@@ -395,29 +388,37 @@ export default function TeamLeaderDashboard() {
       
        <h2 className="text-2xl font-semibold tracking-tight pt-4">Organizações Associadas</h2>
       {dashboardInfo?.organization_id && dashboardInfo.organization_name ? (
-          <Card key={dashboardInfo.organization_id} className="max-w-xs border rounded-lg">
-              <CardHeader className="pb-3 text-center">
-                  <CardTitle className="text-lime-500 text-xl font-semibold">
-                      {dashboardInfo.organization_name}
-                  </CardTitle>
-                  <CardDescription className="flex items-center justify-center pt-1 text-muted-foreground">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {dashboardInfo.active_event_count ?? 0} evento{dashboardInfo.active_event_count !== 1 ? 's' : ''} ativo{dashboardInfo.active_event_count !== 1 ? 's' : ''}
-                  </CardDescription>
-            </CardHeader>
-              <CardFooter className="flex justify-center border-t pt-4">
-                  <Link href={`/app/chefe-equipe/eventos?orgId=${dashboardInfo.organization_id}`} className="w-2/3 flex justify-center">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
-                      > 
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Ver eventos
-                      </Button>
-                  </Link>
-              </CardFooter>
-          </Card>
+          <div className="w-52 bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_25px_rgba(0,0,0,0.15)] border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3 relative overflow-hidden cursor-pointer transition-all duration-300">
+            {/* Círculo com símbolo no canto */}
+            <div className="w-20 h-20 bg-black rounded-full absolute -right-4 -top-6">
+              <div className="absolute bottom-5 left-5">
+                <Building className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            {/* Ícone principal */}
+            <div className="w-10">
+              <Building className="w-10 h-10 text-black" />
+            </div>
+            
+            {/* Título */}
+            <h1 className="font-bold text-lg text-gray-900 dark:text-white">{dashboardInfo.organization_name}</h1>
+            
+            {/* Descrição */}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-5">
+              {dashboardInfo.active_event_count ?? 0} evento{dashboardInfo.active_event_count !== 1 ? 's' : ''} ativo{dashboardInfo.active_event_count !== 1 ? 's' : ''}
+            </p>
+
+            {/* Botão de ação */}
+            <div className="pt-2">
+              <Link href={`/app/chefe-equipe/eventos?orgId=${dashboardInfo.organization_id}`} className="block">
+                <button className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors">
+                  <Calendar className="w-3 h-3" />
+                  Ver eventos
+                </button>
+              </Link>
+            </div>
+          </div>
       ) : (
          <Card className="border-dashed bg-muted/50 max-w-xs">
              <CardContent className="p-6 text-center flex flex-col items-center justify-center min-h-[120px]">
