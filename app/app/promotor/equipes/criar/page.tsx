@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import { useForm } from "react-hook-form";
@@ -41,7 +41,7 @@ type CreateTeamFormValues = z.infer<typeof formSchema>;
 export default function CriarEquipePage() {
   const router = useRouter()
   const { user, updateUserRole, isTeamLeader } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   
   const [loading, setLoading] = useState(false)
   const [diagnosisLoading, setDiagnosisLoading] = useState(false)

@@ -58,23 +58,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   // const { usePendingActions } = require('@/hooks/use-pending-actions'); // Comentado se a lógica de pending actions não for central aqui
   // usePendingActions();
   
-  console.log("DEBUG - AppLayoutContent iniciando:", { 
-    userAutenticado: !!user, 
-    isLoadingAuth: isLoadingUser, // Usar isLoadingUser
-    initialAuthCheckCompleted // Logar novo estado
-  });
+  // Debug logs removidos para performance
   
   useEffect(() => {
     // Só redirecionar se a verificação inicial estiver completa E não houver user E não estiver carregando
-    if (initialAuthCheckCompleted && !isLoadingUser && !user) {
+    if (initialAuthCheckCompleted && !isLoadingUser && !user?.id) {
       console.log('AppLayoutContent: Verificação de Auth completa, sem utilizador. Redirecionando para /login.')
       router.push('/login')
     }
-  }, [initialAuthCheckCompleted, isLoadingUser, user, router]) // Adicionar initialAuthCheckCompleted às dependências
+  }, [initialAuthCheckCompleted, isLoadingUser, user?.id]) // CORREÇÃO: Lógica e dependências agora consistentes
 
   // Mostrar loader principal enquanto a verificação inicial de autenticação não estiver completa
   if (!initialAuthCheckCompleted) {
-    console.log("DEBUG - AppLayoutContent: Verificação inicial de Auth pendente. Mostrando loader principal.");
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -82,11 +77,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Se a verificação inicial estiver completa, mas ainda estiver carregando o user (pode acontecer em transições rápidas)
-  // OU se não houver user (e o redirect do useEffect ainda não ocorreu ou é para outra página)
-  // Este if pode ser simplificado ou ajustado dependendo do comportamento desejado
+  // Se a verificação inicial estiver completa, mas ainda estiver carregando o user
   if (isLoadingUser) { 
-    console.log("DEBUG - AppLayoutContent: Verificação inicial completa, mas isLoadingUser é true. Mostrando loader.");
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -94,19 +86,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     )
   }
   
-  // Se a verificação inicial está completa, não está carregando, mas não há user, o useEffect já deve ter redirecionado.
-  // Se, por alguma razão, chegar aqui sem user, é uma falha de segurança ou lógica e não deve renderizar children.
-  // Poderia redirecionar novamente como fallback, ou mostrar uma página de erro.
+  // Se não há user, mostrar loader (redirect deve ocorrer)
   if (!user) {
-    console.log("DEBUG - AppLayoutContent: Verificação inicial completa, não está carregando, MAS SEM USER. O redirect deveria ter ocorrido. Mostrando loader como fallback.");
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
       </div>
     )
   }
-  
-  console.log("DEBUG - AppLayoutContent: Auth verificado, utilizador encontrado. Renderizando children");
   return children
 }
 

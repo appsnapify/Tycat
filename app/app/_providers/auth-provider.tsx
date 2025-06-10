@@ -100,9 +100,13 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   const updateRole = useCallback((userInstance: MaybeUser) => {
     if (userInstance) {
       const role = getRoleFromClaims(userInstance)
-      console.log('[ClientAuthProvider] Role updated:', role)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ClientAuthProvider] Role updated:', role)
+      }
     } else {
-      console.log('[ClientAuthProvider] Role updated: null')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ClientAuthProvider] Role updated: null')
+      }
     }
   }, [])
 
@@ -136,7 +140,9 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       if (userData.user) {
         setUser(userData.user);
         updateRole(userData.user);
-        console.log('[ClientAuthProvider] User role updated successfully to:', normalizedRole);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ClientAuthProvider] User role updated successfully to:', normalizedRole);
+        }
       }
     } catch (error) {
       console.error('[ClientAuthProvider] Error in updateUserRole:', error);
@@ -160,8 +166,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, newSession: Session | null) => {
-        console.log('[ClientAuthProvider] Auth event:', event); // Log do evento
-        console.log('[ClientAuthProvider] New session user email:', newSession?.user?.email); // Log do email do user
+        // Debug logs removidos para performance
         // console.log('[ClientAuthProvider] New session object:', newSession); // Log completo da sessão (pode ser verboso)
         
         setSession(newSession)
@@ -189,7 +194,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
     return () => {
       subscription?.unsubscribe()
     }
-  }, [supabase, router, updateRole, pathname]);
+  }, [updateRole]); // CORREÇÃO CRÍTICA: Removido supabase, router, pathname para evitar re-setup constante
 
   const signOut = async () => {
     setIsLoadingUser(true)

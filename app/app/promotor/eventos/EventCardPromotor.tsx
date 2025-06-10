@@ -1,25 +1,24 @@
 'use client'
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { CalendarIcon, Download as DownloadIcon, ImageOff, Loader2, AlertCircle, MapPinIcon, Download } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
+import { ImageOff, Download, Link } from 'lucide-react';
+import { useAuth } from '@/app/app/_providers/auth-provider';
+import { toast } from 'sonner';
+
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogClose,
     DialogFooter
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from '@/components/ui/button';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 // Updated Evento interface to include location
 interface Evento {
@@ -29,30 +28,7 @@ interface Evento {
     time?: string | null;
     flyer_url: string | null;
     is_published?: boolean;
-    location?: string | null; // Added location
-    // Note: end_date/end_time are fetched by page.tsx but not needed directly in card display
-}
-
-// Updated date/time formatting logic
-function formatDisplayDateTime(dateStr: string, timeStr: string | null | undefined): string {
-    if (!dateStr) return 'Data inválida';
-
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) return 'Data inválida';
-
-    const hasValidTime = timeStr && timeStr !== '00:00:00' && timeStr.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/);
-    
-    const dateTimeToFormat = hasValidTime ? new Date(`${dateStr}T${timeStr}`) : dateObj;
-    if (isNaN(dateTimeToFormat.getTime())) return 'Data inválida'; // Double check combined date
-
-    const formatString = hasValidTime ? "dd 'de' MMMM 'de' yyyy 'às' HH:mm" : "dd 'de' MMMM 'de' yyyy";
-
-    try {
-        return format(dateTimeToFormat, formatString, { locale: ptBR });
-    } catch (e) {
-        console.error("Error formatting date:", e);
-        return 'Data inválida';
-    }
+    location?: string | null;
 }
 
 interface EventCardPromotorProps {
@@ -61,165 +37,390 @@ interface EventCardPromotorProps {
 }
 
 export default function EventCardPromotor({ event, isPastEvent }: EventCardPromotorProps) {
-    const displayDateTime = formatDisplayDateTime(event.date, event.time);
-    const supabase = createClientComponentClient();
+    const supabase = createClient();
+    const { user } = useAuth();
 
-    // State for the promotional material modal (copied from chefe-equipe logic)
+    // State for statistics
+    const [guestStats, setGuestStats] = useState({
+        total: 0,
+        validated: 0
+    });
+    const [loadingStats, setLoadingStats] = useState(true);
+
+    // State for the promotional material modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([]);
-    const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
     const [isLoadingImages, setIsLoadingImages] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
 
-    // Function to fetch promotional images (copied from chefe-equipe logic)
-    const fetchPromotionalImages = async (eventId: string) => {
+    // State for promotion link
+    const [teamId, setTeamId] = useState<string | null>(null);
+    const [promoLink, setPromoLink] = useState<string>('');
+    const [loadingPromoLink, setLoadingPromoLink] = useState(true);
+
+    // Fetch guest statistics
+    useEffect(() => {
+        if (user?.id) {
+            fetchGuestStats();
+        }
+    }, [event.id, user?.id]);
+
+    // Fetch promotion link data
+    useEffect(() => {
+        if (user && event.id) {
+            fetchPromoterTeamId();
+        }
+    }, [user, event.id]);
+
+    const fetchGuestStats = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('guests')
+                .select('id, check_in_time')
+                .eq('event_id', event.id);
+
+            if (error) {
+                console.error(`[EventCard] Erro ao buscar stats para ${event.title}:`, error);
+                return;
+            }
+
+            const total = data?.length || 0;
+            const validated = data?.filter(guest => guest.check_in_time).length || 0;
+
+            setGuestStats({ total, validated });
+        } catch (error) {
+            console.error(`[EventCard] Erro fatal ao buscar stats para ${event.title}:`, error);
+        } finally {
+            setLoadingStats(false);
+        }
+    };
+
+    // Fetch team_id for promotion link
+    const fetchPromoterTeamId = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('event_promoters')
+                .select('team_id')
+                .eq('event_id', event.id)
+                .eq('promoter_id', user?.id)
+                .maybeSingle();
+
+            if (error) {
+                console.error('Error fetching team_id:', error);
+                return;
+            }
+
+            if (data?.team_id) {
+                setTeamId(data.team_id);
+                const link = `${window.location.origin}/promo/${event.id}/${user?.id}/${data.team_id}`;
+                setPromoLink(link);
+            }
+        } catch (error) {
+            console.error('Error fetching promotion data:', error);
+        } finally {
+            setLoadingPromoLink(false);
+        }
+    };
+
+    // Function to fetch promotional images
+    const fetchPromotionalImages = async () => {
         setIsLoadingImages(true);
         setModalError(null);
         setSelectedImageUrls([]);
 
-        console.log("[EventCardPromotor] Fetching images for event ID:", eventId);
-
         try {
             const { data, error: imagesError } = await supabase
-                .from('promotional_materials') // Assuming this table exists
+                .from('promotional_materials')
                 .select('image_url')
-                .eq('event_id', eventId);
+                .eq('event_id', event.id);
 
             if (imagesError) {
-                console.error("[EventCardPromotor] Modal Error:", imagesError);
                 throw new Error(`Falha ao carregar imagens promocionais: ${imagesError.message}`);
             }
 
-            console.log("[EventCardPromotor] Fetched image data:", data);
             const urls = data?.map(item => item.image_url).filter(Boolean) as string[] || [];
-            console.log("[EventCardPromotor] Extracted URLs:", urls);
             setSelectedImageUrls(urls);
 
         } catch (err: any) {
-            console.error("[EventCardPromotor] Modal Error:", err);
             setModalError(err.message || "Ocorreu um erro ao buscar as imagens.");
         } finally {
             setIsLoadingImages(false);
         }
     };
 
-    // Handler to open modal and fetch images (copied from chefe-equipe logic)
+    // Handler to open modal and fetch images
     const handleShowMaterial = () => {
-        console.log("[EventCardPromotor] handleShowMaterial called with eventId:", event.id);
-        setSelectedImageTitle(event.title || 'evento');
         setIsModalOpen(true);
-        fetchPromotionalImages(event.id);
+        fetchPromotionalImages();
     };
 
-    // Define the main card/dialog content once
-    const cardContent = (
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <Card className={`overflow-hidden transition-shadow hover:shadow-md`}>
-                <CardHeader className="p-0 relative">
-                    <div className="aspect-video overflow-hidden relative w-full bg-muted">
+    // Handler to copy promotion link
+    const copyPromoLink = async () => {
+        if (!promoLink) {
+            toast.error('Link de promoção não disponível');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(promoLink);
+            toast.success('Link copiado para a área de transferência!');
+        } catch (error) {
+            console.error('Error copying link:', error);
+            toast.error('Erro ao copiar link');
+        }
+    };
+
+    return (
+        <>
+            {/* Card com CSS inline do design fornecido */}
+            <div className="event-card-modern">
+                <div className="top-section">
+                    {/* Imagem do evento */}
+                    <div className="event-image-container">
                         {isPastEvent && (
-                            <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-2 pt-4">
-                                <p className="text-center text-xs font-semibold uppercase tracking-wider text-white">
-                                    Evento Realizado
-                                </p>
+                            <div className="past-event-overlay">
+                                <span>REALIZADO</span>
                             </div>
                         )}
                         {event.flyer_url ? (
                             <Image
                                 src={event.flyer_url}
-                                alt={`Flyer do evento ${event.title}`}
-                                layout="fill"
-                                objectFit="cover"
+                                alt={event.title}
+                                fill
+                                sizes="230px"
+                                priority
+                                className="object-cover"
                             />
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+                            <div className="no-image-fallback">
                                 <ImageOff className="h-12 w-12 text-gray-400" />
                             </div>
                         )}
                     </div>
-                </CardHeader>
 
-                <CardContent className="p-4 space-y-1.5">
-                    <CardTitle className="text-base font-semibold line-clamp-2">
-                        {event.title}
-                    </CardTitle>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                        <CalendarIcon className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                        <span>{displayDateTime}</span>
+                    {/* Apenas ícone de download no canto */}
+                    <div className="download-icon">
+                        <Download 
+                            className="svg cursor-pointer" 
+                            onClick={handleShowMaterial}
+                        />
                     </div>
-                    {event.location && (
-                        <div className="flex items-center text-xs text-muted-foreground">
-                            <MapPinIcon className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                            <span className="line-clamp-1">{event.location}</span>
-                        </div>
-                    )}
-                </CardContent>
-                <CardFooter className="px-4 pb-3 pt-3">
-                    <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="w-full" onClick={handleShowMaterial}>
-                            <DownloadIcon className="mr-1.5 h-4 w-4" />
-                            Material Promocional
-                        </Button>
-                    </DialogTrigger>
-                </CardFooter>
-            </Card>
-
-            <DialogContent className="sm:max-w-2xl max-h-[90vh]">
-                <DialogHeader>
-                    <DialogTitle>Material Promocional - {selectedImageTitle}</DialogTitle>
-                    <DialogDescription>
-                        Clique numa imagem para fazer o download.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    {isLoadingImages ? (
-                        <div className="flex justify-center items-center py-10 h-40">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : modalError ? (
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Erro</AlertTitle>
-                            <AlertDescription>{modalError}</AlertDescription>
-                        </Alert>
-                    ) : selectedImageUrls.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {selectedImageUrls.map((url, index) => (
-                                <div key={index} className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
-                                    <a
-                                        href={url}
-                                        download={`material_${selectedImageTitle?.replace(/\s+/g, '_')}_${index + 1}.png`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        <Image
-                                            src={url}
-                                            alt={`Material promocional ${index + 1}`}
-                                            layout="fill"
-                                            objectFit="contain"
-                                            className="cursor-pointer"
-                                        />
-                                    </a>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-10 bg-muted/50 rounded-md">
-                            <p className="text-muted-foreground">Nenhum material promocional encontrado.</p>
-                        </div>
-                    )}
                 </div>
-                <DialogFooter className="mt-6">
-                    <DialogClose asChild>
-                        <Button type="button" variant="outline">Fechar</Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
 
-    // Render the content, wrapping conditionally
-    return isPastEvent 
-            ? <div className="relative group opacity-70">{cardContent}</div> 
-            : cardContent;
-} 
+                <div className="bottom-section">
+                    <span className="title">{event.title}</span>
+                    
+                    <div className="row">
+                        <div className="item">
+                            <span className="big-text">
+                                {loadingStats ? '...' : guestStats.total}
+                            </span>
+                            <span className="regular-text">Guests</span>
+                        </div>
+                        <div className="item">
+                            <span className="big-text">
+                                {loadingStats ? '...' : guestStats.validated}
+                            </span>
+                            <span className="regular-text">Validados</span>
+                        </div>
+                        <div className="item cursor-pointer" onClick={handleShowMaterial}>
+                            <Download className="h-4 w-4 mx-auto mb-1 text-black" />
+                            <span className="regular-text">Material</span>
+                        </div>
+                        <div className="item cursor-pointer" onClick={copyPromoLink}>
+                            <Link className="h-4 w-4 mx-auto mb-1 text-black" />
+                            <span className="regular-text">LINK</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Modal */}
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh]">
+                    <DialogHeader>
+                        <DialogTitle>Material Promocional - {event.title}</DialogTitle>
+                        <DialogDescription>
+                            Clique numa imagem para fazer o download.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {isLoadingImages ? (
+                            <div className="flex justify-center items-center py-10 h-40">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : modalError ? (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Erro</AlertTitle>
+                                <AlertDescription>{modalError}</AlertDescription>
+                            </Alert>
+                        ) : selectedImageUrls.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {selectedImageUrls.map((url, index) => (
+                                    <div key={index} className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                                        <a
+                                            href={url}
+                                            download={`material_${event.title?.replace(/\s+/g, '_')}_${index + 1}.png`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <Image
+                                                src={url}
+                                                alt={`Material promocional ${index + 1}`}
+                                                fill
+                                                className="object-contain cursor-pointer"
+                                            />
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 bg-muted/50 rounded-md">
+                                <p className="text-muted-foreground">Nenhum material promocional encontrado.</p>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="mt-6">
+                        <DialogClose asChild>
+                            <Button type="button" variant="outline">Fechar</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <style jsx>{`
+                .event-card-modern {
+                    width: 230px;
+                    border-radius: 20px;
+                    background: white;
+                    border: 1px solid #000;
+                    padding: 5px;
+                    overflow: hidden;
+                    box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px 0px;
+                }
+
+                .top-section {
+                    height: 150px;
+                    border-radius: 15px;
+                    display: flex;
+                    flex-direction: column;
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                .event-image-container {
+                    position: absolute;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                }
+
+                .no-image-fallback {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(45deg, #8ed500 0%, #8ed500 100%);
+                }
+
+                .past-event-overlay {
+                    position: absolute;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10;
+                    color: white;
+                    font-size: 12px;
+                    font-weight: bold;
+                    letter-spacing: 2px;
+                }
+
+                .download-icon {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    padding: 8px;
+                    z-index: 30;
+                }
+
+                .svg {
+                    height: 16px;
+                    width: 16px;
+                    fill: #000;
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 4px;
+                    border-radius: 4px;
+                    transition: all 0.3s ease;
+                }
+
+                .svg:hover {
+                    fill: #000;
+                    background: rgba(255, 255, 255, 1);
+                    transform: scale(1.1);
+                }
+
+                .bottom-section {
+                    margin-top: 15px;
+                    padding: 10px 5px;
+                }
+
+                .title {
+                    display: block;
+                    font-size: 17px;
+                    font-weight: bolder;
+                    color: #000;
+                    text-align: center;
+                    letter-spacing: 2px;
+                    line-height: 1.2;
+                    margin-bottom: 10px;
+                }
+
+                .row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 20px;
+                }
+
+                .item {
+                    flex: 1;
+                    text-align: center;
+                    padding: 3px;
+                    color: #000;
+                    transition: opacity 0.3s ease;
+                }
+
+                .item:hover {
+                    opacity: 0.7;
+                }
+
+                .big-text {
+                    font-size: 12px;
+                    display: block;
+                    font-weight: bold;
+                }
+
+                .regular-text {
+                    font-size: 7px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+
+                .item:nth-child(2) {
+                    border-left: 1px solid rgba(0, 0, 0, 0.2);
+                }
+
+                .item:nth-child(3) {
+                    border-left: 1px solid rgba(0, 0, 0, 0.2);
+                }
+
+                .item:nth-child(4) {
+                    border-left: 1px solid rgba(0, 0, 0, 0.2);
+                }
+            `}</style>
+        </>
+    );
+}

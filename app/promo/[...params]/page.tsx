@@ -4,7 +4,6 @@
 import { notFound } from 'next/navigation';
 import { processPromoParams } from '../actions';
 import PromoterGuestListContent from './PromoterGuestListContent';
-import { ClientAuthProvider } from '@/hooks/useClientAuth';
 
 // Interface para props da página
 interface PageProps {
@@ -48,13 +47,11 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
     }
 
     return (
-      <ClientAuthProvider>
-        <PromoterGuestListContent 
-          event={data.event}
-          params={urlParams}
-          hasAssociation={data.hasAssociation}
-        />
-      </ClientAuthProvider>
+      <PromoterGuestListContent 
+        event={data.event}
+        params={urlParams}
+        hasAssociation={data.hasAssociation}
+      />
     );
   } catch (error) {
     console.error('[ERROR] Erro ao processar página do promotor:', error);

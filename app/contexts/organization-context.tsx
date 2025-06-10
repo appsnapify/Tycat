@@ -34,7 +34,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadOrganizations() {
       if (!user) {
-        console.log('OrganizationContext: Nenhum usuário logado')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('OrganizationContext: Nenhum usuário logado')
+        }
         setIsLoading(false)
         return
       }
@@ -42,7 +44,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       try {
         const supabase = createClient()
         
-        console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
+        }
         
         // Verificar primeiro a tabela user_organizations para confirmar relações
         let userOrgsCheck;
@@ -63,10 +67,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           userOrgsCheck = [];
         }
         
-        console.log('Relações de organizações encontradas:', userOrgsCheck?.length || 0)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Relações de organizações encontradas:', userOrgsCheck?.length || 0)
+        }
         
         if (!userOrgsCheck || userOrgsCheck.length === 0) {
-          console.log('Usuário não tem organizações associadas')
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Usuário não tem organizações associadas')
+          }
           setOrganizations([])
           setCurrentOrganization(null)
           setIsLoading(false)
@@ -75,7 +83,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         
         // Extrair IDs das organizações
         const orgIds = userOrgsCheck.map(rel => rel.organization_id)
-        console.log('IDs das organizações:', orgIds)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('IDs das organizações:', orgIds)
+        }
         
         // Buscar detalhes das organizações diretamente
         try {
@@ -89,25 +99,33 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             // Continuar mesmo com erro
           }
           
-          console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
+          }
           
           if (orgsData && orgsData.length > 0) {
             setOrganizations(orgsData)
             
             // Se não há organização selecionada, selecione a primeira
             if (!currentOrganization) {
-              console.log('Selecionando a primeira organização:', orgsData[0].name, orgsData[0].id)
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Selecionando a primeira organização:', orgsData[0].name, orgsData[0].id)
+              }
               setCurrentOrganization(orgsData[0])
             } else {
               // Verificar se a organização atual ainda está na lista
               const orgStillExists = orgsData.some(org => org.id === currentOrganization.id)
               if (!orgStillExists) {
-                console.log('Organização atual não existe mais, selecionando a primeira:', orgsData[0].name)
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('Organização atual não existe mais, selecionando a primeira:', orgsData[0].name)
+                }
                 setCurrentOrganization(orgsData[0])
               }
             }
           } else {
-            console.log('Nenhuma organização encontrada')
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Nenhuma organização encontrada')
+            }
             setOrganizations([])
             setCurrentOrganization(null)
           }
@@ -126,7 +144,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
     
     loadOrganizations()
-  }, [user, currentOrganization?.id]) // Adicionando apenas o ID para evitar loops de renderização
+  }, [user?.id])
 
   return (
     <OrganizationContext.Provider

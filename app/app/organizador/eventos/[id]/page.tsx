@@ -241,7 +241,7 @@ async function fetchGenderStats(eventId: string, supabaseClient: any) {
 // Componente da Página Principal
 export default async function EventoDetalhesPage({ params: routeParams }: PageProps) {
   // Inicializar cookies e supabaseClient aqui
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
   const eventId = routeParams.id;

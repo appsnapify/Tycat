@@ -102,11 +102,10 @@ async function fetchOrganizationEvents(orgId: string, supabase: any): Promise<Ev
   return (data as Evento[]) || [];
 }
 
-export default async function EventosPromotorPage({
-  searchParams,
-}: {
-  searchParams: { orgId?: string };
+export default async function EventosPromotorPage(props: {
+  searchParams: Promise<{ orgId?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const orgId = searchParams.orgId;
 
   if (!orgId) {
@@ -114,7 +113,7 @@ export default async function EventosPromotorPage({
     redirect('/app/promotor/dashboard');
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

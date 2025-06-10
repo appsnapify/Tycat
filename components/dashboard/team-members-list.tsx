@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { TeamMemberType } from '@/lib/database.types';
 import { toast } from 'sonner';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 
 interface TeamMembersListProps {
@@ -27,7 +27,7 @@ export function TeamMembersList({
 }: TeamMembersListProps) {
   const [members, setMembers] = useState<TeamMemberType[]>(initialMembers || []);
   const { user } = useAuth();
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   useEffect(() => {
     // Se temos membros iniciais, use-os

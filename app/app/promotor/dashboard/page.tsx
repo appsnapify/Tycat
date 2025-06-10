@@ -36,7 +36,6 @@ export default function PromotorDashboardPage() {
   
   // --- Lógica de Busca de Equipas (Simplificada) ---
   const loadTeams = async () => {
-    console.log("DashboardPromotor: loadTeams iniciado");
     if (!user?.id) {
       console.warn("DashboardPromotor: loadTeams chamado sem user ID.");
       setError("Utilizador não autenticado.");
@@ -56,7 +55,6 @@ export default function PromotorDashboardPage() {
 
       if (memberError) throw new Error("Erro ao buscar suas associações de equipa.");
       if (!memberData || memberData.length === 0) {
-        console.log("DashboardPromotor: Nenhuma associação de equipe encontrada.");
         setTeams([]);
         setLoadingTeams(false);
         return;
@@ -119,24 +117,14 @@ export default function PromotorDashboardPage() {
   // --- Use Effects --- 
   // 1. Carrega as equipas
   useEffect(() => {
-    console.log(`DashboardPromotor useEffect: user: ${user ? user.id : 'null'}, initialAuthCheckCompleted: ${initialAuthCheckCompleted}`);
     if (initialAuthCheckCompleted && user?.id) {
-      console.log("DashboardPromotor: Chamando loadTeams pois initialAuthCheckCompleted é true e user.id existe.");
       loadTeams();
     } else if (initialAuthCheckCompleted && !user?.id) {
-      console.warn("DashboardPromotor: initialAuthCheckCompleted é true, mas não há user.id. Não carregando equipas.");
       setLoadingTeams(false);
-      setError("Utilizador não autenticado ou sessão inválida."); // Poderia ser uma mensagem mais específica
+      setError("Utilizador não autenticado ou sessão inválida.");
       setTeams([]); 
-    } else {
-      console.log("DashboardPromotor: Aguardando initialAuthCheckCompleted ou user.id.");
-      // Mantém o loading ativo se a verificação inicial ainda não ocorreu
-      // ou se ainda não há utilizador.
-      // Opcionalmente, adicionar um timeout para evitar loading infinito se algo correr mal no AuthProvider
-      // mas por agora, vamos confiar que initialAuthCheckCompleted ficará true.
-      // setLoadingTeams(true); // Já está true por defeito
     }
-  }, [user, user?.id, initialAuthCheckCompleted]); // Adicionar user.id e initialAuthCheckCompleted às dependências
+  }, [user?.id, initialAuthCheckCompleted]);
 
   // --- Render Logic ---
   const nomePromotor =
@@ -205,83 +193,78 @@ export default function PromotorDashboardPage() {
           </CardContent>
         </Card>
         ) : (
-          // --- Estado Com Equipa (Card Compacto e Centrado) --- 
-          <Card className="max-w-xs w-full overflow-hidden"> {/* Max width e full width */} 
-            <CardContent className="p-4 flex flex-col items-center space-y-3"> {/* Padding, flex column, centralizado */} 
-              {/* Nome da Equipa em Destaque */} 
-              <p className="text-lg font-semibold text-lime-500 truncate"> 
-                {teams[0].name}
-              </p>
-              {/* Código da Equipa */} 
-              <div className="flex items-center text-xs text-muted-foreground">
-                <ShieldCheck className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" /> 
-                <span>Código: {teams[0].team_code || 'N/A'}</span>
-          </div>
-               {/* Linha Separadora */}
-              <hr className="my-2 w-full" /> {/* Separador a toda a largura */} 
-               {/* Botão de Ação com Popup */}
-              <Dialog>
-                 <DialogTrigger asChild>
-                   <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      <LogIn className="mr-1.5 h-3.5 w-3.5" /> {/* Ícone LogIn */}
-                      Entrar {/* Texto do botão mantido */}
-                    </Button>
-                 </DialogTrigger>
-                 <DialogContent className="sm:max-w-[425px] p-6">
-                    <DialogHeader className="mb-4">
-                      <DialogTitle className="text-lg">Organizações Associadas</DialogTitle>
-                      <DialogDescription>
-                        Esta equipa pertence a estas organizações.
-                      </DialogDescription>
-                    </DialogHeader>
-                    {/* Listagem de Organizações Clicáveis */} 
-                    <div className="space-y-3 py-4"> {/* Espaçamento entre itens */} 
-                       {(teams[0]?.organizations && teams[0].organizations.length > 0) ? (
-                         teams[0].organizations.map((org) => (
-                           <Link 
-                             key={org.id} 
-                             href={`/app/promotor/eventos?orgId=${org.id}`}
-                             passHref
-                             legacyBehavior={false} // Recomendado para App Router
-                             className="block p-3 rounded-md hover:bg-muted transition-colors cursor-pointer" // Estilo do link clicável
-                           >
-                             <div className="flex items-center gap-3"> {/* Layout interno do item */} 
-                               {/* Logo Condicional */} 
-                               {org.logo_url ? (
-                                 <Image
-                                   src={org.logo_url}
-                                   alt={`Logo de ${org.name || 'Organização'}`}
-                                   width={32} // Tamanho menor para lista
-                                   height={32}
-                                   className="rounded-md object-cover flex-shrink-0"
-                                 />
-                               ) : (
-                                 <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0"> {/* Placeholder */} 
-                                   <Building className="w-5 h-5 text-muted-foreground" />
-               </div>
-                               )}
-                               {/* Nome da Organização */} 
-                               <p className="text-base font-medium leading-tight flex-grow truncate"> {/* Tamanho base, truncado */} 
-                                 {org.name || 'Organização Sem Nome'}
-                             </p>
-                         </div>
-                           </Link>
-                         ))
-                       ) : (
-                         <p className="text-center text-muted-foreground py-4">
-                           Nenhuma organização diretamente associada a esta equipa.
+          // --- Estado Com Equipa (Card Moderno) --- 
+          <Dialog>
+            <DialogTrigger asChild>
+              <div className="w-52 bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] dark:shadow-[0px_0px_15px_rgba(255,255,255,0.05)] p-6 space-y-3 relative overflow-hidden cursor-pointer hover:shadow-[0px_0px_20px_rgba(0,0,0,0.15)] dark:hover:shadow-[0px_0px_20px_rgba(255,255,255,0.1)] transition-all duration-300">
+                {/* Círculo com número no canto */}
+                <div className="w-20 h-20 bg-gray-900 dark:bg-gray-700 rounded-full absolute -right-4 -top-6">
+                  <p className="absolute bottom-5 left-6 text-white text-xl font-bold">1</p>
+                </div>
+                
+                {/* Ícone da equipa */}
+                <div className="w-10">
+                  <Users className="w-10 h-10 text-gray-900 dark:text-gray-300" />
+                </div>
+                
+                {/* Nome da equipa */}
+                <h1 className="font-bold text-lg text-gray-900 dark:text-white">{teams[0].name}</h1>
+                
+                {/* Código e role da equipa */}
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-5">
+                  Código: {teams[0].team_code || 'N/A'} • {teams[0].role === 'admin' ? 'Administrador' : 'Membro'}
+                </p>
+              </div>
+            </DialogTrigger>
+            
+            <DialogContent className="sm:max-w-[425px] p-6">
+              <DialogHeader className="mb-4">
+                <DialogTitle className="text-lg">Organizações Associadas</DialogTitle>
+                <DialogDescription>
+                  Esta equipa pertence a estas organizações.
+                </DialogDescription>
+              </DialogHeader>
+              {/* Listagem de Organizações Clicáveis */} 
+              <div className="space-y-3 py-4"> {/* Espaçamento entre itens */} 
+                 {(teams[0]?.organizations && teams[0].organizations.length > 0) ? (
+                   teams[0].organizations.map((org) => (
+                     <Link 
+                       key={org.id} 
+                       href={`/app/promotor/eventos?orgId=${org.id}`}
+                       passHref
+                       legacyBehavior={false} // Recomendado para App Router
+                       className="block p-3 rounded-md hover:bg-muted transition-colors cursor-pointer" // Estilo do link clicável
+                     >
+                       <div className="flex items-center gap-3"> {/* Layout interno do item */} 
+                         {/* Logo Condicional */} 
+                         {org.logo_url ? (
+                           <Image
+                             src={org.logo_url}
+                             alt={`Logo de ${org.name || 'Organização'}`}
+                             width={32} // Tamanho menor para lista
+                             height={32}
+                             className="rounded-md object-cover flex-shrink-0"
+                           />
+                         ) : (
+                           <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0"> {/* Placeholder */} 
+                             <Building className="w-5 h-5 text-muted-foreground" />
+                           </div>
+                         )}
+                         {/* Nome da Organização */} 
+                         <p className="text-base font-medium leading-tight flex-grow truncate"> {/* Tamanho base, truncado */} 
+                           {org.name || 'Organização Sem Nome'}
                          </p>
-                       )}
-        </div>
-                 </DialogContent>
-              </Dialog>
-          </CardContent>
-            {/* Remover CardFooter se não for necessário */}
-        </Card>
+                       </div>
+                     </Link>
+                   ))
+                 ) : (
+                   <p className="text-center text-muted-foreground py-4">
+                     Nenhuma organização diretamente associada a esta equipa.
+                   </p>
+                 )}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>

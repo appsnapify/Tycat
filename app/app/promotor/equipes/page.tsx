@@ -14,7 +14,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
@@ -43,7 +43,7 @@ interface Team {
 export default function EquipesPage() {
   const router = useRouter()
   const { user, isTeamLeader } = useAuth()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [teams, setTeams] = useState<Team[]>([])
