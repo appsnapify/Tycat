@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
@@ -21,7 +21,6 @@ import { toast } from 'sonner'
 export default function CriarEquipePage() {
   const router = useRouter()
   const { user, updateUserRole } = useAuth()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(false)
   const [teamName, setTeamName] = useState('')
@@ -79,6 +78,7 @@ export default function CriarEquipePage() {
     try {
       console.log("Tentando criar equipa para o utilizador:", user.id);
       
+      const supabase = createClient();
       // Criar a equipe usando RPC
       const { data: teamId, error: rpcError } = await supabase
         .rpc('create_promoter_team_v2', {

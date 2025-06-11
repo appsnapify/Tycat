@@ -15,7 +15,7 @@ export default function UserDashboardLayout({
   // O redirecionamento agora é tratado pelo ClientProtectedRoute
   
   return (
-    <div className="flex flex-col min-h-screen pb-16">
+    <div className="flex flex-col min-h-screen">
       <Header 
         userFirstName={user?.firstName} 
         avatarUrl={user?.avatarUrl} 

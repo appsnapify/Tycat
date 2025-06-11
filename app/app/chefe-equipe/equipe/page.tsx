@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
@@ -16,7 +16,6 @@ import {
   Download,
   Filter,
   Search,
-  Settings,
   Shield,
   UserPlus,
   Users,
@@ -93,7 +92,6 @@ interface DetailedMember {
 export default function EquipePage() {
   const router = useRouter()
   const { user } = useAuth()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<TeamDetails | null>(null)
@@ -124,8 +122,7 @@ export default function EquipePage() {
           return;
         }
 
-        console.log(`EquipePage: Carregando detalhes SIMPLIFICADOS para team_id: ${teamIdToLoad}`);
-
+        const supabase = createClient();
         // --- CONSULTA ÚNICA: Buscar detalhes básicos da equipa --- 
         const { data: teamData, error: teamError } = await supabase
             .from('teams')
@@ -146,7 +143,6 @@ export default function EquipePage() {
              return;
         }
 
-        console.log("EquipePage: Detalhes básicos da equipe carregados:", teamData);
         setTeam(teamData as TeamDetails);
 
         // --- CHAMADA RPC PARA CONTAGEM (mantida) ---
@@ -157,7 +153,6 @@ export default function EquipePage() {
             console.error("EquipePage: Erro ao chamar RPC get_team_member_count:", countError);
             setMemberCount(null);
         } else {
-            console.log("EquipePage: Contagem de membros (via RPC):", countData);
             setMemberCount(countData);
         }
 
@@ -169,7 +164,7 @@ export default function EquipePage() {
     };
 
     loadInitialPageData();
-  }, [user, supabase]);
+  }, [user]); // Removido supabase para evitar loops
   
   // copyTeamCode (mantido de minha-equipe)
   const copyTeamCode = () => {
@@ -212,7 +207,7 @@ export default function EquipePage() {
     setDetailedMembers([]); 
 
     try {
-      console.log(`EquipePage: Carregando membros detalhados via RPC (on-demand) para team_id: ${team.id}`);
+      const supabase = createClient();
       const { data: rpcMembersData, error: rpcMembersError } = await supabase
         .rpc('get_team_members_with_details', { p_team_id: team.id });
 
@@ -220,7 +215,6 @@ export default function EquipePage() {
         console.error(`EquipePage: Erro ao carregar membros via RPC (on-demand) para team ${team.id}:`, rpcMembersError);
         toast.error("Erro ao carregar lista de membros.");
       } else if (rpcMembersData) {
-        console.log("EquipePage: Membros detalhados (via RPC, on-demand) carregados:", rpcMembersData);
         const formattedMembers = rpcMembersData.map(member => ({
           user_id: member.user_id,
           member_role: member.member_role,
@@ -286,20 +280,12 @@ export default function EquipePage() {
   // Renderização principal com componentes Shadcn
   return (
     <div className="container py-8 space-y-6">
-      {/* Cabeçalho Padrão */}
+      {/* Cabeçalho Simplificado - Removido botão configurações */}
       <div className="flex flex-col md:flex-row gap-4 md:gap-8 md:items-center justify-between">
         <div>
            {/* Padrão Título H1 */}
           <h1 className="text-3xl font-bold tracking-tight">{team?.name || 'A Minha Equipa'}</h1>
           <p className="text-muted-foreground mt-1">{team?.description || 'Código da equipa e número de elementos.'}</p>
-        </div>
-         {/* Botão Configurações (Corrigido/Reintroduzido) */}
-         <div className="flex items-center space-x-2">
-             <Link href={`/app/chefe-equipe/configuracoes`}>
-                 <Button variant="outline" size="sm" className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600">
-                    <Settings className="mr-2 h-4 w-4"/> Configurações
-                 </Button>
-             </Link>
          </div>
       </div>
       
@@ -307,69 +293,118 @@ export default function EquipePage() {
       <Separator />
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          {/* Card Código da Equipe (Restaurado) */}
-          <Card>
-             <CardHeader>
-               <CardTitle className="text-lg text-lime-500 font-semibold">Código da Equipa</CardTitle>
-               <CardDescription>Partilhe para adicionar promotores.</CardDescription>
-             </CardHeader>
-             <CardContent>
-               <div className="flex space-x-2">
-                 <Input readOnly value={team?.team_code || 'N/A'} className="font-mono text-center" />
-                 <Button size="icon" variant="outline" onClick={copyTeamCode} disabled={!team?.team_code} className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600">
-                   {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                 </Button>
+          {/* Card Código da Equipe - Padrão PromoterPublicLinkCard */}
+          <div className="w-52 bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_25px_rgba(0,0,0,0.15)] border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3 relative overflow-hidden cursor-pointer transition-all duration-300">
+            {/* Círculo com símbolo no canto */}
+            <div className="w-20 h-20 bg-black rounded-full absolute -right-4 -top-6">
+              <div className="absolute bottom-5 left-5">
+                <Copy className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            
+            {/* Ícone principal */}
+            <div className="w-10">
+              <Copy className="w-10 h-10 text-black" />
+            </div>
+            
+            {/* Título */}
+            <h1 className="font-bold text-lg text-gray-900 dark:text-white">Código da Equipa</h1>
+            
+            {/* Descrição com código */}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-5">
+              {team?.team_code || 'N/A'}
+            </p>
+
+            {/* Botão de ação */}
+            <div className="pt-2">
+              <button 
+                onClick={copyTeamCode} 
+                disabled={!team?.team_code}
+                className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors disabled:opacity-50"
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
                </div>
-             </CardContent>
-           </Card>
            
-          {/* Card Contagem de Membros (Restaurado) */}
-          <Card>
-             <CardHeader>
-                 <CardTitle className="text-lg text-lime-500 font-semibold">Membros</CardTitle>
-                 <CardDescription>Total de elementos na equipa.</CardDescription>
-             </CardHeader>
-             <CardContent>
-                 <div className="flex items-center gap-4">
-                     <Users className="h-8 w-8 text-lime-500" />
-                     <div>
-                        <p className="text-2xl font-bold">{memberCount !== null ? memberCount : '-'}</p> 
-                        <p className="text-sm text-muted-foreground">Total de elementos</p>
+          {/* Card Contagem de Membros - Padrão PromoterPublicLinkCard */}
+          <div className="w-52 bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_25px_rgba(0,0,0,0.15)] border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3 relative overflow-hidden cursor-pointer transition-all duration-300">
+            {/* Círculo com símbolo no canto */}
+            <div className="w-20 h-20 bg-black rounded-full absolute -right-4 -top-6">
+              <div className="absolute bottom-5 left-5">
+                <Users className="w-6 h-6 text-white" />
                      </div>
                  </div>
-             </CardContent>
-           </Card>
+            
+            {/* Ícone principal */}
+            <div className="w-10">
+              <Users className="w-10 h-10 text-black" />
+            </div>
+            
+            {/* Título */}
+            <h1 className="font-bold text-lg text-gray-900 dark:text-white">Membros</h1>
+            
+            {/* Descrição com contagem */}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-5">
+              {memberCount !== null ? `${memberCount} elemento${memberCount !== 1 ? 's' : ''}` : 'Contagem indisponível'}
+            </p>
 
-          {/* NOVO CARD: Link de Partilha da Página Pública do Chefe */}
+            {/* Informação adicional */}
+            <div className="pt-2">
+              <div className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md">
+                <UserCog className="w-3 h-3" />
+                Total da equipa
+              </div>
+            </div>
+          </div>
+
+          {/* Card Link Página Pública - Padrão PromoterPublicLinkCard */}
           {user?.id && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-lime-500 font-semibold">Link Página Pública</CardTitle>
-                <CardDescription>Partilhe o link para a sua página de eventos.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex space-x-2">
-                  <Input 
-                    readOnly 
-                    value={`${typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:3000' : 'https://snapify-xm3c.vercel.app'}/promotor/${user.id}`} 
-                    className="font-mono text-sm" 
-                  />
-                  <Button 
-                    size="icon" 
-                    variant="outline" 
-                    onClick={copyPublicProfileLink} 
-                    className="border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
-                  >
-                    {copiedLink ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
-                  </Button>
+            <div className="w-52 bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_25px_rgba(0,0,0,0.15)] border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-3 relative overflow-hidden cursor-pointer transition-all duration-300">
+              {/* Círculo com símbolo no canto */}
+              <div className="w-20 h-20 bg-black rounded-full absolute -right-4 -top-6">
+                <div className="absolute bottom-5 left-5">
+                  <Share2 className="w-6 h-6 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              {/* Ícone principal */}
+              <div className="w-10">
+                <Share2 className="w-10 h-10 text-black" />
+              </div>
+              
+              {/* Título */}
+              <h1 className="font-bold text-lg text-gray-900 dark:text-white">Link Público</h1>
+              
+              {/* Descrição */}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-5">
+                Para partilhar
+              </p>
+
+              {/* Botões de ação */}
+              <div className="flex gap-2 pt-2">
+                <button 
+                  onClick={copyPublicProfileLink}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+                >
+                  {copiedLink ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedLink ? 'Copiado!' : 'Copiar'}
+                </button>
+                <button 
+                  onClick={() => window.open(`${typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:3000' : 'https://snapify-xm3c.vercel.app'}/promotor/${user.id}`, '_blank')}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  Abrir
+                </button>
+              </div>
+            </div>
           )}
       </div>
       {/* --- FIM DA SECÇÃO REINTRODUZIDA --- */}
 
-      {/* Card/Secção para Membros da Equipa (Carregamento On-Demand) */}
+      {/* Card/Secção para Membros da Equipa (Carregamento On-Demand) - Cores harmonizadas */}
       <Card>
         <CardHeader 
           className="flex flex-row items-center justify-between cursor-pointer" 
@@ -385,7 +420,7 @@ export default function EquipePage() {
           }}
         >
           <div>
-            <CardTitle className="text-lime-500">Membros da Equipa</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Membros da Equipa</CardTitle>
             <CardDescription>
               {showMembersSection ? "Clique para esconder" : "Clique para ver a lista de promotores e o líder."}
             </CardDescription>
@@ -409,7 +444,7 @@ export default function EquipePage() {
                       {member.first_name || 'N/A'} {member.last_name || ''}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={member.member_role === 'leader' ? 'default' : 'secondary'} className={member.member_role === 'leader' ? 'bg-lime-500 text-white' : ''}>
+                      <Badge variant={member.member_role === 'leader' ? 'default' : 'secondary'} className={member.member_role === 'leader' ? 'bg-black dark:bg-white dark:text-black text-white' : ''}>
                         {member.member_role === 'leader' ? 'Líder' : member.member_role === 'member' ? 'Promotor' : member.member_role}
                       </Badge>
                     </TableCell>
@@ -421,7 +456,7 @@ export default function EquipePage() {
         )}
         {showMembersSection && loadingMembers && (
           <CardContent className="flex justify-center items-center py-4">
-            <Loader2 className="h-8 w-8 animate-spin text-lime-500" /> 
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" /> 
             <p className="ml-2">A carregar membros...</p>
           </CardContent>
         )}

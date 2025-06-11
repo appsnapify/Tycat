@@ -2,23 +2,16 @@
 
 import React, { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/app/app/_providers/auth-provider'
 import { Database } from '@/lib/database.types' // Assuming you have this type definitions file
 import { Loader2, AlertCircle, Calendar, Info, MapPin, Clock, Download, ImageOff } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog"
+import EventCardChefe from './EventCardChefe'
+
 
 // Helper function to safely parse date and time strings into a Date object
 function parseDateTime(dateStr: string | null | undefined, timeStr: string | null | undefined): Date | null {
@@ -85,63 +78,15 @@ interface EventListContentProps {
 
 // Internal component to handle the logic dependent on searchParams
 function EventListContent({ orgId }: EventListContentProps) {
-  const supabase = createClientComponentClient<Database>()
+  const { user } = useAuth();
 
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [organizationName, setOrganizationName] = useState<string | null>(null)
+  const [teamId, setTeamId] = useState<string | null>(null)
 
-  // State for the promotional material modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  // Changed to store multiple URLs
-  const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([]);
-  const [selectedImageTitle, setSelectedImageTitle] = useState<string | null>(null);
-  // Added loading state for modal images
-  const [isLoadingImages, setIsLoadingImages] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null); // Error specific to modal
 
-  // New function to fetch promotional images for a specific event
-  const fetchPromotionalImages = async (eventId: string) => {
-    setIsLoadingImages(true);
-    setModalError(null);
-    setSelectedImageUrls([]); // Clear previous images
-
-    console.log("[Debug] Fetching images for event ID:", eventId); // Adicionado log
-
-    try {
-      const { data, error: imagesError } = await supabase
-        .from('promotional_materials')
-        .select('image_url')
-        .eq('event_id', eventId);
-
-      if (imagesError) {
-        console.error("Modal Error: Erro ao buscar imagens promocionais:", imagesError);
-        throw new Error(`Falha ao carregar imagens promocionais: ${imagesError.message}`);
-      }
-
-      console.log("[Debug] Fetched data from Supabase:", data); // Adicionado log
-
-      // Extrai as URLs, garantindo que tratamos null/undefined
-      const urls = data?.map(item => item.image_url).filter(Boolean) as string[] || [];
-      console.log("[Debug] Extracted URLs:", urls); // Adicionado log
-
-      setSelectedImageUrls(urls);
-
-    } catch (err: any) {
-      setModalError(err.message || "Ocorreu um erro ao buscar as imagens.");
-    } finally {
-      setIsLoadingImages(false);
-    }
-  };
-
-  // Updated handler to fetch images based on event ID
-  const handleShowMaterial = (eventId: string, eventTitle: string | null | undefined) => {
-      console.log("[Debug] handleShowMaterial called with eventId:", eventId); // Adicionado log
-      setSelectedImageTitle(eventTitle || 'evento'); // Set title immediately
-      setIsModalOpen(true); // Open modal
-      fetchPromotionalImages(eventId); // Start fetching images
-  };
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -157,6 +102,7 @@ function EventListContent({ orgId }: EventListContentProps) {
       setOrganizationName(null)
 
       try {
+        const supabase = createClient();
         // 1. Fetch Organization Name (Remains the same)
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
@@ -168,6 +114,50 @@ function EventListContent({ orgId }: EventListContentProps) {
           console.warn("EventsPage: Erro ao buscar nome da organização:", orgError)
         } else if (orgData) {
           setOrganizationName(orgData.name)
+        }
+
+        // 1.5. Fetch Team ID for the current user in this organization
+        if (user?.id) {
+          console.log('[CHEFE EQUIPE] Buscando team_id para userId:', user.id, 'orgId:', orgId);
+          
+          // Query CORRIGIDA: buscar team via team_members -> organization_teams
+          const { data: teamData, error: teamError } = await supabase
+            .from('team_members')
+            .select(`
+              team_id,
+              teams!inner(
+                id,
+                name,
+                organization_teams!inner(
+                  organization_id
+                )
+              )
+            `)
+            .eq('user_id', user.id)
+            .eq('teams.organization_teams.organization_id', orgId)
+            .limit(1)
+            .single();
+
+          if (teamError) {
+            console.warn("[CHEFE EQUIPE] Erro ao buscar team_id:", teamError);
+            // Tentativa alternativa: buscar direto via event_promoters
+            const { data: eventPromoterData, error: epError } = await supabase
+              .from('event_promoters')
+              .select('team_id')
+              .eq('promoter_id', user.id)
+              .limit(1)
+              .single();
+              
+            if (!epError && eventPromoterData) {
+              console.log("[CHEFE EQUIPE] Team ID encontrado via event_promoters:", eventPromoterData.team_id);
+              setTeamId(eventPromoterData.team_id);
+            } else {
+              console.warn("[CHEFE EQUIPE] Fallback também falhou:", epError);
+            }
+          } else if (teamData) {
+            console.log("[CHEFE EQUIPE] Team ID encontrado via team_members:", teamData.team_id);
+            setTeamId(teamData.team_id);
+          }
         }
 
         // 2. Fetch Events
@@ -228,7 +218,7 @@ function EventListContent({ orgId }: EventListContentProps) {
     }
 
     fetchEvents()
-  }, [orgId, supabase])
+  }, [orgId, user?.id])
 
   // --- Filter events into active and past right before rendering ---
   const activeEvents = events.filter(event => !isEventPast(event));
@@ -282,87 +272,15 @@ function EventListContent({ orgId }: EventListContentProps) {
       {activeEvents.length > 0 && (
         <section>
           <h2 className="text-2xl font-semibold tracking-tight mb-4">Eventos Ativos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeEvents.map((event) => {
-              // --- Card Rendering Logic (Adapted) ---
-              const eventImg = event.flyer_url || '/placeholder-event.jpg';
-
-              // --- Determine Status Badge based on Dates ---
-              const now = new Date();
-              const startDateTime = parseDateTime(event.date, event.time);
-              const endDateTime = parseDateTime(event.end_date || event.date, event.end_date ? event.end_time : '23:59:59');
-
-              let statusLabel = "Próximo";
-              let statusColor = "bg-blue-500";
-
-              if (startDateTime && endDateTime && now >= startDateTime && now <= endDateTime) {
-                  statusLabel = "Em Andamento";
-                  statusColor = "bg-green-500";
-              } else if (startDateTime && startDateTime > now) {
-                   statusLabel = "Próximo";
-                   statusColor = "bg-blue-500";
-              }
-              // Fallback for ongoing if start is past but event isn't filtered as past (should not happen with correct isEventPast)
-              else if (startDateTime && now >= startDateTime) {
-                 statusLabel = "Em Andamento";
-                 statusColor = "bg-green-500";
-              }
-
-              return (
-                <Card key={event.id} className="overflow-hidden">
-                  <CardHeader className="p-0">
-                    <div className="relative h-40">
-                      <Image
-                        src={eventImg}
-                        alt={event.title || 'Imagem do evento'} // Use title
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        onError={(e) => { e.currentTarget.src = '/placeholder-event.jpg' }}
-                      />
-                       <div className="absolute top-2 right-2">
-                           <Badge className={`${statusColor} text-white text-xs backdrop-blur-sm shadow`}>
-                             {statusLabel}
-                           </Badge>
-                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-lg text-lime-500 mb-2 truncate" title={event.title || 'Nome Indisponível'}>
-                      {event.title || 'Nome Indisponível'} {/* Use title */}
-                    </h3>
-                    <div className="text-sm text-muted-foreground space-y-1.5 mt-1">
-                       {event.date && (
-                           <div className="flex items-center gap-2">
-                               <Calendar className="w-4 h-4 flex-shrink-0"/>
-                               <span>
-                                   {new Date(event.date + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                   {event.time && ` às ${event.time.substring(0, 5)}`}
-                               </span>
-                           </div>
-                       )}
-                       {event.location && (
-                           <div className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4 flex-shrink-0"/>
-                              <span className="truncate" title={event.location}>{event.location}</span>
-                           </div>
-                       )}
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-muted/60">
-                       <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
-                          onClick={() => handleShowMaterial(event.id, event.title)}
-                       >
-                           <Download className="mr-2 h-4 w-4" />
-                           Material Promocional
-                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="flex flex-wrap gap-6 justify-start">
+            {activeEvents.map((event) => (
+              <EventCardChefe 
+                key={event.id}
+                event={event}
+                isPastEvent={false}
+                teamId={teamId || ''}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -371,61 +289,15 @@ function EventListContent({ orgId }: EventListContentProps) {
       {pastEvents.length > 0 && (
         <section>
           <h2 className="text-2xl font-semibold tracking-tight mb-4">Eventos Terminados</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pastEvents.map((event) => {
-               const eventImg = event.flyer_url || '/placeholder-event.jpg';
-
-              return (
-                <Card key={event.id} className="overflow-hidden opacity-80 border-gray-300">
-                  <CardHeader className="p-0">
-                    <div className="relative h-40">
-                      <Image
-                        src={eventImg}
-                        alt={event.title || 'Imagem do evento'} // Use title
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        onError={(e) => { e.currentTarget.src = '/placeholder-event.jpg' }}
-                      />
-                      <div className="absolute inset-0 bg-gray-200 bg-opacity-20"></div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 bg-opacity-80 text-white text-center py-1.5 text-sm font-semibold">
-                          EVENTO REALIZADO
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4 bg-gray-50">
-                    <h3 className="font-semibold text-lg text-lime-500 mb-2 truncate" title={event.title || 'Nome Indisponível'}>
-                      {event.title || 'Nome Indisponível'} {/* Use title */}
-                    </h3>
-                    <div className="text-sm text-muted-foreground space-y-1.5 mt-1">
-                       {event.date && (
-                           <div className="flex items-center gap-2">
-                               <Calendar className="w-4 h-4 flex-shrink-0"/>
-                               <span>{new Date(event.date + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                           </div>
-                       )}
-                       {event.location && (
-                           <div className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4 flex-shrink-0"/>
-                              <span className="truncate" title={event.location}>{event.location}</span>
-                           </div>
-                       )}
-                    </div>
-                     <div className="mt-4 pt-4 border-t border-muted/60">
-                       <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-lime-500 text-lime-500 hover:bg-lime-50 hover:text-lime-600"
-                          onClick={() => handleShowMaterial(event.id, event.title)}
-                       >
-                           <Download className="mr-2 h-4 w-4" />
-                           Material Promocional
-                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="flex flex-wrap gap-6 justify-start">
+            {pastEvents.map((event) => (
+              <EventCardChefe 
+                key={event.id}
+                event={event}
+                isPastEvent={true}
+                teamId={teamId || ''}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -442,75 +314,6 @@ function EventListContent({ orgId }: EventListContentProps) {
         </CardContent>
       </Card>
       )}
-
-      {/* --- Promotional Material Modal (Updated for Multiple Images) --- */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col"> {/* Wider modal, flex column */}
-          <DialogHeader>
-            <DialogTitle>Material Promocional: {selectedImageTitle || 'Evento'}</DialogTitle>
-            <DialogDescription>
-              Clique numa imagem para fazer o download.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Content Area with Loading/Error/Images */}
-          <div className="flex-grow overflow-y-auto p-1"> {/* Scrollable area */}
-            {isLoadingImages ? (
-              <div className="flex justify-center items-center h-40">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="ml-3 text-muted-foreground">A carregar imagens...</p>
-              </div>
-            ) : modalError ? (
-              <div className="flex flex-col justify-center items-center h-40 text-destructive">
-                <AlertCircle className="h-8 w-8 mb-2"/>
-                <p className="font-semibold">Erro ao carregar</p>
-                <p className="text-sm text-center">{modalError}</p>
-              </div>
-            ) : selectedImageUrls.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4"> {/* Grid layout for images */}
-                {selectedImageUrls.map((imageUrl, index) => (
-                  <a
-                    key={index}
-                    href={imageUrl}
-                    // Create filename based on title and index
-                    download={`material_${selectedImageTitle?.replace(/\s+/g, '_').toLowerCase() || 'evento'}_${index + 1}.jpg`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Clique para fazer download"
-                    className="block relative aspect-square overflow-hidden rounded-md border hover:opacity-80 transition-opacity"
-                  >
-                    <Image
-                      src={imageUrl}
-                      alt={`Material ${index + 1} para ${selectedImageTitle || 'evento'}`}
-                      fill
-                      style={{ objectFit: 'cover', cursor: 'pointer' }}
-                      sizes="(max-width: 640px) 50vw, 33vw"
-                      onError={(e) => {
-                        // More robust error handling inside map if needed
-                        e.currentTarget.src = '/placeholder-error.png';
-                        e.currentTarget.alt = 'Erro ao carregar imagem';
-                      }}
-                    />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col justify-center items-center h-40 text-muted-foreground">
-                 <ImageOff className="h-10 w-10 mb-3" />
-                 <p>Nenhum material promocional encontrado para este evento.</p>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="mt-auto pt-4 border-t"> {/* Footer sticks to bottom */}
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Fechar
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
     </div>
   )
@@ -531,12 +334,12 @@ function EventsPageContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get('orgId');
   const [orgName, setOrgName] = useState<string | null>(null);
-  const supabase = createClientComponentClient<Database>();
 
   // Fetch org name separately for the title (remains the same)
   useEffect(() => {
      const fetchOrgNameForTitle = async () => {
         if (orgId && !orgName) {
+            const supabase = createClient();
             const { data, error } = await supabase
                 .from('organizations')
                 .select('name')
@@ -552,7 +355,7 @@ function EventsPageContent() {
         }
      };
      fetchOrgNameForTitle();
-  }, [orgId, supabase, orgName]);
+  }, [orgId, orgName]);
 
 
   return (

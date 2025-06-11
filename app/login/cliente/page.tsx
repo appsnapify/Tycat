@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import ClientLoginForm from '@/components/cliente/ClientLoginForm'
+import ClientLoginFormReal from '@/components/cliente/ClientLoginFormReal'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -78,7 +78,7 @@ export default async function ClientLoginPage() {
           </div>
 
           <div className="mt-6">
-            <ClientLoginForm />
+            <ClientLoginFormReal />
           </div>
 
           <div className="mt-6 text-center">

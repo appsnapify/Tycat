@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
@@ -58,7 +58,6 @@ interface UserSettings {
 export default function ConfiguracoesPage() {
   const router = useRouter()
   const { user, signOut } = useAuth()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -88,6 +87,7 @@ export default function ConfiguracoesPage() {
   const loadSettings = async () => {
     setLoading(true)
     try {
+      const supabase = createClient();
       // Obter ID da equipe dos metadados do usuário
       const teamId = user?.user_metadata?.team_id
       
@@ -188,6 +188,7 @@ export default function ConfiguracoesPage() {
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
+      const supabase = createClient();
       // Atualizar perfil do usuário no Supabase
       const { error } = await supabase
         .from('profiles')
@@ -225,6 +226,7 @@ export default function ConfiguracoesPage() {
   const handleSaveTeam = async () => {
     setSaving(true)
     try {
+      const supabase = createClient();
       // Atualizar informações da equipe no Supabase
       const { error } = await supabase
         .from('teams')

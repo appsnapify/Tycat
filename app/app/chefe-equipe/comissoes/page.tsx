@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import Link from 'next/link'
 
@@ -59,7 +59,6 @@ interface Commission {
 export default function ComissoesPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const supabase = createClientComponentClient()
   
   const [loading, setLoading] = useState(true)
   const [teamId, setTeamId] = useState<string | null>(null)
@@ -86,6 +85,7 @@ export default function ComissoesPage() {
   const loadTeamData = async () => {
     setLoading(true)
     try {
+      const supabase = createClient();
       // Obter ID da equipe dos metadados do usuário
       const teamId = user?.user_metadata?.team_id
       
