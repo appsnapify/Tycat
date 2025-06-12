@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         event_id,
         qr_code_url,
         created_at,
-        events!inner (
+        events (
           id,
           title,
           description,
@@ -33,13 +33,13 @@ export async function GET(request: Request) {
           time,
           location,
           flyer_url,
-          is_active
+          is_active,
+          is_published
         )
       `)
       .eq('client_user_id', userId)
-      .eq('events.is_active', true)
-      .eq('events.is_published', true)
-      .order('events.date', { ascending: true });
+      .not('events', 'is', null)
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar eventos:', error);
@@ -49,18 +49,21 @@ export async function GET(request: Request) {
       }, { status: 500 });
     }
 
-    // Formatar dados para o frontend
-    const formattedEvents = events?.map(guest => ({
-      id: guest.id,
-      event_id: guest.event_id,
-      qr_code_url: guest.qr_code_url || '',
-      title: guest.events.title,
-      date: guest.events.date,
-      location: guest.events.location || 'Local não definido',
-      flyer_url: guest.events.flyer_url || '',
-      description: guest.events.description || '',
-      time: guest.events.time || ''
-    })) || [];
+    // Filtrar e formatar dados para o frontend
+    const formattedEvents = events
+      ?.filter(guest => guest.events && guest.events.is_active && guest.events.is_published)
+      .map(guest => ({
+        id: guest.id,
+        event_id: guest.event_id,
+        qr_code_url: guest.qr_code_url || '',
+        title: guest.events.title,
+        date: guest.events.date,
+        location: guest.events.location || 'Local não definido',
+        flyer_url: guest.events.flyer_url || '',
+        description: guest.events.description || '',
+        time: guest.events.time || ''
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
     console.log(`Encontrados ${formattedEvents.length} eventos para o utilizador`);
 

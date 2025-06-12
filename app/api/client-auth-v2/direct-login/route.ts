@@ -77,31 +77,70 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Criar token JWT - LÓGICA COMENTADA
-    /*
-    const token = sign(
-      { 
-        id: userData.id,
-        phone: userData.phone,
-        email: userData.email 
-      }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRY }
-    );
-    */
+    // CORREÇÃO SIMPLIFICADA: Criar sessão Supabase Auth
+    console.log('[V2] Criando sessão Supabase Auth...');
     
-    // console.log('Token gerado para o cliente:', token); // Comentado
-
-    // Definir o cookie de autenticação - JÁ COMENTADO ANTERIORMENTE
-    // cookies().set('client_auth_token', token, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV !== 'development',
-    //   maxAge: 60 * 60 * 24 * 7, // 1 semana
-    //   path: '/',
-    //   sameSite: 'lax'
-    // });
+    // Determinar email para autenticação
+    const loginEmail = userData.email || `${userData.phone}@cliente.snapify.app`;
+    console.log('[V2] Email para sessão:', loginEmail);
     
-    console.log('[V2] Login direto realizado com sucesso:', { id: userData.id });
+    try {
+      // Tentar criar o usuário no Auth (mais direto)
+      console.log('[V2] Criando usuário no Auth...');
+      const { data: createAuthData, error: createAuthError } = await supabase.auth.admin.createUser({
+        email: loginEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          client_user_id: userData.id,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          phone: userData.phone
+        }
+      });
+      
+      if (createAuthError && !createAuthError.message.includes('already been registered')) {
+        console.error('[V2] Erro ao criar usuário no Auth:', createAuthError);
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao criar usuário no sistema de autenticação'
+        }, { status: 500 });
+      }
+      
+      // Fazer login para criar sessão
+      console.log('[V2] Fazendo login para criar sessão...');
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: password
+      });
+      
+      if (authError) {
+        console.error('[V2] Erro no login:', authError);
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao criar sessão de autenticação'
+        }, { status: 500 });
+      }
+      
+      console.log('[V2] Sessão criada com sucesso');
+      
+      // Limpar password da tabela após migração bem-sucedida
+      await supabase
+        .from('client_users')
+        .update({ password: null })
+        .eq('id', userData.id);
+        
+      console.log('[V2] Password removida da tabela após migração');
+      
+    } catch (authSetupError) {
+      console.error('[V2] Erro no setup de autenticação:', authSetupError);
+      return NextResponse.json({
+        success: false,
+        error: 'Erro ao configurar sessão de autenticação'
+      }, { status: 500 });
+    }
+    
+    console.log('[V2] Login direto realizado com sucesso e sessão criada:', { id: userData.id });
     
     // Retornar dados do usuário (sem senha)
     return NextResponse.json({ 
