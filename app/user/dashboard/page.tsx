@@ -28,6 +28,7 @@ export default function ClientDashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState<EventGuest | null>(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [showPastEvents, setShowPastEvents] = useState(false);
 
   // Verificação de autenticação simples
   useEffect(() => {
@@ -249,7 +250,7 @@ export default function ClientDashboardPage() {
                           <Card className="bg-gradient-to-br from-blue-600 to-purple-600 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform">
                             <CardContent className="p-0 relative">
                               {/* Background Image */}
-                              <div className="relative h-48 sm:h-56 overflow-hidden">
+                              <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600">
                                 {event.flyer_url && (
                                   <Image
                                     src={event.flyer_url}
@@ -257,6 +258,12 @@ export default function ClientDashboardPage() {
                                     fill
                                     className="object-cover"
                                     priority={index === 0}
+                                    loading={index === 0 ? "eager" : "lazy"}
+                                    placeholder="blur"
+                                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
                                   />
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -332,13 +339,19 @@ export default function ClientDashboardPage() {
                           <Card className="bg-gradient-to-br from-orange-600 to-red-600 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform">
                             <CardContent className="p-0 relative">
                               {/* Background Image */}
-                              <div className="relative h-48 sm:h-56 overflow-hidden">
+                              <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-orange-600 to-red-600">
                                 {event.flyer_url && (
                                   <Image
                                     src={event.flyer_url}
                                     alt={event.title}
                                     fill
                                     className="object-cover"
+                                    loading="lazy"
+                                    placeholder="blur"
+                                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
                                   />
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -395,91 +408,131 @@ export default function ClientDashboardPage() {
                   </div>
                 )}
 
-                {/* Eventos Passados (> 24h) */}
+                {/* Eventos Passados (> 24h) - Lazy Loading */}
                 {past.length > 0 && (
                   <div>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6">
                       <h2 className="text-lg sm:text-xl font-bold text-gray-400 mb-2 sm:mb-0">Eventos Passados</h2>
                       <span className="text-gray-500 text-sm">{past.length} evento{past.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {past.slice(0, 4).map((event, index) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
+                    
+                    {!showPastEvents ? (
+                      // Botão para expandir eventos passados
+                      <div className="text-center">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowPastEvents(true)}
+                          className="border-gray-600 text-gray-400 hover:bg-gray-800 transition-all px-6 py-3 rounded-xl"
                         >
-                          <Card className="bg-gradient-to-br from-gray-700 to-gray-800 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform opacity-75">
-                            <CardContent className="p-0 relative">
-                              {/* Background Image */}
-                              <div className="relative h-48 sm:h-56 overflow-hidden">
-                                {event.flyer_url && (
-                                  <Image
-                                    src={event.flyer_url}
-                                    alt={event.title}
-                                    fill
-                                    className="object-cover grayscale"
-                                  />
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                                
-                                {/* Badge "Passado" */}
-                                <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
-                                  <div className="bg-gray-600/90 backdrop-blur rounded-lg px-2 py-1">
-                                    <span className="text-xs text-gray-300 font-medium">PASSADO</span>
-                                  </div>
-                                </div>
-
-                                {/* Data */}
-                                <div className="absolute top-3 sm:top-4 left-3 sm:left-4">
-                                  <div className="bg-white/10 backdrop-blur rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
-                                    <div className="text-center">
-                                      <div className="text-xs text-gray-300 uppercase">
-                                        {formatDate(event.date).split(' ')[1]}
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Ver {past.length} evento{past.length !== 1 ? 's' : ''} passado{past.length !== 1 ? 's' : ''}
+                        </Button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          💡 Clique para carregar e economizar dados
+                        </p>
+                      </div>
+                    ) : (
+                      // Grid de eventos passados (só carrega quando expandido)
+                      <>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {past.slice(0, 4).map((event, index) => (
+                            <motion.div
+                              key={event.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                            >
+                              <Card className="bg-gradient-to-br from-gray-700 to-gray-800 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform opacity-75">
+                                <CardContent className="p-0 relative">
+                                  {/* Background Image - Lazy Loading */}
+                                  <div className="relative h-48 sm:h-56 overflow-hidden bg-gray-800">
+                                    {event.flyer_url && (
+                                      <Image
+                                        src={event.flyer_url}
+                                        alt={event.title}
+                                        fill
+                                        className="object-cover grayscale"
+                                        loading="lazy"
+                                        placeholder="blur"
+                                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                                    
+                                    {/* Badge "Passado" */}
+                                    <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
+                                      <div className="bg-gray-600/90 backdrop-blur rounded-lg px-2 py-1">
+                                        <span className="text-xs text-gray-300 font-medium">PASSADO</span>
                                       </div>
-                                      <div className="text-sm sm:text-lg font-bold text-gray-200">
-                                        {formatDate(event.date).split(' ')[0]}
+                                    </div>
+
+                                    {/* Data */}
+                                    <div className="absolute top-3 sm:top-4 left-3 sm:left-4">
+                                      <div className="bg-white/10 backdrop-blur rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
+                                        <div className="text-center">
+                                          <div className="text-xs text-gray-300 uppercase">
+                                            {formatDate(event.date).split(' ')[1]}
+                                          </div>
+                                          <div className="text-sm sm:text-lg font-bold text-gray-200">
+                                            {formatDate(event.date).split(' ')[0]}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Conteúdo */}
+                                    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                                      <h3 className="font-bold text-gray-200 text-base sm:text-lg mb-2 line-clamp-2">
+                                        {event.title}
+                                      </h3>
+                                      
+                                      <div className="flex items-center text-gray-300 text-xs sm:text-sm mb-3 sm:mb-4">
+                                        <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                        <span className="truncate">{event.location}</span>
+                                      </div>
+
+                                      {/* Info */}
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs text-gray-400">Evento concluído</span>
+                                        <Button
+                                          onClick={() => openQrModal(event)}
+                                          variant="outline"
+                                          className="border-gray-600 text-gray-300 hover:bg-gray-700 font-semibold px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm"
+                                        >
+                                          Histórico
+                                        </Button>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-
-                                {/* Conteúdo */}
-                                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-                                  <h3 className="font-bold text-gray-200 text-base sm:text-lg mb-2 line-clamp-2">
-                                    {event.title}
-                                  </h3>
-                                  
-                                  <div className="flex items-center text-gray-300 text-xs sm:text-sm mb-3 sm:mb-4">
-                                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                    <span className="truncate">{event.location}</span>
-                                  </div>
-
-                                  {/* Info */}
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-400">Evento concluído</span>
-                                    <Button
-                                      onClick={() => openQrModal(event)}
-                                      variant="outline"
-                                      className="border-gray-600 text-gray-300 hover:bg-gray-700 font-semibold px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm"
-                                    >
-                                      Histórico
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
-                    </div>
-                    {past.length > 4 && (
-                      <div className="text-center mt-4">
-                        <Button variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800">
-                          Ver mais {past.length - 4} eventos passados
-                        </Button>
-                      </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </div>
+                        
+                        {/* Botão para ocultar novamente */}
+                        <div className="text-center mt-6">
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => setShowPastEvents(false)}
+                            className="text-gray-500 hover:text-gray-300 text-sm"
+                          >
+                            Ocultar eventos passados
+                          </Button>
+                        </div>
+                        
+                        {/* Ver mais eventos (se houver mais de 4) */}
+                        {past.length > 4 && (
+                          <div className="text-center mt-4">
+                            <Button variant="outline" className="border-gray-600 text-gray-400 hover:bg-gray-800">
+                              Ver mais {past.length - 4} eventos passados
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
