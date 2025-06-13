@@ -122,7 +122,6 @@ export default function EventDetailsClient({
     const [loadingLocations, setLoadingLocations] = useState(false);
     
     // Estado para o gráfico de localidades - Comentado para teste
-    /*
     const [locationChartOptions, setLocationChartOptions] = useState<ApexOptions>({
         labels: ['Carregando...'],
         colors: ['#818cf8', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#6366f1'],
@@ -178,7 +177,6 @@ export default function EventDetailsClient({
         }]
     });
     const [locationChartSeries, setLocationChartSeries] = useState<number[]>([100]);
-    */
     
     // Estado para o gráfico de gênero - Comentado para teste
     /*
@@ -364,32 +362,34 @@ export default function EventDetailsClient({
                         count: item.count
                     }));
                     
-                    setTopLocations(locationData); // Manter para dados da tabela, se houver
+                    setTopLocations(locationData);
 
-                    const labels = locationData.map(loc => `${loc.name} (${loc.code})`);
+                    const labels = locationData.map(loc => 
+                        loc.name === 'Desconhecido' ? 'Desconhecido' : `${loc.name} (${loc.code})`
+                    );
                     const series = locationData.map(loc => loc.count);
 
-                    // setLocationChartSeries(series); // Comentado para teste
-                    // setLocationChartOptions(prev => ({ // Comentado para teste
-                    //     ...prev,
-                    //     labels: labels,
-                    // }));
+                    setLocationChartSeries(series);
+                    setLocationChartOptions(prev => ({
+                        ...prev,
+                        labels: labels,
+                    }));
                 } else {
-                    // setLocationChartSeries([0]); // Comentado para teste
-                    // setLocationChartOptions(prev => ({ // Comentado para teste
-                    //     ...prev,
-                    //     labels: ["Sem dados de localização"],
-                    // }));
-                    setTopLocations([]); // Limpar dados da tabela
+                    setLocationChartSeries([0]);
+                    setLocationChartOptions(prev => ({
+                        ...prev,
+                        labels: ["Sem dados de localização"],
+                    }));
+                    setTopLocations([]);
                 }
             } catch (error) {
                 console.error('Erro ao buscar localidades:', error);
-                // setLocationChartSeries([0]); // Comentado para teste
-                // setLocationChartOptions(prev => ({ // Comentado para teste
-                //     ...prev,
-                //     labels: ["Erro ao carregar dados"],
-                // }));
-                setTopLocations([]); // Limpar dados da tabela
+                setLocationChartSeries([0]);
+                setLocationChartOptions(prev => ({
+                    ...prev,
+                    labels: ["Erro ao carregar dados"],
+                }));
+                setTopLocations([]);
             } finally {
                 setLoadingLocations(false);
             }
@@ -542,11 +542,15 @@ export default function EventDetailsClient({
                                 ) : (
                                     <>
                                         {topLocations.length > 0 ? (
-                                             <div className="h-48 flex items-center justify-center text-sm text-gray-500">
-                                                {/* Chart comentado para teste */}
-                                                Gráfico de Localização Desativado para Teste
-                                                {/* Você pode querer mostrar os dados de topLocations como uma lista aqui para depuração */}
-                                                {/* Ex: <pre>{JSON.stringify(topLocations, null, 2)}</pre> */}
+                                            <div className="h-48">
+                                                {typeof window !== 'undefined' && (
+                                                    <Chart
+                                                        options={locationChartOptions}
+                                                        series={locationChartSeries}
+                                                        type="donut"
+                                                        height="100%"
+                                                    />
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="h-32 flex items-center justify-center text-sm text-gray-500">

@@ -72,7 +72,11 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   children,
   serverSession,
 }) => {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => {
+    // Proteger contra SSR - só criar client no browser
+    if (typeof window === 'undefined') return null
+    return createClient()
+  }, [])
   const router = useRouter()
   const pathname = usePathname()
 
@@ -124,6 +128,8 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       // Preservar metadados existentes
       const currentMetadata = user.user_metadata || {};
       
+      if (!supabase) throw new Error('Supabase client not available')
+      
       const { data: userData, error: updateError } = await supabase.auth.updateUser({
         data: { 
           ...currentMetadata, // Manter outros metadados
@@ -148,7 +154,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
       console.error('[ClientAuthProvider] Error in updateUserRole:', error);
       throw error;
     }
-  }, [user, supabase.auth, updateRole]);
+  }, [user, supabase, updateRole]);
 
   useEffect(() => {
     // Inicializar estado do user e role com base na serverSession
@@ -159,6 +165,9 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   }, [serverSession, updateRole]);
 
   useEffect(() => {
+    // Proteger contra SSR
+    if (!supabase) return
+
     // Imediatamente marca como carregando até que a primeira verificação de auth ocorra.
     setIsLoadingUser(true);
 
@@ -194,9 +203,10 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
     return () => {
       subscription?.unsubscribe()
     }
-  }, [updateRole]); // CORREÇÃO CRÍTICA: Removido supabase, router, pathname para evitar re-setup constante
+  }, [updateRole, supabase]); // Adicionado supabase na dependência para safety
 
   const signOut = async () => {
+    if (!supabase) return
     setIsLoadingUser(true)
     await supabase.auth.signOut()
     // Os listeners de onAuthStateChange já devem limpar os estados session, user e role
@@ -215,6 +225,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   // }, [user, userProfile, refreshUserProfile]);
 
   const signIn = async (credentials: SignInWithPasswordCredentials): Promise<{ error: Error | null }> => {
+    if (!supabase) return { error: new Error('Supabase client not available') }
     setIsLoadingUser(true);
     const { data, error } = await supabase.auth.signInWithPassword(credentials);
     
@@ -244,6 +255,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   };
 
   const signUp = async (credentials: SignUpWithPasswordCredentials, metadata?: Record<string, any>): Promise<{ error: Error | null }> => {
+    if (!supabase) return { error: new Error('Supabase client not available') }
     setIsLoadingUser(true);
     const { data, error } = await supabase.auth.signUp({
       email: credentials.email,
@@ -271,7 +283,7 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
 
   const contextValue = useMemo(
     () => ({
-      supabase,
+      supabase: supabase || null, // Garantir que nunca seja undefined
       session,
       user,
       // currentRole, // Comentado temporariamente

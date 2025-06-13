@@ -140,9 +140,9 @@ export default function ClientDashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       {/* Header Moderno */}
       <div className="px-4 sm:px-6 pt-8 sm:pt-12 pb-4 sm:pb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
               <span className="text-lg sm:text-xl font-bold text-black">
                 {user?.firstName?.charAt(0) || 'U'}
               </span>
@@ -155,21 +155,20 @@ export default function ClientDashboardPage() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
-              size="icon"
-              className="text-gray-400 hover:text-white w-8 h-8 sm:w-10 sm:h-10"
+              disabled={true}
+              className="text-gray-400 opacity-50 cursor-not-allowed w-10 h-10 sm:w-12 sm:h-12 rounded-2xl"
             >
-              <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
             <Button
               variant="ghost"
-              size="icon"
               onClick={handleLogout}
-              className="text-gray-400 hover:text-red-400 w-8 h-8 sm:w-10 sm:h-10"
+              className="text-gray-400 hover:text-red-400 hover:bg-red-500/10 w-10 h-10 sm:w-12 sm:h-12 rounded-2xl transition-all"
             >
-              <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </Button>
@@ -183,11 +182,11 @@ export default function ClientDashboardPage() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedCategory('guest')}
+              disabled={true}
               className={`flex-1 flex items-center justify-center space-x-1 sm:space-x-3 px-2 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl transition-all ${
                 selectedCategory === 'guest'
-                  ? 'bg-yellow-400/80 sm:bg-yellow-500 text-black shadow-md sm:shadow-lg'
-                  : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
+                  ? 'bg-yellow-500 text-black shadow-md sm:shadow-lg opacity-50 cursor-not-allowed'
+                  : 'bg-gray-800/50 text-gray-300 opacity-50 cursor-not-allowed'
               }`}
             >
               <div className={`w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
@@ -201,11 +200,11 @@ export default function ClientDashboardPage() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedCategory('bilhetes')}
+              disabled={true}
               className={`flex-1 flex items-center justify-center space-x-1 sm:space-x-3 px-2 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl transition-all ${
                 selectedCategory === 'bilhetes'
-                  ? 'bg-yellow-400/80 sm:bg-yellow-500 text-black shadow-md sm:shadow-lg'
-                  : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
+                  ? 'bg-yellow-500 text-black shadow-md sm:shadow-lg opacity-50 cursor-not-allowed'
+                  : 'bg-gray-800/50 text-gray-300 opacity-50 cursor-not-allowed'
               }`}
             >
               <div className={`w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
@@ -220,7 +219,7 @@ export default function ClientDashboardPage() {
       </div>
 
       {/* Conteúdo Principal */}
-      <div className="px-4 sm:px-6 pb-20 sm:pb-24">
+      <div className="px-4 sm:px-6 pb-16 sm:pb-20">
         {selectedCategory === 'guest' ? (
           <>
             {loadingEvents ? (
@@ -241,22 +240,22 @@ export default function ClientDashboardPage() {
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {upcoming.map((event, index) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                        >
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
                           <Card className="bg-gradient-to-br from-blue-600 to-purple-600 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform">
-                            <CardContent className="p-0 relative">
-                              {/* Background Image */}
+                      <CardContent className="p-0 relative">
+                        {/* Background Image */}
                               <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600">
-                                {event.flyer_url && (
-                                  <Image
-                                    src={event.flyer_url}
-                                    alt={event.title}
-                                    fill
-                                    className="object-cover"
+                          {event.flyer_url && (
+                            <Image
+                              src={event.flyer_url}
+                              alt={event.title}
+                              fill
+                              className="object-cover"
                                     priority={index === 0}
                                     loading={index === 0 ? "eager" : "lazy"}
                                     placeholder="blur"
@@ -264,45 +263,45 @@ export default function ClientDashboardPage() {
                                     onError={(e) => {
                                       e.currentTarget.style.display = 'none';
                                     }}
-                                  />
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                                
-                                {/* Like Button */}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                          
+                          {/* Like Button */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
                                   className="absolute top-3 sm:top-4 right-3 sm:right-4 text-white hover:text-red-400 w-8 h-8 sm:w-10 sm:h-10"
-                                >
+                          >
                                   <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
-                                </Button>
+                          </Button>
 
-                                {/* Data */}
+                          {/* Data */}
                                 <div className="absolute top-3 sm:top-4 left-3 sm:left-4">
                                   <div className="bg-yellow-500/90 backdrop-blur rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
-                                    <div className="text-center">
+                              <div className="text-center">
                                       <div className="text-xs text-black uppercase font-medium">
-                                        {formatDate(event.date).split(' ')[1]}
-                                      </div>
-                                      <div className="text-sm sm:text-lg font-bold text-black">
-                                        {formatDate(event.date).split(' ')[0]}
-                                      </div>
-                                    </div>
-                                  </div>
+                                  {formatDate(event.date).split(' ')[1]}
                                 </div>
+                                      <div className="text-sm sm:text-lg font-bold text-black">
+                                  {formatDate(event.date).split(' ')[0]}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-                                {/* Conteúdo */}
+                          {/* Conteúdo */}
                                 <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
                                   <h3 className="font-bold text-white text-base sm:text-lg mb-2 line-clamp-2">
-                                    {event.title}
-                                  </h3>
-                                  
+                              {event.title}
+                            </h3>
+                            
                                   <div className="flex items-center text-gray-200 text-xs sm:text-sm mb-3 sm:mb-4">
                                     <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                     <span className="truncate">{event.location}</span>
-                                  </div>
+                            </div>
 
-                                  {/* Botão QR Code */}
+                            {/* Botão QR Code */}
                                   <div className="flex items-center justify-end">
                                     <Button
                                       onClick={() => openQrModal(event)}
@@ -358,7 +357,7 @@ export default function ClientDashboardPage() {
                                 
                                 {/* Badge "Recente" */}
                                 <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
-                                  <div className="bg-orange-500/90 backdrop-blur rounded-lg px-2 py-1">
+                                  <div className="bg-orange-500/90 backdrop-blur rounded-2xl px-2 py-1">
                                     <span className="text-xs text-white font-medium">RECENTE</span>
                                   </div>
                                 </div>
@@ -386,24 +385,24 @@ export default function ClientDashboardPage() {
                                   <div className="flex items-center text-gray-200 text-xs sm:text-sm mb-3 sm:mb-4">
                                     <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                     <span className="truncate">{event.location}</span>
-                                  </div>
-
+                              </div>
+                              
                                   {/* Botão QR Code */}
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-300">Evento concluído</span>
-                                    <Button
-                                      onClick={() => openQrModal(event)}
+                              <Button
+                                onClick={() => openQrModal(event)}
                                       className="bg-gray-600 hover:bg-gray-500 text-white font-semibold px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm"
-                                    >
-                                      Ver QR
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
+                              >
+                                Ver QR
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
                     </div>
                   </div>
                 )}
@@ -420,16 +419,12 @@ export default function ClientDashboardPage() {
                       // Botão para expandir eventos passados
                       <div className="text-center">
                         <Button 
-                          variant="outline" 
                           onClick={() => setShowPastEvents(true)}
-                          className="border-gray-600 text-gray-400 hover:bg-gray-800 transition-all px-6 py-3 rounded-xl"
+                          className="bg-yellow-500 hover:bg-yellow-400 text-black font-semibold transition-all px-6 py-3 rounded-2xl shadow-lg"
                         >
                           <Calendar className="h-4 w-4 mr-2" />
                           Ver {past.length} evento{past.length !== 1 ? 's' : ''} passado{past.length !== 1 ? 's' : ''}
                         </Button>
-                        <p className="text-xs text-gray-500 mt-2">
-                          💡 Clique para carregar e economizar dados
-                        </p>
                       </div>
                     ) : (
                       // Grid de eventos passados (só carrega quando expandido)
@@ -464,7 +459,7 @@ export default function ClientDashboardPage() {
                                     
                                     {/* Badge "Passado" */}
                                     <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
-                                      <div className="bg-gray-600/90 backdrop-blur rounded-lg px-2 py-1">
+                                      <div className="bg-gray-600/90 backdrop-blur rounded-2xl px-2 py-1">
                                         <span className="text-xs text-gray-300 font-medium">PASSADO</span>
                                       </div>
                                     </div>
@@ -591,7 +586,7 @@ export default function ClientDashboardPage() {
                   alt="QR Code"
                   width={180}
                   height={180}
-                  className="rounded-lg sm:w-[200px] sm:h-[200px]"
+                                                  className="rounded-2xl sm:w-[200px] sm:h-[200px]"
                 />
               </div>
               

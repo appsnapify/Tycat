@@ -1,15 +1,107 @@
 # 🔍 AUDITORIA COMPLETA - RESOLUÇÃO 2025
 **Data Início:** 2025-01-28
 **Status:** EM ANDAMENTO
-**Última Atualização:** 2025-01-28 15:45:00
+**Última Atualização:** 2025-01-28 17:45:00
 
 ## 📊 RESUMO EXECUTIVO (Atualizado em Tempo Real)
-- **Páginas Analisadas:** 0 / TBD
-- **Componentes Analisados:** 0 / TBD
-- **APIs Analisadas:** 0 / TBD
-- **Bugs Encontrados:** 0
-- **Vulnerabilidades:** 0
-- **Score Atual:** TBD/10
+- **Páginas Analisadas:** 3 / 82 (4%)
+- **Componentes Analisados:** 2 / TBD
+- **APIs Analisadas:** 3 / TBD
+- **Bugs Encontrados:** 28
+- **Vulnerabilidades:** 16
+- **Score Atual:** 4/10
+
+### Problemas Críticos Identificados:
+1. **Segurança:**
+   - Exposição de dados sensíveis em logs
+   - Falta de rate limiting em APIs críticas
+   - Validações fracas de input
+   - Race conditions em operações críticas
+   - Tokens e senhas expostos em logs
+   - Proteção insuficiente contra ataques
+
+2. **Performance:**
+   - Queries sequenciais não otimizadas
+   - Falta de transações em operações críticas
+   - Memory leaks em useEffects
+   - Falta de caching em operações frequentes
+
+3. **Code Quality:**
+   - Console logs excessivos (30+ por arquivo)
+   - Duplicação de código (colors, types, utils)
+   - Validações inconsistentes
+   - Código morto e imports não usados
+
+4. **UX/Acessibilidade:**
+   - Falta de feedback em operações
+   - Loading states inconsistentes
+   - Mensagens de erro genéricas
+   - Problemas de acessibilidade
+
+### Prioridades de Correção:
+1. 🔴 **CRÍTICO (24h):**
+   - Remover exposição de dados sensíveis
+   - Implementar rate limiting
+   - Corrigir race conditions
+   - Adicionar validações robustas
+
+2. 🟡 **ALTA (72h):**
+   - Implementar logging seguro
+   - Melhorar tratamento de erros
+   - Otimizar queries críticas
+   - Adicionar proteções de segurança
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Refatorar componentes grandes
+   - Implementar testes
+   - Melhorar UX/feedback
+   - Otimizar performance
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Documentar APIs/componentes
+   - Implementar monitoring
+   - Melhorar acessibilidade
+   - Adicionar analytics
+
+### Métricas de Qualidade:
+1. **Componentes:**
+   - StatCard: 8/10 (Bom, pequenas melhorias)
+   - DashboardContent: 6/10 (Precisa refatoração)
+
+2. **APIs:**
+   - Login: 3/10 (Crítico, precisa correção)
+   - Registro: 4/10 (Problemas sérios)
+   - Check-in: 2/10 (Muito crítico)
+
+3. **Páginas:**
+   - Home: 7/10 (Melhorias menores)
+   - Login: 5/10 (Precisa atenção)
+   - Dashboard: 4/10 (Problemas sérios)
+
+### Próximos Passos:
+1. **Imediato (Hoje):**
+   - Criar plano de correção de segurança
+   - Priorizar remoção de logs sensíveis
+   - Iniciar implementação de rate limiting
+   - Documentar todas as vulnerabilidades
+
+2. **Curto Prazo (72h):**
+   - Implementar correções críticas
+   - Estabelecer padrões de código
+   - Criar pipeline de testes
+   - Melhorar monitoramento
+
+3. **Médio Prazo (2 semanas):**
+   - Refatorar componentes grandes
+   - Otimizar performance geral
+   - Implementar testes e2e
+   - Melhorar documentação
+
+4. **Longo Prazo (1 mês):**
+   - Revisar arquitetura geral
+   - Implementar CI/CD robusto
+   - Estabelecer métricas de qualidade
+   - Criar plano de manutenção
 
 ## 🏗️ ARQUITETURA DO SISTEMA
 ### Stack Tecnológico Identificado:
@@ -61,10 +153,9 @@ snap/
 
 ## 📄 ANÁLISE DE PÁGINAS (Registro em Tempo Real)
 
-### ✅ PÁGINA ANALISADA: / (Home Page)
-**Analisada em:** 2025-01-28 15:47:00
+### ✅ PÁGINA ANALISADA: / (Home Page) [ATUALIZAÇÃO: 2025-01-28 16:30:00]
 **Tipo:** Client Component (Static)
-**Propósito:** Página de landing principal do sistema - Marketing/Apresentação
+**Propósito:** Landing page principal do sistema - Marketing/Apresentação
 
 #### Componentes Utilizados:
 - Button (UI component) - Status: OK
@@ -72,87 +163,190 @@ snap/
 - Lucide Icons (ícones) - Status: OK
 - Supabase Client (auth) - Status: OK
 
-#### APIs/Endpoints Consumidos:
-- supabase.auth.getSession() - Status: OK
-- supabase.auth.onAuthStateChange() - Status: OK
-- supabase.auth.signOut() - Status: OK
-
-#### Funcionalidades:
-- Sistema de autenticação com estado
-- Navegação condicional (autenticado vs não autenticado)
-- Logout funcional
-- Design responsivo
-- Animações com Framer Motion
-
-#### Problemas Identificados:
+#### Problemas Identificados (ATUALIZADOS):
 🐛 **BUGS:**
-- Nenhum bug crítico identificado
+1. **Console Logs em Produção:**
+```typescript
+console.error('Erro ao verificar sessão:', error)
+console.error('Erro ao fazer logout:', error)
+```
+2. **Possível Memory Leak:**
+- useEffect não limpa todos os estados no unmount
 
 🔒 **SEGURANÇA:**
-- ✅ Usa createClient() do Supabase
-- ✅ Gerencia estados de autenticação
-- ✅ Logout seguro
+1. **Client-side Authentication:**
+- Verificação de sessão feita apenas no cliente
+- Falta middleware de proteção
 
 💀 **CÓDIGO MORTO:**
-- Cores duplicadas em objeto `colors` (pode ser otimizado)
-- Elementos decorativos complexos (verificar se necessários)
+1. **Objeto `colors` Duplicado:**
+```typescript
+const colors = {
+  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
+  // ... mais cores
+}
+```
+2. **Links Não Implementados:**
+- Footer contém links não funcionais (Documentação, Blog, etc.)
 
-⚡ **OTIMIZAÇÕES SUGERIDAS:**
-- **Performance:** Mover `colors` para arquivo separado
-- **UX:** Loading state muito básico
-- **Acessibilidade:** Falta alt text em elementos decorativos
-- **SEO:** Falta meta tags e description
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Performance:**
+- Mover verificação de sessão para middleware
+- Implementar SSR para SEO
+- Lazy loading para seções não críticas
 
-#### Score da Página: 7/10
-**Justificação:** Boa funcionalidade e design, mas falta otimizações de performance e SEO
+2. **UX/UI:**
+- Adicionar loading states mais sofisticados
+- Implementar feedback visual para ações de autenticação
+- Melhorar acessibilidade dos elementos decorativos
 
-### ✅ PÁGINA ANALISADA: /login (Login Page)
-**Analisada em:** 2025-01-28 15:49:00
+3. **SEO:**
+- Adicionar meta tags
+- Implementar dynamic OG images
+- Adicionar structured data
+
+4. **Code Quality:**
+- Extrair componentes para arquivos separados
+- Centralizar objeto colors em theme
+- Implementar error boundaries
+
+#### Score Atualizado: 6/10 (⬇️ -1.0)
+**Justificativa da Redução:**
+- Descoberta de memory leaks potenciais
+- Falta de SSR impactando SEO
+- Código duplicado (colors)
+- Links não implementados no footer
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO:**
+   - Implementar middleware de autenticação
+   - Corrigir memory leaks
+   - Remover console.logs de produção
+
+2. 🟡 **ALTA:**
+   - Migrar para SSR
+   - Centralizar theme/colors
+   - Implementar error boundaries
+
+3. 🟢 **MÉDIA:**
+   - Melhorar loading states
+   - Implementar meta tags
+   - Adicionar feedback visual
+
+4. 🔵 **BAIXA:**
+   - Implementar links do footer
+   - Melhorar acessibilidade
+   - Adicionar testes e2e
+
+### ✅ PÁGINA ANALISADA: /login (Login Page) [ATUALIZAÇÃO: 2025-01-28 16:35:00]
 **Tipo:** Client Component (Authentication)
-**Propósito:** Autenticação de usuários no sistema
+**Propósito:** Autenticação de usuários no sistema com redirecionamento inteligente
 
 #### Componentes Utilizados:
-- Button, Input, Label (UI components) - Status: OK
+- Button, Input, Label, Alert (UI components) - Status: OK
 - Framer Motion (animações) - Status: OK
-- Alert (feedback) - Status: OK
+- Lucide Icons (ícones) - Status: OK
 - Supabase Client (auth) - Status: OK
 
-#### APIs/Endpoints Consumidos:
-- supabase.auth.getSession() - Status: OK
-- supabase.auth.signInWithPassword() - Status: OK
+#### Problemas Identificados (ATUALIZADOS):
+🐛 **BUGS CRÍTICOS:**
+1. **Console Logs Excessivos:**
+```typescript
+console.log('[LOGIN] Determinando redirect para role:', role)
+console.error('Erro ao verificar sessão:', error)
+```
 
-#### Funcionalidades:
-- Formulário de login funcional
-- Verificação de sessão existente
-- Redirecionamento automático se já autenticado
-- Tratamento de erros específicos
-- Rate limiting awareness
+2. **Memory Leaks:**
+```typescript
+useEffect(() => {
+  checkAuthAndRedirect()
+}, [router]) // Falta cleanup
+```
 
-#### Problemas Identificados:
-🐛 **BUGS:**
-- **Window API sem verificação SSR:** `window.location.search` usado sem verificação
-- **Memory leak potencial:** useEffect sem cleanup apropriado
+3. **Window API sem Verificação:**
+```typescript
+const hasAuthError = new URLSearchParams(window.location.search)
+```
 
-🔒 **SEGURANÇA:**
-- ✅ Usa Supabase auth (seguro)
-- ✅ Tratamento específico de rate limiting
-- ✅ Sanitização de URL para remover auth_error
-- ⚠️ **VULNERABILIDADE MÉDIA:** Mensagens de erro muito específicas (podem facilitar enumeration attacks)
-- ⚠️ **MELHORIA:** Falta implementação de CAPTCHA para rate limiting
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Exposição de Informações:**
+- Logs expõem metadata do usuário
+- Mensagens de erro muito específicas
+
+2. **Autenticação Client-side:**
+- Verificação de sessão apenas no cliente
+- Falta proteção contra brute force
 
 💀 **CÓDIGO MORTO:**
-- Objeto `colors` duplicado (mesmo da homepage)
-- Ícones Mail, Lock importados mas não usados
+1. **Objeto `colors` Duplicado (9ª ocorrência):**
+```typescript
+const colors = {
+  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
+  // ... mais cores
+}
+```
 
-⚡ **OTIMIZAÇÕES SUGERIDAS:**
-- **Performance:** Mover validação de sessão para middleware
-- **UX:** Adicionar show/hide password toggle
-- **Security:** Implementar CAPTCHA após 3 tentativas
-- **Acessibilidade:** Melhorar labels e aria-descriptions
-- **DX:** Extrair lógica de auth para custom hook
+2. **Imports Não Utilizados:**
+```typescript
+import { Mail, Lock } from 'lucide-react'
+```
 
-#### Score da Página: 6/10
-**Justificação:** Funcionalidade sólida mas vulnerabilidades de segurança e código duplicado
+⚡ **OTIMIZAÇÕES CRÍTICAS NECESSÁRIAS:**
+1. **Segurança:**
+- Implementar middleware de autenticação
+- Adicionar CAPTCHA após 3 tentativas
+- Implementar rate limiting por IP
+- Padronizar mensagens de erro
+- Remover logs sensíveis
+
+2. **Performance:**
+- Mover verificação de sessão para middleware
+- Implementar SSR para SEO
+- Otimizar imports
+
+3. **UX:**
+- Melhorar feedback de erros
+- Adicionar indicador de força da senha
+- Implementar "Lembrar-me"
+- Adicionar recuperação de senha
+
+4. **Code Quality:**
+- Extrair lógica de autenticação para hooks
+- Centralizar objeto colors
+- Implementar testes e2e
+- Adicionar error boundaries
+
+#### Score Atualizado: 4/10 (⬇️ -2.0)
+**Justificativa da Redução:**
+- Exposição crítica de dados nos logs
+- Falta de proteção contra ataques
+- Memory leaks em useEffect
+- Código duplicado (colors)
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Remover TODOS os console.logs
+   - Implementar rate limiting
+   - Corrigir memory leaks
+   - Padronizar mensagens de erro
+
+2. 🟡 **ALTA (72h):**
+   - Implementar CAPTCHA
+   - Migrar para middleware
+   - Adicionar testes e2e
+   - Implementar error boundaries
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Melhorar UX de erros
+   - Adicionar recuperação de senha
+   - Implementar "Lembrar-me"
+   - Refatorar para hooks
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Centralizar theme/colors
+   - Melhorar acessibilidade
+   - Adicionar analytics
+   - Documentar componente
 
 ### ✅ PÁGINA ANALISADA: /promo/[...params] (Promo Page)
 **Analisada em:** 2025-01-28 15:52:00
@@ -200,107 +394,262 @@ snap/
 #### Score da Página: 8/10
 **Justificação:** Funcionalidade crítica bem implementada, com correção recente aplicada. Falta apenas otimizações de performance
 
-### ✅ PÁGINA ANALISADA: /register (Register Page)
-**Analisada em:** 2025-01-28 16:08:00
+### ✅ PÁGINA ANALISADA: /register (Register Page) [NOVA ANÁLISE: 2025-01-28 17:05:00]
 **Tipo:** Client Component (Authentication/Onboarding)
-**Propósito:** Registro de novos usuários no sistema
+**Propósito:** Registro de novos usuários com seleção de role
 
 #### Componentes Utilizados:
-- Form, FormField (React Hook Form) - Status: OK
+- Form, FormField, FormItem (React Hook Form) - Status: OK
 - Button, Input, Label, RadioGroup (UI components) - Status: OK
 - Framer Motion (animações) - Status: OK
 - Zod (validação) - Status: OK
-
-#### APIs/Endpoints Consumidos:
-- supabase.auth.signUp() - Status: OK
-
-#### Funcionalidades:
-- ✅ Formulário com validação robusta (Zod + React Hook Form)
-- ✅ Seleção de role (organizador/promotor)
-- ✅ Confirmação de senha
-- ✅ Redirecionamento baseado em role
-- ✅ Feedback visual com toast
-- ✅ Loading states
+- Sonner (toasts) - Status: OK
 
 #### Problemas Identificados:
-🐛 **BUGS:**
-- **Timeout hard-coded:** Delay de 1.5s para redirecionamento não é ideal
-- **Icons não utilizados:** Mail, Building2, Lock importados mas não usados
-- **Error handling:** Erro do Supabase pode vazar informações sensíveis
+🐛 **BUGS CRÍTICOS:**
+1. **Timeout Hard-coded:**
+```typescript
+setTimeout(() => {
+  router.push(redirectPath);
+}, 1500); // Delay fixo de 1.5s
+```
 
-🔒 **SEGURANÇA:**
-- ✅ Validação client-side e server-side
-- ✅ Confirmação de senha obrigatória
-- ✅ Usa Supabase auth (seguro)
-- ⚠️ **MELHORIA:** Falta validação de força da senha
-- ⚠️ **MELHORIA:** Falta verificação de email existente antes do submit
+2. **Console Logs em Produção:**
+```typescript
+console.error('Error during registration:', error);
+```
+
+3. **Verificação de Email Automática:**
+```typescript
+email_verified: true // Definido sem verificação real
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Validação de Senha Fraca:**
+- Mínimo de apenas 6 caracteres
+- Sem requisitos de complexidade
+- Sem verificação contra senhas comuns
+
+2. **Exposição de Erros:**
+```typescript
+const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+```
+
+3. **Metadata Exposta:**
+- Role e email_verified expostos no client-side
 
 💀 **CÓDIGO MORTO:**
-- **Objeto `colors` duplicado** (9ª ocorrência identificada!)
-- Icons Mail, Building2, Lock importados mas não usados
+1. **Objeto `colors` Duplicado (10ª ocorrência):**
+```typescript
+const colors = {
+  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
+  // ... mais cores
+}
+```
 
-⚡ **OTIMIZAÇÕES SUGERIDAS:**
-- **UX:** Mostrar força da senha em tempo real
-- **Performance:** Debounce na verificação de email existente
-- **Security:** Implementar verificação de email
-- **Acessibilidade:** Melhorar aria-labels
-- **UX:** Remover delay hard-coded, usar callback do auth
+2. **Imports Não Utilizados:**
+```typescript
+import { Building2, Lock } from 'lucide-react'
+```
 
-#### Score da Página: 7/10
-**Justificação:** Boa implementação com validação robusta, mas problemas de UX e código duplicado
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Segurança:**
+- Implementar verificação real de email
+- Fortalecer requisitos de senha
+- Adicionar CAPTCHA
+- Implementar rate limiting
 
-### ✅ PÁGINA ANALISADA: /app/organizador/dashboard (Organizador Dashboard)
-**Analisada em:** 2025-01-28 16:12:00
+2. **UX/UI:**
+- Adicionar indicador de força da senha
+- Melhorar feedback de erros
+- Remover delay fixo no redirecionamento
+- Adicionar termos de uso e privacidade
+
+3. **Performance:**
+- Mover validações pesadas para servidor
+- Implementar SSR para SEO
+- Otimizar imports
+
+4. **Code Quality:**
+- Extrair lógica de autenticação para hooks
+- Centralizar objeto colors
+- Adicionar testes e2e
+- Implementar error boundaries
+
+#### Score: 5/10
+**Justificativa:**
+- Problemas de segurança significativos
+- UX pode ser melhorada
+- Código duplicado
+- Falta de testes em componente crítico
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Implementar verificação real de email
+   - Fortalecer validação de senha
+   - Remover console.logs
+   - Implementar rate limiting
+
+2. 🟡 **ALTA (72h):**
+   - Adicionar CAPTCHA
+   - Implementar termos de uso
+   - Adicionar testes e2e
+   - Melhorar feedback de erros
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Indicador de força da senha
+   - Extrair lógica para hooks
+   - Melhorar UX de erros
+   - Implementar SSR
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Centralizar theme/colors
+   - Melhorar acessibilidade
+   - Adicionar analytics
+   - Documentar componente
+
+### ✅ PÁGINA ANALISADA: /app/organizador/dashboard (Organizador Dashboard) [ATUALIZAÇÃO: 2025-01-28 17:15:00]
 **Tipo:** Client Component (Dashboard/Analytics)
-**Propósito:** Dashboard principal para organizadores - Centro de controle do sistema
+**Propósito:** Dashboard principal para organizadores com KPIs, eventos e equipes
 
 #### Componentes Utilizados:
 - Multiple UI components (Card, Button, Badge, Progress, Tabs) - Status: OK
 - StatCard, DashboardContent (custom components) - Status: OK
-- useAuth (custom hook) - Status: OK
-- Múltiplos ícones Lucide - Status: OK
-
-#### APIs/Endpoints Consumidos:
-- Supabase queries (user_organizations, organizations, events, teams) - Status: PROBLEMÁTICO
-- Multiple dashboard data endpoints - Status: COMPLEXO
-
-#### Funcionalidades:
-- ✅ Dashboard com KPIs em tempo real
-- ✅ Gestão de organizações
-- ✅ Visualização de eventos e equipas
-- ✅ Loading states individuais
-- ✅ Error handling robusto
-- ✅ Search e filtros
+- useAuth, useOrganization (custom hooks) - Status: OK
+- Lucide Icons (18 ícones importados) - Status: OTIMIZAR
 
 #### Problemas Identificados:
 🐛 **BUGS CRÍTICOS:**
-- **Query complexity crítica:** 4+ queries sequenciais no load inicial
-- **Over-engineering:** Verificação de existência de tabelas (checkTableExists)
-- **Console logging excessivo:** 15+ console.logs em produção
-- **Error handling defensivo demais:** Pode mascarar problemas reais
-- **Memory leaks:** useEffect sem dependencies adequadas
+1. **Console Logs Excessivos (15+ ocorrências):**
+```typescript
+console.log('Dashboard useEffect', { user, currentOrganization })
+console.log('Dashboard: Usuário e organização disponíveis...')
+console.log('Iniciando loadOrganizationAndData')
+console.error('Erro DETALHADO ao buscar user_organizations:', {...})
+// ... mais logs
+```
 
-🔒 **SEGURANÇA:**
-- ✅ Verificação de roles (owner, organizador)
-- ✅ Filtragem por organização do usuário
-- ⚠️ **PROBLEMA:** Logs expõem estrutura interna do sistema
-- ⚠️ **PROBLEMA:** Error messages muito detalhados
+2. **Memory Leaks em useEffects:**
+```typescript
+useEffect(() => {
+  if (user && currentOrganization) {
+    loadOrganizationAndData()
+  }
+}, [user, currentOrganization]) // Sem cleanup
+```
+
+3. **Queries Sequenciais Não Otimizadas:**
+```typescript
+// Verificações sequenciais de tabela/coluna
+const checkTableExists = async (tableName) => {...}
+const checkColumnExists = async (tableName, columnName) => {...}
+```
+
+4. **Error Handling Defensivo Demais:**
+```typescript
+try {
+  loadKpis(organizationId)
+} catch (e) {
+  console.error('Erro ao iniciar loadKpis:', e)
+}
+// ... repetido para cada função
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Exposição de Dados:**
+- Logs detalhados expõem estrutura do banco
+- Stack traces em produção
+- Metadata de usuário em logs
+
+2. **Verificações Desnecessárias:**
+```typescript
+const checkTableExists = async (tableName) => {
+  const { data } = await supabase.rpc('check_table_exists', { table_name: tableName })
+  return data
+}
+```
+
+3. **Queries Não Parametrizadas:**
+```typescript
+const safeQuery = async (tableName, options = {}) => {
+  // Concatenação de strings em queries
+}
+```
 
 💀 **CÓDIGO MORTO:**
-- **Objeto `dashboardColors` duplicado** (versão mais complexa do `colors`)
-- **Icons não utilizados:** Copy, RefreshCw, AlertCircle aparecem não usados
-- **Estados não utilizados:** Algumas variáveis de state podem estar órfãs
+1. **Funções Mock Não Utilizadas:**
+```typescript
+const getMockActivities = (): Activity[] => {...}
+```
 
-⚡ **OTIMIZAÇÕES CRÍTICAS:**
-- **Performance:** Paralelizar todas as queries iniciais
-- **Performance:** Implementar cache para dados de organização
-- **Performance:** Usar React Query ou SWR para data fetching
-- **UX:** Skeleton loading em vez de spinners genéricos
-- **Monitoring:** Remover logs de produção, implementar error tracking
-- **Architecture:** Extrair lógica de data fetching para custom hooks
+2. **Imports Não Utilizados:**
+```typescript
+import { Copy, RefreshCw, AlertCircle } from 'lucide-react'
+```
 
-#### Score da Página: 5/10
-**Justificação:** Funcionalidade complexa mas problemas graves de performance e over-engineering
+3. **Estados Não Utilizados:**
+```typescript
+const [copied, setCopied] = useState(false)
+const [loadingError, setLoadingError] = useState(false)
+```
+
+⚡ **OTIMIZAÇÕES CRÍTICAS NECESSÁRIAS:**
+1. **Performance:**
+- Remover verificações de tabela/coluna
+- Paralelizar queries iniciais
+- Implementar cache para KPIs
+- Lazy loading para componentes pesados
+
+2. **Code Quality:**
+- Extrair lógica de dados para hooks
+- Remover todos os console.logs
+- Implementar error boundaries
+- Adicionar tipos TypeScript faltantes
+
+3. **UX:**
+- Adicionar loading states granulares
+- Melhorar feedback de erros
+- Implementar retry em falhas
+- Adicionar pull-to-refresh
+
+4. **Monitoramento:**
+- Implementar error tracking
+- Adicionar métricas de performance
+- Logging estruturado
+- Analytics de uso
+
+#### Score Atualizado: 4/10 (⬇️ -1.0)
+**Justificativa da Redução:**
+- Over-engineering crítico (verificações de tabela)
+- Exposição excessiva de dados em logs
+- Memory leaks potenciais
+- Queries não otimizadas
+- Falta de testes em componente crítico
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Remover TODAS as verificações de tabela/coluna
+   - Remover console.logs
+   - Corrigir memory leaks
+   - Parametrizar queries
+
+2. 🟡 **ALTA (72h):**
+   - Implementar error boundaries
+   - Adicionar testes e2e
+   - Paralelizar queries
+   - Implementar cache
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Extrair lógica para hooks
+   - Melhorar UX de erros
+   - Implementar retry
+   - Adicionar analytics
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Refatorar componentes
+   - Melhorar tipos TS
+   - Documentar funções
+   - Otimizar imports
 
 ## 🧩 ANÁLISE DE COMPONENTES (Registro Progressivo)
 
@@ -351,7 +700,259 @@ snap/
 #### Score do Componente: 7/10
 **Justificação:** Funcionalidade rica e bem implementada, mas complexidade excessiva e problemas de performance
 
----
+### ✅ COMPONENTE ANALISADO: StatCard [NOVA ANÁLISE: 2025-01-28 17:20:00]
+**Tipo:** UI Component (Reutilizável)
+**Propósito:** Card para exibição de estatísticas com variações de cor e loading state
+**Localização:** `components/dashboard/stat-card.tsx`
+
+#### Interface:
+```typescript
+interface StatCardProps {
+  title: string
+  value: string | number
+  icon?: React.ReactNode
+  change?: string
+  color?: "lime" | "fuchsia" | "blue" | "amber"
+  loading?: boolean
+}
+```
+
+#### Pontos Positivos:
+1. **Tipagem Forte:**
+   - Interface bem definida
+   - Props opcionais marcadas corretamente
+   - Tipos específicos para cores
+
+2. **Flexibilidade:**
+   - Suporte a ícones opcionais
+   - Múltiplas variações de cor
+   - Loading state integrado
+   - Suporte a mudanças percentuais
+
+3. **Boas Práticas:**
+   - Uso de `cn()` para classes condicionais
+   - Valores default para props opcionais
+   - Animações suaves (transition-all)
+   - Loading skeleton implementado
+
+#### Problemas Identificados:
+🐛 **BUGS MENORES:**
+1. **Acessibilidade:**
+```typescript
+<h3 className="text-gray-600 font-medium text-sm">{title}</h3>
+// Falta aria-label para ícone
+```
+
+2. **Tipagem Incompleta:**
+```typescript
+change?: string // Deveria ser mais específico (ex: `${'+' | '-'}${number}%`)
+```
+
+3. **Validação de Props:**
+```typescript
+// Falta validação do formato de 'change'
+change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+```
+
+⚡ **OTIMIZAÇÕES SUGERIDAS:**
+1. **Performance:**
+```typescript
+// Memoizar mapa de cores
+const colorMap = useMemo(() => ({
+  lime: {...},
+  fuchsia: {...},
+  // ...
+}), [])
+```
+
+2. **Acessibilidade:**
+```typescript
+// Adicionar roles e aria-labels
+<div role="status" aria-label={`${title}: ${value}`}>
+```
+
+3. **Internacionalização:**
+```typescript
+// Texto hardcoded
+"desde último período" // Deveria vir de i18n
+```
+
+4. **Validação:**
+```typescript
+// Adicionar prop-types ou zod para validação em runtime
+```
+
+#### Score do Componente: 8/10
+**Justificativa:**
+- Bem implementado e reutilizável
+- Bom uso de TypeScript
+- Problemas menores de acessibilidade
+- Falta algumas otimizações
+
+#### Ações Necessárias (Priorizadas):
+1. 🟡 **ALTA (72h):**
+   - Adicionar aria-labels
+   - Melhorar tipagem de 'change'
+   - Memoizar mapa de cores
+
+2. 🟢 **MÉDIA (1 semana):**
+   - Implementar i18n
+   - Adicionar prop-types
+   - Melhorar documentação
+
+3. 🔵 **BAIXA (2 semanas):**
+   - Criar testes unitários
+   - Adicionar storybook
+   - Melhorar animações
+
+### ✅ COMPONENTE ANALISADO: DashboardContent [NOVA ANÁLISE: 2025-01-28 17:25:00]
+**Tipo:** UI Component (Layout)
+**Propósito:** Layout principal do dashboard com KPIs, ações rápidas e listagens
+**Localização:** `components/dashboard/dashboard-content.tsx`
+
+#### Interface:
+```typescript
+interface DashboardContentProps {
+  kpis: {
+    totalEvents: number
+    upcomingEvents: number
+    teamsCount: number
+    promotersCount: number
+  }
+  events: Array<{
+    id: string
+    name: string
+    date: string
+    location: string
+    status: 'upcoming' | 'past' | 'draft' | 'canceled'
+  }>
+  teams: Array<{
+    id: string
+    name: string
+    eventCount: number
+  }>
+  loadingKpis: boolean
+  loadingEvents: boolean
+  loadingTeams: boolean
+  loadingError: boolean
+  searchTerm: string
+  setSearchTerm: (term: string) => void
+  onRefresh: () => void
+}
+```
+
+#### Problemas Identificados:
+🐛 **BUGS CRÍTICOS:**
+1. **Hardcoded Routes:**
+```typescript
+onClick={() => router.push('/app/organizador/eventos/novo')}
+onClick={() => router.push('/app/organizador/equipes/nova')}
+// ... mais rotas hardcoded
+```
+
+2. **Duplicação de Cores:**
+```typescript
+const dashboardColors = {
+  card: { /* ... */ },
+  text: { /* ... */ },
+  badge: { /* ... */ },
+  button: { /* ... */ }
+} // 11ª ocorrência do objeto colors
+```
+
+3. **Ícones Duplicados:**
+```typescript
+<Users size={18} /> // Usado 2x com mesmo tamanho
+```
+
+4. **Loading States Inconsistentes:**
+```typescript
+value={loadingKpis ? "..." : kpis.totalEvents}
+// vs
+<div className="h-8 bg-gray-200 animate-pulse" />
+```
+
+🔒 **SEGURANÇA:**
+1. **Navegação Não Validada:**
+```typescript
+router.push('/app/organizador/eventos/novo')
+// Sem verificação de permissões
+```
+
+2. **Exposição de Dados:**
+```typescript
+<p className="text-sm">Ocorreu um erro ao carregar os dados do dashboard.</p>
+// Mensagem genérica mas expõe que é dashboard
+```
+
+💀 **CÓDIGO MORTO:**
+1. **Imports Não Utilizados:**
+```typescript
+import { Percent, Plus, Search } from 'lucide-react'
+```
+
+2. **Props Não Utilizadas:**
+```typescript
+searchTerm, // Não usado no componente
+setSearchTerm // Não usado no componente
+```
+
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Performance:**
+```typescript
+// Memoizar funções e filtros
+const upcomingEvents = useMemo(() => 
+  events.filter(e => e.status === 'upcoming'),
+  [events]
+)
+```
+
+2. **Code Quality:**
+```typescript
+// Extrair componentes menores
+const QuickActionButton = ({ icon, label, href }) => {...}
+const KpiSection = ({ kpis, loading }) => {...}
+```
+
+3. **UX/Acessibilidade:**
+```typescript
+// Adicionar roles e labels
+<div role="region" aria-label="Dashboard KPIs">
+// Adicionar feedback de loading
+<Button loading={isLoading}>
+```
+
+#### Score do Componente: 6/10
+**Justificativa:**
+- Componente muito grande (364 linhas)
+- Muita duplicação de código
+- Problemas de acessibilidade
+- Falta de componentização
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Extrair componentes menores
+   - Centralizar rotas
+   - Remover duplicação de cores
+   - Adicionar validação de permissões
+
+2. 🟡 **ALTA (72h):**
+   - Implementar loading states consistentes
+   - Adicionar roles e aria-labels
+   - Memoizar funções e filtros
+   - Remover imports não usados
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Criar componentes reutilizáveis
+   - Melhorar tratamento de erros
+   - Adicionar testes
+   - Implementar i18n
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Melhorar documentação
+   - Adicionar storybook
+   - Otimizar bundle size
+   - Adicionar analytics
 
 ## 🔌 ANÁLISE DE APIs (Registro Incremental)
 
@@ -435,6 +1036,630 @@ snap/
 
 #### Score da API: 8/10
 **Justificação:** API bem otimizada com boa lógica de fallback, mas ainda com consultas duplas
+
+### ✅ API ANALISADA: /api/client-auth/login [NOVA ANÁLISE: 2025-01-28 17:30:00]
+**Tipo:** POST Endpoint (Autenticação)
+**Propósito:** Login de clientes com migração automática para Supabase Auth
+**Localização:** `app/api/client-auth/login/route.ts`
+
+#### Validação de Input:
+```typescript
+const loginSchema = z.object({
+  phone: z.string().min(8, "Telefone deve ter pelo menos 8 caracteres"),
+  password: z.string().min(1, "Senha é obrigatória")
+});
+```
+
+#### Fluxo de Autenticação:
+1. Validação de input (Zod)
+2. Busca usuário por telefone
+3. Tenta login via Supabase Auth
+4. Fallback para senha na tabela (legacy)
+5. Migração automática para Auth se necessário
+
+#### Problemas Identificados:
+🐛 **BUGS CRÍTICOS:**
+1. **Console Logs Sensíveis:**
+```typescript
+console.log('Dados recebidos para login:', { 
+  phone: body.phone ? `${body.phone.substring(0, 3)}****` : 'não informado',
+  has_password: !!body.password
+});
+// + 10 outros console.logs com dados sensíveis
+```
+
+2. **Email Temporário Previsível:**
+```typescript
+userEmail = `client_${userData.id}@temp.snap.com`;
+// Padrão facilmente deduzível
+```
+
+3. **Validação de Telefone Fraca:**
+```typescript
+phone: z.string().min(8) // Sem validação de formato
+```
+
+4. **Race Conditions:**
+```typescript
+// Verificação e update não são atômicos
+if (!migrationError) {
+  await supabase
+    .from('client_users')
+    .update({ password: null })
+    .eq('id', userData.id);
+}
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Exposição de Erros:**
+```typescript
+error: error.message // Erro interno exposto na resposta
+```
+
+2. **Timing Attacks:**
+```typescript
+if (!userData) {
+  return NextResponse.json({ 
+    error: 'Telefone ou senha incorretos' 
+  }, { status: 401 });
+}
+// Resposta mais rápida se usuário não existe
+```
+
+3. **Senhas Legacy:**
+```typescript
+if (userData.password === password) // Comparação não segura
+```
+
+4. **Rate Limiting:**
+- Nenhuma proteção contra força bruta
+- Nenhum limite de tentativas
+- Nenhum delay progressivo
+
+💀 **CÓDIGO MORTO:**
+1. **Imports Comentados:**
+```typescript
+// import { cookies } from 'next/headers';
+// import { sign } from 'jsonwebtoken';
+```
+
+2. **Variáveis Não Usadas:**
+```typescript
+// const JWT_SECRET = process.env.JWT_SECRET
+// const JWT_EXPIRY = '7d';
+```
+
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Segurança:**
+- Implementar rate limiting
+- Adicionar CAPTCHA
+- Sanitizar logs
+- Usar bcrypt para senhas legacy
+- Implementar 2FA
+
+2. **Performance:**
+- Reduzir número de queries
+- Implementar caching de sessão
+- Otimizar migração automática
+- Adicionar índices apropriados
+
+3. **Code Quality:**
+- Remover todos console.logs
+- Extrair lógica de migração
+- Adicionar testes de integração
+- Melhorar tratamento de erros
+
+4. **Monitoramento:**
+- Adicionar logging estruturado
+- Implementar métricas de performance
+- Rastrear tentativas falhas
+- Monitorar migrações
+
+#### Score da API: 3/10
+**Justificativa:**
+- Exposição crítica de dados em logs
+- Falta de proteção contra ataques
+- Problemas de concorrência
+- Código legacy perigoso
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Remover TODOS os console.logs
+   - Implementar rate limiting
+   - Adicionar CAPTCHA
+   - Corrigir comparação de senhas
+
+2. 🟡 **ALTA (72h):**
+   - Implementar 2FA
+   - Melhorar validação de telefone
+   - Adicionar testes
+   - Implementar logging seguro
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Refatorar migração automática
+   - Melhorar tratamento de erros
+   - Implementar métricas
+   - Otimizar queries
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Documentar API
+   - Criar testes e2e
+   - Implementar métricas
+   - Melhorar tipos TS
+
+### ✅ API ANALISADA: /api/client-auth/register [NOVA ANÁLISE: 2025-01-28 17:35:00]
+**Tipo:** POST Endpoint (Autenticação)
+**Propósito:** Registro de novos clientes com integração Supabase Auth
+**Localização:** `app/api/client-auth/register/route.ts`
+
+#### Validação de Input:
+```typescript
+const registerSchema = z.object({
+  phone: z.string().min(8, "Telefone deve ter pelo menos 8 caracteres"),
+  email: z.string().email("Email inválido").optional().nullable(),
+  first_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  last_name: z.string().optional().nullable(),
+  birth_date: z.string().optional().nullable(),
+  postal_code: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres")
+});
+```
+
+#### Fluxo de Registro:
+1. Validação de input (Zod)
+2. Verificação de telefone duplicado
+3. Criação de usuário no Auth
+4. Criação de entrada em client_users
+5. Rollback em caso de erro
+
+#### Problemas Identificados:
+🐛 **BUGS CRÍTICOS:**
+1. **Console Logs Sensíveis:**
+```typescript
+console.log('Dados recebidos para registro:', { 
+  phone: body.phone ? `${body.phone.substring(0, 3)}****` : 'não informado',
+  email: body.email ? `${body.email.substring(0, 3)}****` : 'não informado',
+  // ... mais dados sensíveis
+});
+```
+
+2. **Race Conditions:**
+```typescript
+// Verificação e inserção não são atômicas
+const { data: existingUser } = await supabase
+  .from('client_users')
+  .select('id, phone')
+  .eq('phone', userData.phone)
+  .maybeSingle();
+
+if (existingUser) {
+  return NextResponse.json({ error: 'Este telefone já está registrado' });
+}
+// Possível race condition aqui
+const { data: authData } = await supabase.auth.admin.createUser({...});
+```
+
+3. **Validação Inconsistente:**
+```typescript
+email: z.string().email("Email inválido").optional().nullable(),
+// Mas depois...
+if (!userData.email) {
+  return NextResponse.json({ error: 'Email é obrigatório' });
+}
+```
+
+4. **Transformação de Data Insegura:**
+```typescript
+birth_date: z.string().optional().nullable()
+  .transform(val => val ? new Date(val) : null)
+// Sem validação de formato ou range
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Auto-confirmação de Email:**
+```typescript
+email_confirm: true, // Auto-confirmar email sem verificação
+```
+
+2. **Senha Fraca:**
+```typescript
+password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres")
+// Sem requisitos de complexidade
+```
+
+3. **Exposição de Erros:**
+```typescript
+error: authError.message // Erro interno exposto
+```
+
+4. **Falta de Proteção:**
+- Nenhum rate limiting
+- Nenhum CAPTCHA
+- Nenhuma verificação de idade
+- Nenhuma validação de telefone real
+
+💀 **CÓDIGO MORTO:**
+1. **Comentários Obsoletos:**
+```typescript
+// FLUXO CORRIGIDO: 
+// 1. Primeiro verificar...
+```
+
+2. **Logs Desnecessários:**
+```typescript
+console.log('Cliente registrado com sucesso:', { id: clientData.id });
+```
+
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Segurança:**
+- Implementar rate limiting
+- Adicionar CAPTCHA
+- Verificar email real
+- Fortalecer requisitos de senha
+- Validar telefone via SMS
+
+2. **Performance:**
+- Usar transações para atomicidade
+- Implementar índices apropriados
+- Otimizar queries
+- Adicionar caching de verificações
+
+3. **Code Quality:**
+- Remover console.logs
+- Corrigir validação de email
+- Melhorar validação de datas
+- Adicionar testes de integração
+
+4. **UX:**
+- Melhorar mensagens de erro
+- Adicionar verificação de força da senha
+- Implementar verificação de telefone
+- Adicionar progress tracking
+
+#### Score da API: 4/10
+**Justificativa:**
+- Problemas de concorrência
+- Validações inconsistentes
+- Falta de proteções básicas
+- Exposição de dados sensíveis
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Corrigir race conditions
+   - Remover console.logs
+   - Implementar rate limiting
+   - Corrigir validação de email
+
+2. 🟡 **ALTA (72h):**
+   - Adicionar CAPTCHA
+   - Implementar verificação de email
+   - Fortalecer validação de senha
+   - Adicionar transações
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Implementar verificação SMS
+   - Melhorar mensagens de erro
+   - Adicionar testes
+   - Otimizar queries
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Documentar API
+   - Melhorar tipos TS
+   - Implementar métricas
+   - Adicionar logging seguro
+
+### ✅ API ANALISADA: /api/scanners/scan [NOVA ANÁLISE: 2025-01-28 17:40:00]
+**Tipo:** POST Endpoint (Check-in)
+**Propósito:** Registrar check-in de convidados via QR Code
+**Localização:** `app/api/scanners/scan/route.ts`
+
+#### Configuração:
+```typescript
+export const dynamic = 'force-dynamic'
+export const runtime = 'edge' // Otimização de performance
+```
+
+#### Fluxo de Check-in:
+1. Validação de token do scanner
+2. Validação do QR Code (UUID)
+3. Busca de sessão ativa do scanner
+4. Busca de convidado pelo QR code
+5. Verificação de check-in anterior
+6. Registro de check-in
+
+#### Problemas Identificados:
+🐛 **BUGS CRÍTICOS:**
+1. **Console Logs Excessivos (30+ ocorrências):**
+```typescript
+console.log(`🔑 [${requestId}] Token recebido: ${token.substring(0, 10)}...`)
+console.log(`📦 [${requestId}] Body parsing bem-sucedido:`, body)
+// + 28 outros logs com dados sensíveis
+```
+
+2. **Race Conditions:**
+```typescript
+// Verificação e update não são atômicos
+if (guest.checked_in) {
+  return NextResponse.json({ error: 'Check-in já realizado' });
+}
+// Possível race condition aqui
+const checkInTime = new Date().toISOString();
+```
+
+3. **Timestamps Inconsistentes:**
+```typescript
+const previousCheckIn = guest.check_in_time || guest.created_at
+// Fallback para created_at pode ser incorreto
+```
+
+4. **Validação de UUID Fraca:**
+```typescript
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// Regex permite valores inválidos como datas
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Exposição de Dados:**
+```typescript
+console.log(`📊 [${requestId}] Busca de guest:`, { 
+  found: !!guest, 
+  error: guestError,
+  guestData: guest ? {
+    id: guest.id,
+    name: guest.name,
+    // ... dados sensíveis expostos
+  } : null
+})
+```
+
+2. **Token Exposto em Logs:**
+```typescript
+console.log(`🔑 [${requestId}] Token recebido: ${token.substring(0, 10)}...`)
+```
+
+3. **Falta de Rate Limiting:**
+- Nenhuma proteção contra spam
+- Nenhum limite por scanner
+- Nenhum delay entre tentativas
+
+4. **Validação de Sessão Fraca:**
+```typescript
+.eq('status', 'active')
+// Sem verificação de expiração
+```
+
+💀 **CÓDIGO MORTO:**
+1. **Comentários Obsoletos:**
+```typescript
+// 🛡️ ABORDAGEM ROBUSTA: Tentar diferentes strategies para update
+// Mas só usa uma strategy
+```
+
+2. **Variáveis Não Usadas:**
+```typescript
+let finalCheckInTime = checkInTime // Nunca usada
+```
+
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Performance:**
+- Implementar transações
+- Adicionar índices apropriados
+- Otimizar queries aninhadas
+- Implementar caching de sessão
+
+2. **Segurança:**
+- Remover todos console.logs
+- Implementar rate limiting
+- Adicionar validação de sessão
+- Sanitizar dados sensíveis
+
+3. **Robustez:**
+- Melhorar validação de UUID
+- Corrigir race conditions
+- Padronizar timestamps
+- Adicionar retry logic
+
+4. **Monitoramento:**
+- Implementar logging estruturado
+- Adicionar métricas de performance
+- Rastrear erros de validação
+- Monitorar tentativas falhas
+
+#### Score da API: 2/10
+**Justificativa:**
+- Exposição crítica de dados
+- Problemas de concorrência
+- Falta de proteções básicas
+- Logs excessivos e inseguros
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Remover TODOS os console.logs
+   - Implementar transações
+   - Corrigir race conditions
+   - Adicionar rate limiting
+
+2. 🟡 **ALTA (72h):**
+   - Melhorar validação de UUID
+   - Padronizar timestamps
+   - Implementar retry logic
+   - Adicionar logging seguro
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Otimizar queries
+   - Adicionar índices
+   - Implementar caching
+   - Melhorar validação de sessão
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Documentar API
+   - Adicionar testes
+   - Implementar métricas
+   - Melhorar tipos TS
+
+### ✅ API ANALISADA: /api/guests/create [NOVA ANÁLISE: 2025-01-28 17:50:00]
+**Tipo:** POST Endpoint (Criação de Convidados)
+**Propósito:** Criar registros de convidados com QR Code
+**Localização:** `app/api/guests/create/route.ts`
+
+#### Configuração:
+```typescript
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+```
+
+#### Fluxo de Criação:
+1. Validação do evento (existência e data)
+2. Validação de input
+3. Tentativa via função RPC segura
+4. Fallback para método antigo
+5. Verificação de duplicidade
+6. Geração de QR Code
+
+#### Problemas Identificados:
+🐛 **BUGS CRÍTICOS:**
+1. **Validação Duplicada:**
+```typescript
+// Verificação do evento duplicada
+const { data: event } = await supabaseAdmin
+  .from('events')
+  .select('date, is_active')
+  .eq('id', eventId)
+  .single();
+// Mesma verificação feita na função RPC
+```
+
+2. **Race Conditions:**
+```typescript
+// Verificação e inserção não são atômicas
+const { data: existingData } = await supabaseAdmin
+  .from('guests')
+  .select('id')
+  .eq('event_id', event_id)
+  .eq('client_user_id', client_user_id);
+
+if (existingData) return ...;
+// Possível race condition aqui
+const { data: result } = await supabaseAdmin.from('guests').insert(...);
+```
+
+3. **QR Code Inseguro:**
+```typescript
+const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${guestId}`;
+// API externa sem HTTPS ou autenticação
+```
+
+4. **Logs Sensíveis:**
+```typescript
+console.log('API - Dados recebidos:', {
+  phone: phone ? phone.substring(0, 3) + '****' : 'não informado'
+  // ... mais dados sensíveis
+});
+```
+
+🔒 **SEGURANÇA CRÍTICA:**
+1. **Exposição de Chaves:**
+```typescript
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// Chave admin exposta em logs de erro
+```
+
+2. **RLS Bypass:**
+```typescript
+// Função contorna RLS sem validação adequada
+const { data: result } = await supabaseAdmin.rpc('create_guest_safely', {...});
+```
+
+3. **Validação Fraca:**
+```typescript
+name: name || 'Convidado', // Nome padrão inseguro
+phone: phone || '', // Telefone vazio permitido
+```
+
+4. **Falta de Proteção:**
+- Nenhum rate limiting
+- Nenhuma validação de telefone
+- Nenhuma sanitização de input
+- Nenhuma proteção contra spam
+
+💀 **CÓDIGO MORTO:**
+1. **Comentários Obsoletos:**
+```typescript
+// Se a função falhar, tenta o método antigo como fallback
+// Mas o método antigo tem os mesmos problemas
+```
+
+2. **Variáveis Não Usadas:**
+```typescript
+const today = new Date();
+today.setHours(0, 0, 0, 0); // Usado apenas uma vez
+```
+
+⚡ **OTIMIZAÇÕES NECESSÁRIAS:**
+1. **Segurança:**
+- Implementar rate limiting
+- Validar inputs adequadamente
+- Usar serviço próprio de QR Code
+- Remover logs sensíveis
+- Implementar auditoria
+
+2. **Performance:**
+- Usar transações
+- Otimizar queries
+- Implementar caching
+- Melhorar fallback strategy
+
+3. **Code Quality:**
+- Remover duplicação de código
+- Melhorar tratamento de erros
+- Adicionar tipos fortes
+- Implementar testes
+
+4. **Monitoramento:**
+- Adicionar logging estruturado
+- Implementar métricas
+- Rastrear erros
+- Monitorar performance
+
+#### Score da API: 3/10
+**Justificativa:**
+- Problemas sérios de segurança
+- Race conditions críticas
+- Código duplicado e confuso
+- Logs sensíveis expostos
+
+#### Ações Necessárias (Priorizadas):
+1. 🔴 **CRÍTICO (24h):**
+   - Remover logs sensíveis
+   - Implementar transações
+   - Corrigir race conditions
+   - Migrar serviço de QR Code
+
+2. 🟡 **ALTA (72h):**
+   - Implementar rate limiting
+   - Melhorar validações
+   - Adicionar auditoria
+   - Corrigir RLS bypass
+
+3. 🟢 **MÉDIA (1 semana):**
+   - Refatorar código duplicado
+   - Implementar testes
+   - Melhorar tipos
+   - Otimizar queries
+
+4. 🔵 **BAIXA (2 semanas):**
+   - Documentar API
+   - Implementar métricas
+   - Adicionar caching
+   - Melhorar logs
 
 ---
 
@@ -579,115 +1804,5 @@ snap/
 **Baseado em:** 3 páginas, 0 componentes, 1 API analisados
 **Principais problemas:** Duplicação de código crítica, vulnerabilidades de segurança médias
 **Pontos fortes:** Funcionalidades core sólidas, arquitetura bem estruturada
-
----
-
-## 📝 LOG DE ATIVIDADE (Registro Cronológico)
-
-### 2025-01-28 15:45:00 - Início da Auditoria
-- ✅ Criado documento resolução2025.md
-- 🔄 Iniciando mapeamento estrutural
-
-### 2025-01-28 15:47:00 - Página / (Home) Analisada  
-- ✅ Identificadas duplicações de código (colors object)
-- ⚠️ Problemas de SEO e performance
-- 📊 Score: 7/10
-
-### 2025-01-28 15:49:00 - Página /login Analisada
-- 🚨 Vulnerabilidade: Login enumeration attack
-- 🐛 Bug: Window API sem verificação SSR
-- 📊 Score: 6/10
-
-### 2025-01-28 15:52:00 - Página /promo/[...params] Analisada
-- ✅ Funcionalidade crítica bem implementada
-- ✅ Bug de associação recentemente corrigido
-- 📊 Score: 8/10
-
-### 2025-01-28 15:55:00 - API /api/client-auth/guests/create Analisada
-- 🚨 Vulnerabilidade: Information disclosure via logs
-- ✅ Boa implementação de anti-duplicata
-- 📊 Score: 8/10
-
-### 2025-01-28 15:58:00 - Código Morto Identificado
-- 🚨 CRÍTICO: Objeto colors duplicado em 8+ arquivos
-- 💀 Imports não utilizados identificados
-
-### 2025-01-28 16:00:00 - Plano de Ação Criado
-- 🔴 3 ações críticas prioritárias
-- 🟡 3 ações de alta prioridade
-- 📊 Total: 9 otimizações identificadas
-
----
-
-**🚀 PRÓXIMOS PASSOS:**
-1. Continuar análise das 79 páginas restantes
-2. Analisar componentes críticos
-3. Auditar todas as APIs do sistema
-4. Verificar estrutura do banco de dados
-5. Análise de segurança do Supabase
-
-*Documento atualizado automaticamente conforme progride a auditoria* 
-
-## 📊 ATUALIZAÇÃO DE PROGRESSO
-**Última atualização:** 2025-01-28 15:52:00
-- **Páginas Analisadas:** 3 / 82
-- **Componentes Analisados:** 0 / TBD
-- **APIs Analisadas:** 0 / TBD
-- **Bugs Encontrados:** 3
-- **Vulnerabilidades:** 2
-- **Score Atual:** 7.0/10 
-
-## 📊 PROGRESSO DA AUDITORIA
-
-### **PROGRESSO GERAL:**
-- **Páginas Web:** 6 de 82 analisadas (7%)
-- **APIs:** 5 de ~50 analisadas (10%)  
-- **Componentes:** 1 de ~150 analisados (1%)
-- **Hooks/Utils:** 0 de ~30 analisados (0%)
-
-### **TEMPO INVESTIDO:** ~3 horas
-### **PROGRESSO TOTAL:** 8% (meta inicial era 100%)
-
-### **PRÓXIMAS ANÁLISES PRIORITÁRIAS:**
-1. **APIs críticas restantes** (auth, payments, events)
-2. **Componentes de UI reutilizados** (forms, modais, layouts)
-3. **Hooks customizados** (useAuth, useClientAuth, data fetching)
-4. **Utils de segurança** (phoneUtils, validations)
-5. **Configurações** (middleware, next.config, policies RLS) 
-
-## 🎯 SCORES ATUALIZADOS
-
-### **FUNCIONALIDADE:** 8/10 ⬆️ (+0.5)
-- Funcionalidades críticas funcionando bem
-- Fluxo de guest registration operacional
-- Dashboard complexo mas funcional
-- **Melhorias:** UX em componentes críticos aprimorada
-
-### **SEGURANÇA:** 5/10 ⬇️ (-1.0) 
-- **PROBLEMA NOVO:** Dashboard over-engineering com risco de timeout
-- Logs em produção continuam problemáticos
-- Rate limiting ainda não implementado
-- Performance issues podem afetar disponibilidade
-
-### **PERFORMANCE:** 5/10 ⬇️ (-1.0)
-- **PROBLEMA CRÍTICO:** Dashboard com 4+ queries sequenciais
-- useEffect dependencies problemáticas
-- Auto-checks agressivos
-- **MELHORIA:** APIs v2 mais otimizadas
-
-### **MANUTENIBILIDADE:** 3/10 ⬇️ (-1.0)
-- **CÓDIGO DUPLICADO CRITICAL:** `colors` objeto encontrado em 10+ arquivos
-- Dashboard de 800+ linhas precisa refatoração
-- Componentes complexos demais (400+ linhas)
-- Console logs espalhados por todo codebase
-
-### **UX/UI:** 8/10 ⬆️ (+1.0)
-- **MELHORADO:** ProgressSteps e LoadingOverlay implementados
-- Interface do promo funcionando bem
-- Auto-check para guests melhora UX
-- Feedback visual melhorado
-
-### **SCORE GERAL:** 5.8/10 ⬇️ (-0.4)
-**Nota:** Score diminuiu devido à descoberta de problemas de performance e over-engineering críticos
 
 --- 

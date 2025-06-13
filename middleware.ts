@@ -13,7 +13,7 @@ const roleMappings: Record<string, string> = {
   'organizer': 'organizador'
 };
 
-const normalizeRole = (role: string | null | undefined): string => {
+const normalizeRoleMiddleware = (role: string | null | undefined): string => {
   if (!role) return 'desconhecido';
   const roleLower = typeof role === 'string' ? role.toLowerCase() : '';
   const normalized = roleMappings[roleLower];
@@ -25,7 +25,7 @@ const normalizeRole = (role: string | null | undefined): string => {
 
 // Função para obter URL do dashboard com base no papel
 const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
-  const normalizedRole = normalizeRole(role);
+  const normalizedRole = normalizeRoleMiddleware(role);
   
   switch (normalizedRole) {
     case 'chefe-equipe':
@@ -115,7 +115,7 @@ export async function middleware(req: NextRequest) {
     }
     
     // Definir papel base do usuário e normalizar
-    let userRole = normalizeRole(user.user_metadata?.role || 'desconhecido');
+    let userRole = normalizeRoleMiddleware(user.user_metadata?.role || 'desconhecido');
     
     // Verificar compatibilidade: se tiver flag is_team_leader mas não tiver role=chefe-equipe
     if (user.user_metadata?.is_team_leader === true && userRole !== 'chefe-equipe') {

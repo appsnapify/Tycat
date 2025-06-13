@@ -19,7 +19,15 @@ const oswald = Oswald({
 
 export const metadata = {
   title: 'Snap',
-  description: 'Plataforma de gestão de eventos',
+  description: 'Plataforma de gestão de eventos'
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover'
 }
 
 // Executar migrações em segundo plano
@@ -54,7 +62,7 @@ export default function RootLayout({
 
   return (
     <html lang="pt" className={`${inter.variable} ${oswald.variable} font-sans`}>
-      <body>
+      <body className="overscroll-none">
         {children}
         <Toaster />
         <Analytics />

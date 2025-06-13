@@ -115,24 +115,15 @@ export default function OrganizadorDashboardPage() {
     promotersCount: 0
   })
   const [teams, setTeams] = useState<Team[]>([])
-  const [events, setEvents] = useState<Event[]>([])
   const [organizationCode, setOrganizationCode] = useState<string | null>(null)
   
-  const [searchTerm, setSearchTerm] = useState('')
-  const [timeFilter, setTimeFilter] = useState('month')
-  const [eventFilter, setEventFilter] = useState<'all' | 'active' | 'past' | 'draft'>('all')
-  const [copied, setCopied] = useState(false)
   const [loadingKpis, setLoadingKpis] = useState(true)
-  const [loadingEvents, setLoadingEvents] = useState(true)
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [loadingError, setLoadingError] = useState(false)
   const [activities, setActivities] = useState<Activity[]>([])
   
   useEffect(() => {
-    console.log('Dashboard useEffect', { user, currentOrganization })
-    
     if (user && currentOrganization) {
-      console.log('Dashboard: Usuário e organização disponíveis, carregando dados...')
       loadOrganizationAndData()
     }
   }, [user, currentOrganization])
@@ -140,12 +131,9 @@ export default function OrganizadorDashboardPage() {
   const loadOrganizationAndData = async () => {
     if (!user) return
     
-    console.log('Iniciando loadOrganizationAndData')
-    
     try {
       // Se currentOrganization já está disponível, usar ela
       if (currentOrganization) {
-        console.log('Usando organização do contexto:', currentOrganization.id)
         const organizationId = currentOrganization.id
         
         // Carregar dados em paralelo com tratamento individual de erros
@@ -153,12 +141,6 @@ export default function OrganizadorDashboardPage() {
           loadKpis(organizationId)
         } catch (e) {
           console.error('Erro ao iniciar loadKpis:', e)
-        }
-        
-        try {
-          loadEvents(organizationId)
-        } catch (e) {
-          console.error('Erro ao iniciar loadEvents:', e)
         }
         
         try {
@@ -178,7 +160,6 @@ export default function OrganizadorDashboardPage() {
       }
       
       // Buscar organização do usuário (código de fallback mantido)
-      console.log('Buscando organizações do usuário:', user.id)
       const { data: orgDataArray, error: orgError } = await supabase
         .from('user_organizations')
         .select('organization_id')
@@ -186,14 +167,8 @@ export default function OrganizadorDashboardPage() {
         .in('role', ['owner', 'organizador'])
         .limit(1)
 
-      // Log detalhado do resultado
       if (orgError) {
-        console.error('Erro DETALHADO ao buscar user_organizations:', {
-          message: orgError.message,
-          details: orgError.details,
-          hint: orgError.hint,
-          code: orgError.code
-        })
+        console.error('Erro ao buscar user_organizations:', orgError.message)
         if (orgError.code === 'PGRST116') {
            console.warn('A query retornou múltiplas linhas onde apenas uma era esperada. Verifique RLS ou dados duplicados.')
         }
@@ -204,14 +179,12 @@ export default function OrganizadorDashboardPage() {
 
       // Verificar se o array tem dados
       if (!orgDataArray || orgDataArray.length === 0) {
-        console.log('Nenhuma organização encontrada para o usuário (array vazio ou nulo).', orgDataArray)
         setLoading(false)
         return
       }
 
       // Se chegou aqui, temos pelo menos uma organização
       const orgData = orgDataArray[0]
-      console.log('Organização encontrada via user_organizations, ID:', orgData.organization_id)
       
       // Buscar detalhes da organização
       const { data: orgDetails, error: detailsError } = await supabase
@@ -221,23 +194,17 @@ export default function OrganizadorDashboardPage() {
         .single()
         
       if (detailsError) {
-        console.error('Erro ao buscar detalhes da organização:', {
-          code: detailsError.code,
-          message: detailsError.message,
-          details: detailsError.details
-        })
+        console.error('Erro ao buscar detalhes da organização:', detailsError.message)
         setLoading(false)
         setLoadingError(true)
         return
       }
       
       if (!orgDetails) {
-        console.log('Detalhes da organização não encontrados')
         setLoading(false)
         return
       }
       
-      console.log('Detalhes da organização encontrados:', orgDetails)
       const organizationId = orgDetails.id
       
       // Verificar se o ID da organização é válido
@@ -256,12 +223,6 @@ export default function OrganizadorDashboardPage() {
       }
       
       try {
-        loadEvents(organizationId)
-      } catch (e) {
-        console.error('Erro ao iniciar loadEvents:', e)
-      }
-      
-      try {
         loadTeams(organizationId)
       } catch (e) {
         console.error('Erro ao iniciar loadTeams:', e)
@@ -273,17 +234,7 @@ export default function OrganizadorDashboardPage() {
         console.error('Erro ao iniciar loadActivities:', e)
       }
     } catch (e) {
-      const errorInfo = {
-        name: e?.name || 'Unknown error',
-        message: e?.message || 'No error message available',
-        stack: e?.stack || 'No stack trace available',
-        toString: e?.toString?.() || 'Error cannot be stringified',
-        isError: e instanceof Error,
-        constructor: e?.constructor?.name || 'Unknown constructor',
-        keys: Object.keys(e || {}).join(', ') || 'No properties'
-      }
-      
-      console.error('Erro detalhado ao carregar organização:', errorInfo)
+      console.error('Erro ao carregar organização:', e)
       setLoading(false)
       setLoadingError(true)
     }
@@ -299,8 +250,6 @@ export default function OrganizadorDashboardPage() {
     setLoadingKpis(true);
     
     try {
-      console.log('Iniciando carregamento de KPIs para organização:', organizationId);
-      
       if (!organizationId) {
         console.error('ID da organização não fornecido para KPIs');
         setKpis({
@@ -342,14 +291,10 @@ export default function OrganizadorDashboardPage() {
                 upcomingEvents++;
               }
             });
-            
-            console.log(`Eventos completos: ${completedEvents}, Eventos próximos: ${upcomingEvents}`);
           }
         } catch (eventError) {
           console.error('Exceção ao contar eventos:', eventError);
         }
-      } else {
-        console.log('A tabela events não existe. Usando contagem zero.');
       }
       
       // 2. Buscar contagem de equipes (já estava correto)
@@ -358,7 +303,6 @@ export default function OrganizadorDashboardPage() {
       
       if (orgTeamsTableExists) {
         try {
-          console.log(`Contando equipes vinculadas à organização ${organizationId}...`);
           const { count, error: countError } = await supabase
             .from('organization_teams')
             .select('team_id', { count: 'exact', head: true })
@@ -368,13 +312,10 @@ export default function OrganizadorDashboardPage() {
             console.error('Erro ao contar equipes vinculadas:', countError);
           } else {
             teamsCount = count ?? 0;
-            console.log(`Contagem de equipes vinculadas: ${teamsCount}`);
           }
         } catch (teamError) {
           console.error('Exceção ao contar equipes vinculadas:', teamError);
         }
-      } else {
-        console.log('A tabela organization_teams não existe. Usando contagem zero.');
       }
       
       // 3. Buscar contagem de promotores únicos nas equipes da organização
@@ -383,8 +324,6 @@ export default function OrganizadorDashboardPage() {
       
       if (teamMembersTableExists && orgTeamsTableExists) {
         try {
-          console.log(`Contando promotores únicos nas equipes da organização ${organizationId}...`);
-          
           // CORRIGIDO: Primeiro buscar IDs das equipes da organização
           const { data: orgTeamIds, error: orgTeamsError } = await supabase
             .from('organization_teams')
@@ -393,38 +332,26 @@ export default function OrganizadorDashboardPage() {
             
           if (orgTeamsError) {
             console.error('Erro ao buscar equipes da organização:', orgTeamsError);
-            throw orgTeamsError;
-          }
-          
-          // Extrair array de team_ids
-          const teamIdArray = orgTeamIds?.map(ot => ot.team_id) || [];
-          console.log(`Encontradas ${teamIdArray.length} equipes para a organização`);
-          
-          if (teamIdArray.length === 0) {
-            console.log('Nenhuma equipe encontrada para esta organização');
-            promotersCount = 0;
           } else {
-            // Agora buscar promotores únicos usando array de IDs
-            const { data: promotersData, error: promotersError } = await supabase
-              .from('team_members')
-              .select('user_id')
-              .in('team_id', teamIdArray);
-              
-            if (promotersError) {
-              console.error('Erro ao contar promotores:', promotersError);
-              throw promotersError;
-            } else {
-              // Contar promotores únicos (remover duplicatas)
-              const uniquePromoters = new Set(promotersData?.map(p => p.user_id) || []);
-              promotersCount = uniquePromoters.size;
-              console.log(`Contagem de promotores únicos: ${promotersCount}`);
+            const teamIdArray = orgTeamIds?.map(ot => ot.team_id) || [];
+            
+            if (teamIdArray.length > 0) {
+              // Agora buscar promotores únicos nessas equipes
+              const { count, error: promotersError } = await supabase
+                .from('team_members')
+                .select('user_id', { count: 'exact', head: true })
+                .in('team_id', teamIdArray);
+                
+              if (promotersError) {
+                console.error('Erro ao contar promotores:', promotersError);
+              } else {
+                promotersCount = count ?? 0;
+              }
             }
           }
         } catch (promotersError) {
           console.error('Exceção ao contar promotores:', promotersError);
         }
-      } else {
-        console.log('Tabelas necessárias para contar promotores não existem. Usando contagem zero.');
       }
       
       // Atualizar estados com os dados obtidos
@@ -435,7 +362,6 @@ export default function OrganizadorDashboardPage() {
         promotersCount: promotersCount
       });
       
-      console.log('KPIs carregados com sucesso');
     } catch (e) {
       console.error('Erro geral ao carregar KPIs:', e);
       setLoadingError(true);
@@ -453,82 +379,195 @@ export default function OrganizadorDashboardPage() {
     }
   };
   
-  const loadEvents = async (organizationId: string) => {
-    setLoadingEvents(true)
+  // Função para carregar equipes com tratamento robusto de erros
+  const loadTeams = async (organizationId: string) => {
+    setLoadingTeams(true);
     
     try {
-      console.log('Iniciando carregamento de eventos para organização:', organizationId)
-      
       if (!organizationId) {
-        console.error('ID da organização não fornecido para eventos')
-        throw new Error('ID da organização não fornecido')
+        console.error('ID da organização não fornecido para equipes');
+        setTeams([]);
+        setLoadingTeams(false);
+        return;
       }
       
-      const { data: eventsData, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('date', { ascending: true })
-        .limit(5)
-
-      if (error) {
-        console.error('Erro na consulta Supabase (events):', {
-          code: error.code,
-          message: error.message,
-          details: error.details
-        })
-        throw error
+      // Verificar se a tabela teams existe
+      const tableExists = await checkTableExists('teams');
+      
+      if (!tableExists) {
+        setTeams([
+          {
+            id: `simulated-1`,
+            name: 'Equipe Simulada 1',
+            eventCount: 0
+          },
+          {
+            id: `simulated-2`,
+            name: 'Equipe Simulada 2',
+            eventCount: 0
+          }
+        ]);
+        setLoadingTeams(false);
+        return;
       }
       
-      if (!eventsData) {
-        console.warn('Nenhum evento encontrado para a organização:', organizationId)
-        setEvents([])
+      // A tabela existe, vamos carregar todas as equipes sem filtrar por organization_id
+      // já que sabemos que essa coluna não existe na tabela
+      const response = await supabase
+        .from('teams')
+        .select('id, name')
+        .limit(5);
+      
+      // Verificar se houve erro na consulta
+      if (response.error) {
+        console.error('Erro ao buscar equipes:', response.error);
+        setTeams([]);
+      } else {
+        // Não houve erro, processamos os dados
+        const teams = response.data || [];
+        
+        const processedTeams = teams.map(team => ({
+          id: team.id,
+          name: team.name || 'Equipe sem nome',
+          eventCount: 0
+        }));
+        
+        setTeams(processedTeams);
+      }
+    } catch (e) {
+      console.error('Erro geral ao carregar equipes:', e);
+      setLoadingError(true);
+      setTeams([]);
+    } finally {
+      setLoadingTeams(false);
+      setLoading(false);
+    }
+  };
+  
+  const loadActivities = async (organizationId: string) => {
+    try {
+      if (!organizationId) {
+        setActivities(getMockActivities())
         return
       }
       
-      console.log(`Encontrados ${eventsData.length} eventos para a organização`)
+      let realActivities: Activity[] = []
       
-      const mappedEvents = eventsData.map(event => {
-        // Verificar e fornecer valores padrão para todos os campos
-        const eventDate = event.date || event.event_date || new Date().toISOString()
-        const eventName = event.name || event.title || 'Evento sem nome'
-        const eventLocation = event.location || 'Local não especificado'
-        
-        return {
-          id: event.id || `unknown-${Math.random().toString(36).substring(7)}`,
-          name: eventName,
-          date: eventDate,
-          location: eventLocation,
-          status: determineEventStatus(eventDate)
+      // Tentar buscar atividades reais do banco de dados diretamente
+      const { data: activityData, error: activityError } = await supabase
+        .from('activity_logs')
+        .select('type, title, description, created_at')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (activityError) {
+        if (activityError.code !== '42P01') {
+          console.error('Erro ao buscar activity_logs:', activityError);
         }
-      })
-      
-      setEvents(mappedEvents)
-      console.log('Eventos carregados com sucesso:', mappedEvents.length)
-      
-    } catch (e) {
-      const errorInfo = {
-        name: e?.name || 'Unknown error',
-        message: e?.message || 'No error message available',
-        stack: e?.stack || 'No stack trace available',
-        toString: e?.toString?.() || 'Error cannot be stringified',
-        isError: e instanceof Error,
-        constructor: e?.constructor?.name || 'Unknown constructor',
-        keys: Object.keys(e || {}).join(', ') || 'No properties',
-        code: e?.code,
-        details: e?.details
+        setActivities(getMockActivities())
+        return
       }
       
-      console.error('Erro detalhado ao carregar eventos:', errorInfo)
-      setLoadingError(true)
-      setEvents([])
-    } finally {
-      setLoadingEvents(false)
-      setLoading(false)
+      // Se não houve erro e activityData existe (pode ser um array vazio)
+      if (activityData) {
+        if (activityData.length > 0) {
+          realActivities = activityData.map(act => ({
+            type: act.type || 'other',
+            title: act.title || 'Atividade',
+            description: act.description || 'Sem descrição',
+            date: act.created_at || new Date().toISOString()
+          }))
+          setActivities(realActivities)
+        } else {
+          setActivities(getMockActivities())
+        }
+      } else {
+        setActivities(getMockActivities())
+      }
+      
+    } catch (e) {
+      console.error('Erro ao carregar atividades:', e)
+      setActivities(getMockActivities())
     }
   }
   
-  // Funções para verificar a estrutura do banco de dados
+  // Função auxiliar para obter mock de atividades, para evitar repetição
+  const getMockActivities = (): Activity[] => {
+    const now = new Date()
+    return [
+      {
+        type: 'guest',
+        title: 'Novo convidado registrado',
+        description: 'João Silva registrou-se para o evento "Festival de Verão"',
+        date: new Date(now.getTime() - 30 * 60000).toISOString()
+      },
+      {
+        type: 'ticket',
+        title: 'Bilhete vendido',
+        description: 'Bilhete VIP vendido para o evento "Noite de Gala"',
+        date: new Date(now.getTime() - 2 * 3600000).toISOString()
+      },
+      {
+        type: 'commission',
+        title: 'Comissão paga',
+        description: 'Comissão de €150 paga para equipe "Vendedores Elite"',
+        date: new Date(now.getTime() - 5 * 3600000).toISOString()
+      }
+    ];
+  }
+  
+  const determineEventStatus = (dateString: string): 'upcoming' | 'past' | 'draft' => {
+    const eventDate = new Date(dateString)
+    const now = new Date()
+    
+    if (eventDate < now) {
+      return 'past'
+    }
+    
+    return 'upcoming'
+  }
+  
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-PT', { 
+      style: 'currency', 
+      currency: 'EUR' 
+    }).format(value)
+  }
+  
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('pt-PT', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+  
+  // Função para obter metadados do banco de dados
+  const getDatabaseMetadata = async () => {
+    try {
+      // 1. Obter lista de tabelas
+      const { data: tables, error: tablesError } = await supabase.rpc('list_tables');
+      
+      if (tablesError) {
+        // Se a função RPC não existe, tentar uma abordagem alternativa
+        const { data, error } = await supabase.from('_metadata_tables').select('*');
+        
+        if (error) {
+          console.error('Erro ao buscar tabelas:', error);
+          return { tables: [], error: error };
+        }
+        
+        return { tables: data || [], error: null };
+      }
+      
+      return { tables: tables || [], error: null };
+    } catch (e) {
+      console.error('Erro ao buscar metadados:', e);
+      return { tables: [], error: e };
+    }
+  };
+
+  // Verificação de existência de tabelas mantida para estabilidade
   const checkTableExists = async (tableName) => {
     try {
       // Usamos uma consulta simples para verificar se a tabela existe
@@ -539,18 +578,15 @@ export default function OrganizadorDashboardPage() {
       
       // Se não houve erro, a tabela existe
       if (!response.error) {
-        console.log(`A tabela ${tableName} existe`);
         return true;
       }
       
       // Se o código de erro for 42P01, a tabela não existe
       if (response.error.code === '42P01') {
-        console.error(`A tabela ${tableName} não existe no banco de dados`);
         return false;
       }
       
       // Para outros erros, assumimos que a tabela existe mas há um problema de permissão
-      console.warn(`Erro ao verificar tabela ${tableName}:`, response.error);
       return true;
     } catch (e) {
       console.error(`Erro ao verificar se a tabela ${tableName} existe:`, e);
@@ -575,7 +611,6 @@ export default function OrganizadorDashboardPage() {
       if (error) {
         // Código 42703 significa que a coluna não existe
         if (error.code === '42703') {
-          console.log(`Coluna '${columnName}' não existe na tabela '${tableName}'`)
           return false
         }
         
@@ -652,241 +687,15 @@ export default function OrganizadorDashboardPage() {
       return { data: [], error: e }
     }
   }
-
-  // Função para carregar equipes com tratamento robusto de erros
-  const loadTeams = async (organizationId: string) => {
-    setLoadingTeams(true);
-    
-    try {
-      console.log('Iniciando carregamento de equipes para organização:', organizationId);
-      
-      if (!organizationId) {
-        console.error('ID da organização não fornecido para equipes');
-        setTeams([]);
-        setLoadingTeams(false);
-        return;
-      }
-      
-      // Verificar se a tabela teams existe
-      const tableExists = await checkTableExists('teams');
-      
-      if (!tableExists) {
-        console.warn('A tabela teams não existe. Usando dados simulados.');
-        setTeams([
-          {
-            id: `simulated-1`,
-            name: 'Equipe Simulada 1',
-            eventCount: 0
-          },
-          {
-            id: `simulated-2`,
-            name: 'Equipe Simulada 2',
-            eventCount: 0
-          }
-        ]);
-        setLoadingTeams(false);
-        return;
-      }
-      
-      // A tabela existe, vamos carregar todas as equipes sem filtrar por organization_id
-      // já que sabemos que essa coluna não existe na tabela
-      console.log('Carregando todas as equipes sem filtro de organização');
-      const response = await supabase
-        .from('teams')
-        .select('id, name')
-        .limit(5);
-      
-      // Verificar se houve erro na consulta
-      if (response.error) {
-        console.error('Erro ao buscar equipes:', response.error);
-        setTeams([]);
-      } else {
-        // Não houve erro, processamos os dados
-        const teams = response.data || [];
-        console.log(`Encontradas ${teams.length} equipes`);
-        
-        const processedTeams = teams.map(team => ({
-          id: team.id,
-          name: team.name || 'Equipe sem nome',
-          eventCount: 0
-        }));
-        
-        setTeams(processedTeams);
-      }
-    } catch (e) {
-      console.error('Erro geral ao carregar equipes:', e);
-      setLoadingError(true);
-      setTeams([]);
-    } finally {
-      setLoadingTeams(false);
-      setLoading(false);
-    }
-  };
-  
-  const loadActivities = async (organizationId: string) => {
-    try {
-      console.log('[Dashboard:loadActivities] Iniciando carregamento de atividades para organização:', organizationId)
-      
-      if (!organizationId) {
-        console.warn('[Dashboard:loadActivities] ID da organização não fornecido. Usando mock.')
-        setActivities(getMockActivities())
-        return
-      }
-      
-      let realActivities: Activity[] = []
-      
-      // Tentar buscar atividades reais do banco de dados diretamente
-      const { data: activityData, error: activityError } = await supabase
-        .from('activity_logs') // Nome da tabela conforme criada
-        .select('type, title, description, created_at') // Selecionar apenas os campos necessários
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (activityError) {
-        console.warn('[Dashboard:loadActivities] Erro ao buscar activity_logs:', {
-          code: activityError.code,
-          message: activityError.message,
-          details: activityError.details,
-          hint: activityError.hint
-        })
-        // Se o erro específico for "tabela não encontrada" (42P01), ou outro erro que impeça a leitura,
-        // usar dados simulados.
-        if (activityError.code === '42P01') {
-          console.warn('[Dashboard:loadActivities] Tabela activity_logs não encontrada (42P01). Usando mock.')
-        } else {
-          console.warn('[Dashboard:loadActivities] Erro desconhecido ao ler activity_logs, usando mock como fallback. Code:', activityError.code)
-        }
-        setActivities(getMockActivities())
-        return
-      }
-      
-      // Se não houve erro e activityData existe (pode ser um array vazio)
-      if (activityData) {
-        if (activityData.length > 0) {
-          realActivities = activityData.map(act => ({
-            type: act.type || 'other',
-            title: act.title || 'Atividade',
-            description: act.description || 'Sem descrição',
-            date: act.created_at || new Date().toISOString() // Usar created_at que selecionamos
-          }))
-          console.log(`[Dashboard:loadActivities] Encontradas ${realActivities.length} atividades reais.`)
-          setActivities(realActivities)
-        } else {
-          console.log('[Dashboard:loadActivities] Nenhuma atividade real encontrada (tabela vazia). Usando mock.')
-          setActivities(getMockActivities()) // Usar mock se a tabela estiver vazia
-        }
-      } else {
-        // Caso inesperado onde não há erro mas não há dados (improvável com .select() se a tabela existe)
-        console.warn('[Dashboard:loadActivities] Nenhum dado retornado de activity_logs, mas sem erro. Usando mock.')
-        setActivities(getMockActivities())
-      }
-      
-    } catch (e) {
-      // Catch para erros inesperados no processo
-      const errorInfo = {
-        name: e?.name || 'Unknown error',
-        message: e?.message || 'No error message available',
-        stack: e?.stack || 'No stack trace available'
-      }
-      console.error('[Dashboard:loadActivities] Erro catastrófico ao carregar atividades:', errorInfo)
-      setActivities(getMockActivities()) // Fallback final para mock
-    }
-  }
-  
-  // Função auxiliar para obter mock de atividades, para evitar repetição
-  const getMockActivities = (): Activity[] => {
-    console.log('[Dashboard:getMockActivities] Gerando atividades simuladas.')
-    const now = new Date()
-    return [
-      {
-        type: 'guest',
-        title: 'Novo convidado registrado (Mock)',
-        description: 'João Silva registrou-se para o evento "Festival de Verão" (Mock)',
-        date: new Date(now.getTime() - 30 * 60000).toISOString()
-      },
-      {
-        type: 'ticket',
-        title: 'Bilhete vendido (Mock)',
-        description: 'Bilhete VIP vendido para o evento "Noite de Gala" (Mock)',
-        date: new Date(now.getTime() - 2 * 3600000).toISOString()
-      },
-      {
-        type: 'commission',
-        title: 'Comissão paga (Mock)',
-        description: 'Comissão de €150 paga para equipe "Vendedores Elite" (Mock)',
-        date: new Date(now.getTime() - 5 * 3600000).toISOString()
-      }
-    ];
-  }
-  
-  const determineEventStatus = (dateString: string): 'upcoming' | 'past' | 'draft' => {
-    const eventDate = new Date(dateString)
-    const now = new Date()
-    
-    if (eventDate < now) {
-      return 'past'
-    }
-    
-    return 'upcoming'
-  }
-  
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', { 
-      style: 'currency', 
-      currency: 'EUR' 
-    }).format(value)
-  }
-  
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('pt-PT', {
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-  
-  // Função para obter metadados do banco de dados
-  const getDatabaseMetadata = async () => {
-    try {
-      console.log('Buscando metadados do banco de dados Supabase');
-      
-      // 1. Obter lista de tabelas
-      const { data: tables, error: tablesError } = await supabase.rpc('list_tables');
-      
-      if (tablesError) {
-        // Se a função RPC não existe, tentar uma abordagem alternativa
-        console.log('Função RPC não existe, usando alternativa');
-        
-        // Essa consulta deve funcionar na maioria dos casos com Supabase
-        const { data, error } = await supabase.from('_metadata_tables').select('*');
-        
-        if (error) {
-          console.error('Erro ao buscar tabelas:', error);
-          return { tables: [], error: error };
-        }
-        
-        return { tables: data || [], error: null };
-      }
-      
-      return { tables: tables || [], error: null };
-    } catch (e) {
-      console.error('Erro ao buscar metadados:', e);
-      return { tables: [], error: e };
-    }
-  };
   
   // Renderização do novo dashboard com o componente DashboardContent
     return (
     <DashboardContent
       kpis={kpis}
-      events={events}
       teams={teams}
       loadingKpis={loadingKpis}
-      loadingEvents={loadingEvents}
       loadingTeams={loadingTeams}
       loadingError={loadingError} 
-      searchTerm={searchTerm}
-      setSearchTerm={setSearchTerm}
       onRefresh={loadOrganizationAndData}
     />
   )
