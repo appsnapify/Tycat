@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Users, Plus, Smartphone, Settings } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useGuestCount } from '@/hooks/useGuestCount'
 
@@ -87,7 +87,7 @@ export default function CheckInPage() {
   // Buscar eventos - APENAS EVENTOS ATIVOS OU FUTUROS
   useEffect(() => {
     async function fetchEvents() {
-      if (!currentOrganization) return
+      if (!currentOrganization?.id) return
 
       try {
         const today = new Date().toISOString().split('T')[0]; // Data atual em formato YYYY-MM-DD
@@ -117,7 +117,7 @@ export default function CheckInPage() {
     }
     
     fetchEvents()
-  }, [currentOrganization])
+  }, [currentOrganization?.id]) // Otimizada: dependência específica
 
   // Fallback: Buscar estatísticas se hook falhar
   useEffect(() => {
@@ -148,7 +148,7 @@ export default function CheckInPage() {
     }
     
     fetchFallbackStats();
-  }, [selectedEvent, guestCountData, guestCountError]);
+  }, [selectedEvent, guestCountData, guestCountError]); // Otimizada: dependências específicas
 
   // Buscar scanners quando evento selecionado
   useEffect(() => {

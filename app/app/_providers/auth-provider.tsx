@@ -104,12 +104,17 @@ export const ClientAuthProvider: React.FC<ClientAuthProviderProps> = ({
   const updateRole = useCallback((userInstance: MaybeUser) => {
     if (userInstance) {
       const role = getRoleFromClaims(userInstance)
-      if (process.env.NODE_ENV === 'development') {
+      // Reduzir logs excessivos - só logar mudanças importantes
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__roleLoggedRecently) {
         console.log('[ClientAuthProvider] Role updated:', role)
+        window.__roleLoggedRecently = true
+        setTimeout(() => { window.__roleLoggedRecently = false }, 2000) // Reset após 2s
       }
     } else {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__nullRoleLoggedRecently) {
         console.log('[ClientAuthProvider] Role updated: null')
+        window.__nullRoleLoggedRecently = true
+        setTimeout(() => { window.__nullRoleLoggedRecently = false }, 2000)
       }
     }
   }, [])

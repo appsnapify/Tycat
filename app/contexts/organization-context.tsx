@@ -34,8 +34,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadOrganizations() {
       if (!user) {
-        if (process.env.NODE_ENV === 'development') {
+        // Throttle logs para evitar spam durante fast refresh
+        if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__orgNoUserLoggedRecently) {
           console.log('OrganizationContext: Nenhum usuário logado')
+          window.__orgNoUserLoggedRecently = true
+          setTimeout(() => { window.__orgNoUserLoggedRecently = false }, 3000)
         }
         setIsLoading(false)
         return
@@ -44,8 +47,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       try {
         const supabase = createClient()
         
-        if (process.env.NODE_ENV === 'development') {
+        // Throttle logs de busca
+        if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__orgSearchLoggedRecently) {
           console.log('OrganizationContext: Buscando organizações para o usuário:', user.id)
+          window.__orgSearchLoggedRecently = true
+          setTimeout(() => { window.__orgSearchLoggedRecently = false }, 3000)
         }
         
         // Verificar primeiro a tabela user_organizations para confirmar relações
@@ -108,8 +114,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             
             // Se não há organização selecionada, selecione a primeira
             if (!currentOrganization) {
-              if (process.env.NODE_ENV === 'development') {
+              // Throttle logs de seleção
+              if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__orgSelectLoggedRecently) {
                 console.log('Selecionando a primeira organização:', orgsData[0].name, orgsData[0].id)
+                window.__orgSelectLoggedRecently = true
+                setTimeout(() => { window.__orgSelectLoggedRecently = false }, 3000)
               }
               setCurrentOrganization(orgsData[0])
             } else {
