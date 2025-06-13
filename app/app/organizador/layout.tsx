@@ -28,14 +28,14 @@ import {
   Store,
 } from 'lucide-react'
 
-// Estilos Atualizados
+// Estilos Atualizados - Migração para azul
 const colors = {
   brand: {
-    lime: 'text-lime-500',
-    limeHover: 'hover:text-lime-600',
-    limeBg: 'bg-lime-500',
-    limeBgHover: 'hover:bg-lime-600',
-    limeBorder: 'border-lime-500',
+    blue: 'text-blue-400',
+    blueHover: 'hover:text-blue-500',
+    blueBg: 'bg-blue-600',
+    blueBgHover: 'hover:bg-blue-700',
+    blueBorder: 'border-blue-500',
     fuchsia: 'text-fuchsia-500',
     fuchsiaBg: 'bg-fuchsia-500',
     fuchsiaBgHover: 'hover:bg-fuchsia-600'
@@ -43,8 +43,8 @@ const colors = {
   sidebar: {
     bg: 'bg-gray-900',
     text: 'text-gray-300',
-    hover: 'hover:bg-gray-800 hover:text-lime-400',
-    active: 'bg-gray-800 text-lime-400 border-l-2 border-lime-400',
+    hover: 'hover:bg-gray-800 hover:text-blue-400',
+    active: 'bg-gray-800 text-blue-400 border-l-2 border-blue-500',
     border: 'border-gray-800'
   },
   main: {
@@ -101,14 +101,14 @@ export default function OrganizadorLayout({
   const isCreatingOrg = pathname === '/app/organizador/organizacoes/nova'
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Links da barra lateral - Mesmos links, apenas ícones atualizados
+  // Links da barra lateral - Corrigidos para português de Portugal
   const sidebarLinks = [
     { href: '/app/organizador/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { href: '/app/organizador/eventos', label: 'Eventos', icon: <CalendarDays size={18} /> },
     { href: '/app/organizador/bilhetes', label: 'Bilhetes', icon: <Ticket size={18} /> },
     { href: '/app/organizador/check-in', label: 'Check-in', icon: <ScanLine size={18} /> },
-    { href: '/app/organizador/equipes', label: 'Equipes', icon: <Users size={18} /> },
-    { href: '/app/organizador/relatorios', label: 'Relatórios', icon: <FileText size={18} /> },
+    { href: '/app/organizador/equipes', label: 'Equipas', icon: <Users size={18} /> },
+    { href: '/app/organizador/relatorios', label: 'Relatórios', icon: <FileText size={18} />, disabled: true },
     { href: '/app/organizador/organizacao', label: 'Organização', icon: <Store size={18} /> },
     { href: '/app/organizador/configuracoes', label: 'Configurações', icon: <Settings size={18} /> },
   ]
@@ -134,8 +134,8 @@ export default function OrganizadorLayout({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
         <h1 className="text-2xl font-bold mb-4">Nenhuma organização encontrada</h1>
-        <p className="text-gray-500 mb-8">Você precisa criar uma organização para começar.</p>
-        <Button asChild className={cn(colors.brand.limeBg, colors.brand.limeBgHover, "text-white")}>
+        <p className="text-gray-500 mb-8">Precisa de criar uma organização para começar.</p>
+        <Button asChild className={cn(colors.brand.blueBg, colors.brand.blueBgHover, "text-white")}>
           <Link href="/app/organizador/organizacoes/nova">
             Criar Organização
           </Link>
@@ -148,7 +148,7 @@ export default function OrganizadorLayout({
     <div className="flex min-h-screen">
       {/* Botão do menu móvel - Redesenhado com cores da marca */}
       <button 
-        className="md:hidden fixed top-4 left-4 z-30 bg-lime-500 text-white rounded-full p-2 shadow-md"
+        className="md:hidden fixed top-4 left-4 z-30 bg-blue-600 text-white rounded-full p-2 shadow-md"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -162,8 +162,8 @@ export default function OrganizadorLayout({
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center border-b border-gray-800 px-6">
-          <div className="text-xl font-bold text-lime-400">SNAPIFY</div>
+        <div className="flex h-16 items-center justify-center border-b border-gray-800 px-6">
+          <div className="text-xl font-bold text-white">Tycat</div>
         </div>
         <div className="px-4 py-4">
           <OrganizationSelector />
@@ -175,7 +175,7 @@ export default function OrganizadorLayout({
                 key={link.href}
                 href={link.href} 
                 icon={link.icon}
-                disabled={!hasOrganizations}
+                disabled={!hasOrganizations || link.disabled}
               >
                 {link.label}
               </NavItem>
@@ -223,15 +223,15 @@ export default function OrganizadorLayout({
   )
 }
 
-// Função auxiliar para pegar o título da página atual
+// Função auxiliar para obter o título da página actual
 function getCurrentPageTitle(pathname: string): string {
   if (pathname.includes('/dashboard')) return 'Dashboard'
   if (pathname.includes('/eventos')) {
     if (pathname.includes('/checkin')) return 'Check-in'
-    return 'Gerenciar Eventos'
+    return 'Gerir Eventos'
   }
   if (pathname.includes('/bilheteria')) return 'Bilheteria'
-  if (pathname.includes('/equipes')) return 'Equipes'
+  if (pathname.includes('/equipes')) return 'Equipas'
   if (pathname.includes('/relatorios')) return 'Relatórios'
   if (pathname.includes('/organizacao')) return 'Organização'
   if (pathname.includes('/configuracoes')) return 'Configurações'

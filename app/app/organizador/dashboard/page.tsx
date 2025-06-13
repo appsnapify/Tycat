@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/app/app/_providers/auth-provider'
@@ -240,7 +240,7 @@ export default function OrganizadorDashboardPage() {
   useEffect(() => {
     if (user && currentOrganization) {
       loadOrganizationAndData()
-    }
+  }
   }, [user, currentOrganization, loadOrganizationAndData])
   
   const generateOrganizationCode = (organizationId: string) => {
@@ -341,13 +341,13 @@ export default function OrganizadorDashboardPage() {
             if (teamIdArray.length > 0) {
               // Agora buscar promotores únicos nessas equipes
               const { count, error: promotersError } = await supabase
-                .from('team_members')
+              .from('team_members')
                 .select('user_id', { count: 'exact', head: true })
-                .in('team_id', teamIdArray);
-                
-              if (promotersError) {
-                console.error('Erro ao contar promotores:', promotersError);
-              } else {
+              .in('team_id', teamIdArray);
+              
+            if (promotersError) {
+              console.error('Erro ao contar promotores:', promotersError);
+            } else {
                 promotersCount = count ?? 0;
               }
             }

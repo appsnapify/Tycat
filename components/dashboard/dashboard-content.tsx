@@ -108,78 +108,78 @@ export function DashboardContent({
           title="Eventos Completos"
           value={loadingKpis ? "..." : kpis.totalEvents}
           icon={<CalendarDays size={18} />}
-          color="lime"
+          color="primary"
           loading={loadingKpis}
         />
         <StatCard
           title="Eventos Próximos"
           value={loadingKpis ? "..." : kpis.upcomingEvents} 
           icon={<TicketCheck size={18} />}
-          color="fuchsia"
+          color="accent"
           loading={loadingKpis}
         />
         <StatCard
-          title="Equipes"
+          title="Equipas"
           value={loadingKpis ? "..." : kpis.teamsCount}
           icon={<Users size={18} />}
-          color="fuchsia"
+          color="secondary"
           loading={loadingKpis}
         />
         <StatCard
           title="Promotores"
           value={loadingKpis ? "..." : kpis.promotersCount}
           icon={<Users size={18} />}
-          color="lime"
+          color="neutral"
           loading={loadingKpis}
         />
       </div>
       
       {/* Ações rápidas */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">
-        <Card className="border rounded-xl p-6">
-          <div className="space-y-2 mb-5">
-            <h3 className="text-xl font-bold">Ações Rápidas</h3>
-            <p className="text-gray-500">Acesse rapidamente as principais funções</p>
+        <Card className="border rounded-xl p-4 md:p-6">
+          <div className="space-y-2 mb-4 md:mb-5">
+            <h3 className="text-lg md:text-xl font-bold">Acções Rápidas</h3>
+            <p className="text-sm md:text-base text-gray-500">Aceda rapidamente às principais funções</p>
           </div>
           <div className="grid grid-cols-1 gap-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div 
-                className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push('/app/organizador/eventos/novo')}
+                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => router.push('/app/organizador/evento/criar')}
               >
                 <span className="flex-shrink-0">
-                  <CalendarPlus className="h-6 w-6 text-lime-600" />
+                  <CalendarPlus className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                 </span>
-                <span className="font-medium">Criar Evento</span>
+                <span className="text-sm md:text-base font-medium">Criar Evento</span>
               </div>
               <div 
-                className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push('/app/organizador/equipes/nova')}
+                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => router.push('/app/organizador/equipes')}
               >
                 <span className="flex-shrink-0">
-                  <UserPlus className="h-6 w-6 text-fuchsia-600" />
+                  <UserPlus className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                 </span>
-                <span className="font-medium">Nova Equipe</span>
+                <span className="text-sm md:text-base font-medium">Gerir Equipas</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div 
-                className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
+                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
                 onClick={() => router.push('/app/organizador/check-in')}
               >
                 <span className="flex-shrink-0">
-                  <TicketCheck className="h-6 w-6 text-lime-600" />
+                  <TicketCheck className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                 </span>
-                <span className="font-medium">Gestão Check-in</span>
+                <span className="text-sm md:text-base font-medium">Gestão de Check-in</span>
               </div>
               <div 
-                className="flex items-center gap-3 py-4 px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push('/app/organizador/relatorios')}
+                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 opacity-50 cursor-not-allowed"
               >
                 <span className="flex-shrink-0">
-                  <TrendingUp className="h-6 w-6 text-fuchsia-600" />
+                  <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-gray-400" />
                 </span>
-                <span className="font-medium">Ver Relatórios</span>
+                <span className="text-sm md:text-base font-medium text-gray-400">Ver Relatórios</span>
+                <span className="text-xs text-gray-400 ml-auto">(Em breve)</span>
               </div>
             </div>
           </div>

@@ -7,7 +7,7 @@ interface StatCardProps {
   value: string | number
   icon?: React.ReactNode
   change?: string
-  color?: "lime" | "fuchsia" | "blue" | "amber"
+  color?: "primary" | "secondary" | "accent" | "neutral"
   loading?: boolean
 }
 
@@ -16,35 +16,43 @@ export function StatCard({
   value, 
   icon, 
   change, 
-  color = "lime",
+  color = "primary",
   loading = false
 }: StatCardProps) {
-  // Mapeia as cores para classes tailwind
+  // Sistema de cores azul moderno - baseado no PromoterPublicLinkCard
   const getColors = () => {
     const colorMap = {
-      lime: {
-        bgGradient: "from-lime-50 to-lime-100",
-        border: "border-lime-200",
-        iconColor: "text-lime-500",
-        iconBg: "bg-lime-100"
-      },
-      fuchsia: {
-        bgGradient: "from-fuchsia-50 to-fuchsia-100",
-        border: "border-fuchsia-200", 
-        iconColor: "text-fuchsia-500",
-        iconBg: "bg-fuchsia-100"
-      },
-      blue: {
+      primary: {
         bgGradient: "from-blue-50 to-blue-100",
         border: "border-blue-200",
-        iconColor: "text-blue-500",
-        iconBg: "bg-blue-100"
+        iconColor: "text-blue-600",
+        iconBg: "bg-blue-100",
+        circleColor: "bg-blue-600",
+        circleIcon: "text-white"
       },
-      amber: {
-        bgGradient: "from-amber-50 to-amber-100",
-        border: "border-amber-200",
-        iconColor: "text-amber-500",
-        iconBg: "bg-amber-100"
+      secondary: {
+        bgGradient: "from-blue-50 to-blue-100",
+        border: "border-blue-200", 
+        iconColor: "text-blue-600",
+        iconBg: "bg-blue-100",
+        circleColor: "bg-blue-600",
+        circleIcon: "text-white"
+      },
+      accent: {
+        bgGradient: "from-blue-50 to-blue-100",
+        border: "border-blue-200",
+        iconColor: "text-blue-600",
+        iconBg: "bg-blue-100",
+        circleColor: "bg-blue-600",
+        circleIcon: "text-white"
+      },
+      neutral: {
+        bgGradient: "from-blue-50 to-blue-100",
+        border: "border-blue-200",
+        iconColor: "text-blue-600",
+        iconBg: "bg-blue-100",
+        circleColor: "bg-blue-600",
+        circleIcon: "text-white"
       }
     }
     
@@ -55,31 +63,46 @@ export function StatCard({
   
   return (
     <Card className={cn(
-      "bg-gradient-to-br border shadow-sm transition-all duration-200 hover:shadow-md",
-      colors.bgGradient,
+      "bg-white dark:bg-gray-800 shadow-[0px_0px_15px_rgba(0,0,0,0.09)] dark:shadow-[0px_0px_15px_rgba(255,255,255,0.05)] hover:shadow-[0px_0px_20px_rgba(0,0,0,0.15)] dark:hover:shadow-[0px_0px_20px_rgba(255,255,255,0.1)] transition-all duration-300 relative overflow-hidden rounded-xl",
       colors.border
     )}>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-gray-600 font-medium text-sm">{title}</h3>
-          {icon && (
-            <div className={cn("p-2 rounded-lg", colors.iconColor, colors.iconBg)}>
-              {icon}
-            </div>
-          )}
+      {/* Elemento decorativo circular no canto - ícone centralizado */}
+      <div className={cn("w-14 h-14 md:w-16 md:h-16 rounded-full absolute -right-2 -top-3 md:-right-3 md:-top-4 flex items-center justify-center", colors.circleColor)}>
+        {icon && React.cloneElement(icon as React.ReactElement, { 
+          className: cn("w-3 h-3 md:w-4 md:h-4", colors.circleIcon) 
+        })}
+      </div>
+      
+      <div className="p-4 md:p-6">
+        {/* Ícone principal e título */}
+        <div className="flex items-start justify-between mb-3 md:mb-4">
+          <div className="space-y-1">
+            <h3 className="text-gray-600 dark:text-gray-300 font-medium text-xs md:text-sm">{title}</h3>
+            {icon && (
+              <div className={cn("w-6 h-6 md:w-8 md:h-8 flex items-center justify-center", colors.iconColor)}>
+                {React.cloneElement(icon as React.ReactElement, { 
+                  className: "w-6 h-6 md:w-8 md:h-8" 
+                })}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
+        
+        {/* Valor principal */}
+        <div className="space-y-1 md:space-y-2">
           {loading ? (
-            <div className="h-8 bg-gray-200 animate-pulse rounded-md w-16 mx-auto"></div>
+            <div className="h-6 md:h-8 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-md w-16 md:w-20"></div>
           ) : (
-            <p className="text-2xl font-bold text-gray-800 text-center">{value}</p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
           )}
+          
+          {/* Mudança percentual */}
           {change && (
             <p className={cn(
-              "text-xs font-medium text-center",
-              change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+              "text-xs font-medium",
+              change.startsWith('+') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             )}>
-              {change} desde último período
+              {change} desde o último período
             </p>
           )}
         </div>
