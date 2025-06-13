@@ -1,5 +1,8 @@
 'use client';
 
+// Fix para erro de build: Force dynamic rendering para evitar SSG com createClient
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
