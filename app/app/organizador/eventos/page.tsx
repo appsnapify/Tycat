@@ -97,7 +97,6 @@ async function duplicateEvent(event: Event) {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError || !session) {
-      console.error('Sessão expirada, redirecionando para login');
       // Armazenar intenção de duplicar para retomar após login
       sessionStorage.setItem('pendingAction', JSON.stringify({
         type: 'duplicate_event',
@@ -123,7 +122,7 @@ async function duplicateEvent(event: Event) {
       delete newEvent.status;
     }
     
-    console.log('Duplicando evento:', newEvent);
+
     
     // Inserir o novo evento no banco de dados
     const { data, error } = await supabase
@@ -133,8 +132,6 @@ async function duplicateEvent(event: Event) {
       .single();
     
     if (error) {
-      console.error('Erro ao duplicar evento:', error);
-      
       // Tratamento específico para erro de RLS
       if (error.code === '42501') {
         throw new Error('Você não tem permissão para duplicar este evento. Verifique se você ainda está na mesma organização.');
@@ -143,10 +140,8 @@ async function duplicateEvent(event: Event) {
       throw new Error(error.message);
     }
     
-    console.log('Evento duplicado com sucesso:', data);
     return data;
   } catch (err) {
-    console.error('Erro ao duplicar evento:', err);
     throw err;
   }
 }
@@ -164,7 +159,6 @@ export default function EventosPage() {
   
   // Função para forçar atualização da página
   const forceRefresh = () => {
-    console.log("Forçando atualização da página de eventos");
     setRefreshKey(prev => prev + 1);
   };
   
@@ -202,7 +196,7 @@ export default function EventosPage() {
             .eq('id', event.id)
             .then(({ error }) => {
               if (error) {
-                console.error(`Erro ao atualizar status do evento ${event.id}:`, error);
+                // Log de erro silencioso para não expor IDs
               }
             });
           
@@ -241,7 +235,7 @@ export default function EventosPage() {
       
       try {
         const supabase = createClient();
-        console.log(`Buscando eventos para organização: ${currentOrganization.id}`);
+
         const { data, error } = await supabase
           .from('events')
           .select('*')
@@ -256,7 +250,7 @@ export default function EventosPage() {
             variant: "destructive"
           });
         } else {
-          console.log(`${data?.length || 0} eventos encontrados`);
+
           
           // Atualizar status para eventos que não têm o campo
           const eventsWithStatus = data?.map(event => {
@@ -589,7 +583,6 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
   // Função para tentar fazer check-in com verificação de status
   const handleCheckinClick = () => {
     // Navegar para a página de detalhes do evento
-    console.log(`Navegando para detalhes do evento: ${event.id}`)
     router.push(`/app/organizador/eventos/${event.id}`)
   }
   
@@ -610,7 +603,6 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
           title: "Link Copiado!",
           description: "O link público do evento foi copiado para a área de transferência.",
         });
-        console.log("Link copiado:", publicEventUrl);
       })
       .catch(err => {
         console.error("Falha ao copiar link: ", err);
@@ -628,8 +620,6 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
       setIsLoading(true);
       
       try {
-        console.log(`EventCard [${event.id}] - Buscando contagem via API`);
-        
         // Usar o endpoint de API dedicado para contagem
         const response = await fetch(`/api/guest-count?eventId=${event.id}`, {
           method: 'GET',
@@ -646,28 +636,22 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
         const data = await response.json();
         const count = data.count || 0;
         
-        console.log(`EventCard [${event.id}] - API retornou ${count} convidados`);
         setGuestCount(count);
       } catch (err) {
-        console.error(`EventCard [${event.id}] - Erro ao buscar contagem:`, err);
         // Fallback: tentar buscar diretamente no Supabase como plano B
         try {
-          console.log(`EventCard [${event.id}] - Tentando fallback direto`);
           const { data, error } = await createClient()
             .from('guests')
             .select('id')
             .eq('event_id', event.id);
           
           if (error) {
-            console.error(`EventCard [${event.id}] - Erro no fallback:`, error);
             setGuestCount(0);
           } else {
             const count = data?.length || 0;
-            console.log(`EventCard [${event.id}] - Fallback encontrou ${count} convidados`);
             setGuestCount(count);
           }
         } catch (fbErr) {
-          console.error(`EventCard [${event.id}] - Erro no fallback:`, fbErr);
           setGuestCount(0);
         }
       } finally {
@@ -676,17 +660,16 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
     }
   };
   
-  // Carregar contagem inicial e configurar atualização periódica
+  // Estado para controlar se já foi inicializado para evitar chamadas duplicadas
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Carregar contagem inicial apenas uma vez
   useEffect(() => {
-    if (event.type === 'guest-list') {
-      // Buscar contagem inicial (uma única vez)
+    if (event.type === 'guest-list' && !isInitialized && !isLoading) {
+      setIsInitialized(true);
       refreshGuestCount();
-      
-      // Removida atualização automática a cada 5 segundos
-      // const interval = setInterval(refreshGuestCount, 5000);
-      // return () => clearInterval(interval);
     }
-  }, [event.id, event.type]);
+  }, [event.id]);
 
   return (
     <Card className={`overflow-hidden 
