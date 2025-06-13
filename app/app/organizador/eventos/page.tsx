@@ -20,7 +20,8 @@ import {
   ListPlus,
   MoreHorizontal,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -581,6 +582,34 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
             </div>
           )}
         </div>
+        
+        {/* Barra azul para Guest Count - apenas para guest-lists */}
+        {event.type === 'guest-list' && (
+          <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4" />
+              {isLoading ? (
+                <span className="text-sm font-medium">Carregando...</span>
+              ) : (
+                <span className="text-sm font-medium">
+                  {guestCount !== null ? `${guestCount} Guests` : '0 Guests'}
+                </span>
+              )}
+            </div>
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                refreshGuestCount();
+              }}
+              className="text-white hover:text-blue-200 transition-colors duration-200 hover:bg-blue-700 p-1 rounded"
+              disabled={isLoading}
+              title="Atualizar contagem de guests"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className={`p-4 md:p-6 ${isPast ? 'bg-gray-50' : ''} ${!isPublished ? 'bg-orange-50' : ''}`}>
         <h3 className="font-semibold text-lg text-gray-900">{event.title}</h3>
@@ -591,32 +620,6 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
           <Calendar className="w-3 h-3 text-blue-600" />
           <span>{event.date ? new Date(event.date).toLocaleDateString('pt-BR') : '-'}</span>
         </div>
-        
-        {event.type === 'guest-list' && (
-          <div className="mt-2 text-xs text-gray-500">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <UserCheck className="w-3 h-3 text-blue-600" />
-                {isLoading ? (
-                  <span>Carregando...</span>
-                ) : (
-                  <span>{guestCount !== null ? `${guestCount} convidados registrados` : 'Nenhum convidado'}</span>
-                )}
-              </div>
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  refreshGuestCount();
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 transition-colors duration-200 hover:bg-blue-50 px-2 py-1 rounded"
-                disabled={isLoading}
-              >
-                {isLoading ? '...' : 'Atualizar'}
-              </button>
-            </div>
-          </div>
-        )}
         
         {isPast && (
           <div className="mt-3 text-xs text-gray-500 italic border-t border-gray-200 pt-2">
