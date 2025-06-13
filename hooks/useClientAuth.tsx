@@ -51,12 +51,23 @@ export const ClientAuthProvider = ({
     error: null
   });
 
-  // Referência ao cliente Supabase
-  const supabaseClientRef = useRef(createClient())
+  // Referência ao cliente Supabase com proteção SSR
+  const supabaseClientRef = useRef<ReturnType<typeof createClient> | null>(null)
+  
+  // Função para obter cliente de forma lazy e segura para SSR
+  const getSupabaseClient = () => {
+    // Proteção contra execução no servidor durante SSR
+    if (typeof window === 'undefined') return null;
+    
+    // Lazy loading: só cria o cliente quando necessário
+    if (!supabaseClientRef.current) {
+      supabaseClientRef.current = createClient();
+    }
+    return supabaseClientRef.current;
+  }
   
   // Log apenas uma vez por carregamento da aplicação
-  if (process.env.NODE_ENV === 'development' && !providerMounted) {
-    console.log('ClientAuthProvider montado - modo sem persistência de sessão');
+  if (process.env.NODE_ENV === 'development' && !providerMounted && typeof window !== 'undefined') {
     providerMounted = true;
   }
   
@@ -65,8 +76,20 @@ export const ClientAuthProvider = ({
     // Função para carregar o usuário da sessão
     const loadUser = async () => {
       try {
+        const supabaseClient = getSupabaseClient();
+        
+        // Se não há cliente (SSR), pular carregamento
+        if (!supabaseClient) {
+          setAuthState({
+            user: null,
+            isLoading: false,
+            error: null
+          });
+          return;
+        }
+
         // Carregar usuário da sessão Supabase
-        const { data: { session }, error } = await supabaseClientRef.current.auth.getSession();
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
         
         if (error) {
           console.error('Erro ao carregar sessão:', error);
@@ -81,7 +104,7 @@ export const ClientAuthProvider = ({
         // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
         if (session && session.user) {
           // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
-          const { data, error: clientError } = await supabaseClientRef.current
+          const { data, error: clientError } = await supabaseClient
             .from('client_users')
             .select('*')
             .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
@@ -106,11 +129,6 @@ export const ClientAuthProvider = ({
               email: data.email || '',
               phone: data.phone || ''
             };
-            
-            // Log apenas quando necessário
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Usuário carregado da sessão:', clientUser);
-            }
             
             setAuthState({
               user: clientUser,
@@ -141,7 +159,10 @@ export const ClientAuthProvider = ({
     loadUser();
 
     // Configurar listener para mudanças na autenticação
-    const { data: authListener } = supabaseClientRef.current.auth.onAuthStateChange(
+    const supabaseClient = getSupabaseClient();
+    if (!supabaseClient) return; // SSR safety
+
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
       async (event, session) => {
         // Log apenas para eventos importantes
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
@@ -151,7 +172,7 @@ export const ClientAuthProvider = ({
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session && session.user) {
             // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
-            const { data, error: clientError } = await supabaseClientRef.current
+            const { data, error: clientError } = await supabaseClient
               .from('client_users')
               .select('*')
               .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
@@ -175,11 +196,6 @@ export const ClientAuthProvider = ({
                 email: data.email || '',
                 phone: data.phone || ''
               };
-              
-              // Log apenas quando necessário
-              if (process.env.NODE_ENV === 'development') {
-                console.log('Usuário atualizado após auth change:', clientUser);
-              }
               
               setAuthState({
                 user: clientUser,
@@ -207,9 +223,6 @@ export const ClientAuthProvider = ({
 
   // Função para atualizar o usuário no contexto
   const updateUser = (user: ClientUser): Promise<ClientUser> => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Atualizando estado do usuário:', user);
-    }
     return new Promise((resolve) => {
       setAuthState(prevState => ({
         ...prevState,
@@ -225,12 +238,14 @@ export const ClientAuthProvider = ({
   
   // Verificar e renovar autenticação
   const checkAuth = async (): Promise<ClientUser | null> => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Verificando autenticação atual');
-    }
     try {
+      const supabaseClient = getSupabaseClient();
+      
+      // Se não há cliente (SSR), retornar null
+      if (!supabaseClient) return null;
+
       // Verificar sessão atual
-      const { data: { session }, error } = await supabaseClientRef.current.auth.getSession();
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
       
       if (error) {
         console.error('Erro ao verificar sessão:', error);
@@ -239,16 +254,13 @@ export const ClientAuthProvider = ({
       
       // Se não há sessão, o usuário não está autenticado
       if (!session) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Nenhuma sessão ativa encontrada');
-        }
         return null;
       }
       
       // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
       if (session && session.user) {
         // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
-        const { data, error: clientError } = await supabaseClientRef.current
+        const { data, error: clientError } = await supabaseClient
           .from('client_users')
           .select('*')
           .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
@@ -268,10 +280,6 @@ export const ClientAuthProvider = ({
             email: data.email || '',
             phone: data.phone || ''
           };
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Usuário verificado e atualizado:', clientUser);
-          }
           
           // Atualizar o estado no contexto
           setAuthState({
@@ -294,7 +302,12 @@ export const ClientAuthProvider = ({
   // Função para fazer logout
   const logout = async () => {
     try {
-      await supabaseClientRef.current.auth.signOut();
+      const supabaseClient = getSupabaseClient();
+      
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+      
       setAuthState({
         user: null,
         isLoading: false,
