@@ -18,8 +18,14 @@ const oswald = Oswald({
 })
 
 export const metadata = {
-  title: 'Snap',
-  description: 'Plataforma de gestão de eventos'
+  title: 'Tycat',
+  description: 'Plataforma de gestão de eventos',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16', type: 'image/x-icon' },
+      { url: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }
+    ]
+  }
 }
 
 export const viewport = {
