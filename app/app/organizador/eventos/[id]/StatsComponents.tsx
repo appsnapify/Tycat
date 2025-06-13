@@ -6,9 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from "@/components/ui/use-toast";
 import dynamic from 'next/dynamic';
-
-// Importar ApexCharts com carregamento dinâmico para evitar erros de SSR
-const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
 
 // Importar react-simple-maps
 const MapChart = dynamic(() => import('./MapChart'), { ssr: false });
@@ -40,89 +39,8 @@ export function RegistrationTrendCard({ eventId }: { eventId: string }) {
     const [trendData, setTrendData] = useState<RegistrationTrend[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Configurações do gráfico
-    const [chartOptions, setChartOptions] = useState({
-        chart: {
-            id: 'registration-trend',
-            type: 'area' as const,
-            height: 250,
-            toolbar: {
-                show: false
-            },
-            fontFamily: 'sans-serif',
-            foreColor: '#64748b',
-        },
-        colors: ['#10b981', '#3b82f6'],
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.7,
-                opacityTo: 0.3,
-                stops: [0, 90, 100]
-            }
-        },
-        dataLabels: {
-            enabled: false
-        },
-        stroke: {
-            curve: 'smooth' as const,
-            width: 2
-        },
-        grid: {
-            borderColor: '#e2e8f0',
-            row: {
-                colors: ['#f8fafc', 'transparent'],
-                opacity: 0.5
-            }
-        },
-        markers: {
-            size: 0
-        },
-        xaxis: {
-            categories: ['--', '--', '--', '--', '--'],
-            labels: {
-                style: {
-                    colors: '#64748b',
-                    fontSize: '12px'
-                }
-            }
-        },
-        yaxis: {
-            labels: {
-                style: {
-                    colors: '#64748b',
-                    fontSize: '12px'
-                }
-            }
-        },
-        legend: {
-            position: 'top' as const,
-            horizontalAlign: 'right' as const,
-            fontSize: '12px',
-            markers: {
-                width: 10,
-                height: 10,
-                radius: 50
-            }
-        },
-        tooltip: {
-            x: {
-                format: 'dd/MM/yy'
-            }
-        }
-    });
-
-    const [chartSeries, setChartSeries] = useState([
-        {
-            name: 'Diário',
-            data: [0, 0, 0, 0, 0]
-        },
-        {
-            name: 'Acumulado',
-            data: [0, 0, 0, 0, 0]
-        }
-    ]);
+    // Dados para Recharts (formato simples)
+    const [chartData, setChartData] = useState<{date: string, daily: number, cumulative: number}[]>([]);
 
     useEffect(() => {
         const fetchTrendData = async () => {
@@ -138,33 +56,14 @@ export function RegistrationTrendCard({ eventId }: { eventId: string }) {
                 if (data && data.length > 0) {
                     setTrendData(data);
                     
-                    // Preparar dados para o gráfico
-                    const dates = data.map(item => {
-                        const date = new Date(item.reg_date);
-                        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                    });
+                    // Preparar dados para Recharts
+                    const rechartsData = data.map(item => ({
+                        date: new Date(item.reg_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                        daily: item.daily_count,
+                        cumulative: item.cumulative
+                    }));
                     
-                    const dailyCounts = data.map(item => item.daily_count);
-                    const cumulativeCounts = data.map(item => item.cumulative);
-                    
-                    setChartOptions({
-                        ...chartOptions,
-                        xaxis: {
-                            ...chartOptions.xaxis,
-                            categories: dates
-                        }
-                    });
-                    
-                    setChartSeries([
-                        {
-                            name: 'Diário',
-                            data: dailyCounts
-                        },
-                        {
-                            name: 'Acumulado',
-                            data: cumulativeCounts
-                        }
-                    ]);
+                    setChartData(rechartsData);
                 }
             } catch (error) {
                 console.error('Erro ao buscar dados de tendência:', error);
@@ -196,15 +95,52 @@ export function RegistrationTrendCard({ eventId }: { eventId: string }) {
                     </div>
                 ) : (
                     <div className="h-64">
-                        {trendData.length > 0 ? (
-                            typeof window !== 'undefined' && (
-                                <Chart
-                                    options={chartOptions}
-                                    series={chartSeries}
-                                    type="area"
-                                    height="100%"
-                                />
-                            )
+                        {chartData.length > 0 ? (
+                            <ChartContainer
+                                config={{
+                                    daily: { label: "Diário", color: "#10b981" },
+                                    cumulative: { label: "Acumulado", color: "#3b82f6" }
+                                }}
+                                className="h-full w-full"
+                            >
+                                <AreaChart width={400} height={250} data={chartData}>
+                                    <defs>
+                                        <linearGradient id="dailyGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.7}/>
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.3}/>
+                                        </linearGradient>
+                                        <linearGradient id="cumulativeGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.7}/>
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                    <XAxis 
+                                        dataKey="date" 
+                                        tick={{ fontSize: 12, fill: '#64748b' }}
+                                    />
+                                    <YAxis 
+                                        tick={{ fontSize: 12, fill: '#64748b' }}
+                                    />
+                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="daily" 
+                                        stroke="#10b981" 
+                                        fillOpacity={1} 
+                                        fill="url(#dailyGradient)"
+                                        strokeWidth={2}
+                                    />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="cumulative" 
+                                        stroke="#3b82f6" 
+                                        fillOpacity={1} 
+                                        fill="url(#cumulativeGradient)"
+                                        strokeWidth={2}
+                                    />
+                                </AreaChart>
+                            </ChartContainer>
                         ) : (
                             <div className="h-full flex items-center justify-center text-sm text-gray-500">
                                 Sem dados de tendência disponíveis
@@ -223,72 +159,8 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
     const [avgAge, setAvgAge] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Configurações do gráfico de barras
-    const [chartOptions, setChartOptions] = useState({
-        chart: {
-            id: 'age-distribution',
-            type: 'bar' as const,
-            height: 250,
-            toolbar: {
-                show: false
-            },
-            fontFamily: 'sans-serif',
-            foreColor: '#64748b',
-        },
-        colors: ['#8b5cf6', '#6366f1', '#4f46e5', '#4338ca', '#3730a3'],
-        plotOptions: {
-            bar: {
-                borderRadius: 4,
-                horizontal: false,
-                columnWidth: '70%',
-                distributed: true
-            }
-        },
-        dataLabels: {
-            enabled: false
-        },
-        grid: {
-            borderColor: '#e2e8f0',
-            row: {
-                colors: ['#f8fafc', 'transparent'],
-                opacity: 0.5
-            }
-        },
-        xaxis: {
-            categories: ['--', '--', '--', '--', '--'],
-            labels: {
-                style: {
-                    colors: '#64748b',
-                    fontSize: '12px'
-                }
-            }
-        },
-        yaxis: {
-            labels: {
-                style: {
-                    colors: '#64748b',
-                    fontSize: '12px'
-                }
-            }
-        },
-        legend: {
-            show: false
-        },
-        tooltip: {
-            y: {
-                formatter: function(val: number) {
-                    return val + " convidados";
-                }
-            }
-        }
-    });
-
-    const [chartSeries, setChartSeries] = useState([
-        {
-            name: 'Convidados',
-            data: [0, 0, 0, 0, 0]
-        }
-    ]);
+    // Dados para Recharts
+    const [chartData, setChartData] = useState<{ageGroup: string, count: number, fill: string}[]>([]);
 
     useEffect(() => {
         const fetchAgeData = async () => {
@@ -309,24 +181,15 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
                         setAvgAge(data[0].avg_age);
                     }
                     
-                    // Preparar dados para o gráfico
-                    const ageGroups = data.map(item => item.age_group);
-                    const counts = data.map(item => item.count);
+                    // Preparar dados para Recharts
+                    const colors = ['#8b5cf6', '#6366f1', '#4f46e5', '#4338ca', '#3730a3'];
+                    const rechartsData = data.map((item, index) => ({
+                        ageGroup: item.age_group,
+                        count: item.count,
+                        fill: colors[index % colors.length]
+                    }));
                     
-                    setChartOptions({
-                        ...chartOptions,
-                        xaxis: {
-                            ...chartOptions.xaxis,
-                            categories: ageGroups
-                        }
-                    });
-                    
-                    setChartSeries([
-                        {
-                            name: 'Convidados',
-                            data: counts
-                        }
-                    ]);
+                    setChartData(rechartsData);
                 }
             } catch (error) {
                 console.error('Erro ao buscar dados de idade:', error);
@@ -365,15 +228,36 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
                     </div>
                 ) : (
                     <div className="h-64">
-                        {ageData.length > 0 ? (
-                            typeof window !== 'undefined' && (
-                                <Chart
-                                    options={chartOptions}
-                                    series={chartSeries}
-                                    type="bar"
-                                    height="100%"
-                                />
-                            )
+                        {chartData.length > 0 ? (
+                            <ChartContainer
+                                config={{
+                                    count: { label: "Convidados", color: "#8b5cf6" }
+                                }}
+                                className="h-full w-full"
+                            >
+                                <BarChart width={400} height={250} data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                    <XAxis 
+                                        dataKey="ageGroup" 
+                                        tick={{ fontSize: 12, fill: '#64748b' }}
+                                    />
+                                    <YAxis 
+                                        tick={{ fontSize: 12, fill: '#64748b' }}
+                                    />
+                                    <ChartTooltip 
+                                        content={<ChartTooltipContent />}
+                                        formatter={(value, name) => [`${value} convidados`, name]}
+                                    />
+                                    <Bar 
+                                        dataKey="count" 
+                                        radius={[4, 4, 0, 0]}
+                                    >
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ChartContainer>
                         ) : (
                             <div className="h-full flex items-center justify-center text-sm text-gray-500">
                                 Sem dados de idade disponíveis

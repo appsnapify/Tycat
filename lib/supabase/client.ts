@@ -14,6 +14,33 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Cliente singleton para evitar múltiplas instâncias
 let clientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
 
+// Função para limpeza cirúrgica de cookies corrompidos
+function cleanupCorruptedCookies() {
+  try {
+    if (typeof window === 'undefined') return // Proteção SSR
+    
+    document.cookie.split(';').forEach(cookie => {
+      const [name, value] = cookie.trim().split('=')
+      
+      // Verificar apenas cookies Supabase que começam com base64-
+      if (name?.includes('supabase') && value?.startsWith('base64-')) {
+        try {
+          // Tentar parsing do conteúdo base64 - se falhar, é corrupto
+          JSON.parse(value.substring(7))
+        } catch {
+          // Cookie corrupto detectado - remover apenas este específico
+          console.log(`[Auth] Removendo cookie corrupto: ${name}`)
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
+        }
+      }
+    })
+  } catch (error) {
+    // Falha silenciosa para manter compatibilidade total
+    console.warn('[Auth] Aviso: Não foi possível verificar cookies:', error)
+  }
+}
+
 export const createClient = () => {
   if (typeof window === 'undefined') {
     throw new Error('createClient deve ser usado apenas no navegador. Use createServerClient para o servidor.')
@@ -24,27 +51,13 @@ export const createClient = () => {
     return clientInstance
   }
 
-  // Criar nova instância com configuração de cookies melhorada
+  // Limpeza preventiva de cookies corrompidos
+  cleanupCorruptedCookies()
+
+  // Criar nova instância usando configuração nativa do Supabase
   clientInstance = createBrowserClient<Database>(
     supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        get(name: string) {
-          const cookie = document.cookie
-            .split('; ')
-            .find((row) => row.startsWith(`${name}=`))
-          return cookie ? decodeURIComponent(cookie.split('=')[1]) : ''
-        },
-        set(name: string, value: string, options: { path?: string; domain?: string; secure?: boolean; sameSite?: string; maxAge?: number; expires?: Date }) {
-          const cookieValue = encodeURIComponent(value)
-          document.cookie = `${name}=${cookieValue}; path=${options.path || '/'}; max-age=${options.maxAge || 60 * 60 * 24 * 7}; samesite=${options.sameSite || 'lax'}; secure=${options.secure !== false}`
-        },
-        remove(name: string, options: { path?: string }) {
-          document.cookie = `${name}=; path=${options.path || '/'}; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-        }
-      }
-    }
+    supabaseAnonKey
   )
 
   return clientInstance

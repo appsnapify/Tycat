@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log(`API GuestCount - Buscando contagem para evento: ${eventId}`);
+    // Log apenas em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`API GuestCount - Buscando contagem para evento: ${eventId}`);
+    }
     
     // 1. Buscar total de convidados na tabela guests
     const { data: guestsData, error: guestsError, count: totalCount } = await supabaseAdmin
@@ -61,9 +64,12 @@ export async function GET(request: NextRequest) {
     const total = totalCount ?? (guestsData?.length || 0);
     const checkedIn = checkedInCount ?? 0;
     
-    // Retornar a contagem com cache-control para evitar cache
-    console.log(`API GuestCount - Encontrados ${total} convidados para evento ${eventId}, com ${checkedIn} check-ins`);
+    // Log apenas em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`API GuestCount - Encontrados ${total} convidados para evento ${eventId}, com ${checkedIn} check-ins`);
+    }
     
+    // Retornar a contagem com cache de 5 minutos para otimizar performance
     return NextResponse.json(
       {
         success: true,
@@ -74,9 +80,9 @@ export async function GET(request: NextRequest) {
       {
         status: 200,
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          'Cache-Control': 'public, max-age=300, s-maxage=300', // 5 minutos de cache
+          'Pragma': 'cache',
+          'Expires': new Date(Date.now() + 5 * 60 * 1000).toUTCString(), // 5 minutos
         }
       }
     );

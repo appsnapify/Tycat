@@ -68,7 +68,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         }
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('Relações de organizações encontradas:', userOrgsCheck?.length || 0)
+          // console.log('Relações de organizações encontradas:', userOrgsCheck?.length || 0)
         }
         
         if (!userOrgsCheck || userOrgsCheck.length === 0) {
@@ -84,7 +84,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         // Extrair IDs das organizações
         const orgIds = userOrgsCheck.map(rel => rel.organization_id)
         if (process.env.NODE_ENV === 'development') {
-          console.log('IDs das organizações:', orgIds)
+          // console.log('IDs das organizações:', orgIds)
         }
         
         // Buscar detalhes das organizações diretamente
@@ -100,7 +100,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           }
           
           if (process.env.NODE_ENV === 'development') {
-            console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
+            // console.log('Detalhes das organizações:', orgsData?.length || 0, orgsData)
           }
           
           if (orgsData && orgsData.length > 0) {

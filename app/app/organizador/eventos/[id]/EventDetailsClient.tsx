@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'; // Manter para estado de sa
 import { toast } from "@/components/ui/use-toast"; // Corrigido import do toast
 import { CalendarIcon, MapPinIcon, QrCode, ExternalLink, PencilIcon, Clock, MapPin } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-// import dynamic from 'next/dynamic'; // Comentado para teste
+
 // Import Tabs components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Importar componentes de Tabela
@@ -33,10 +33,10 @@ import {
 import GuestListTable from './GuestListTable'
 // Importar o componente de estatísticas avançadas
 import { AdvancedStatsSection } from './StatsComponents';
-// import { ApexOptions } from 'apexcharts'; // Comentado para teste
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PieChart, Pie, Cell } from "recharts";
 
-// Importar ApexCharts com carregamento dinâmico para evitar erros de SSR
-// const Chart = dynamic(() => import('react-apexcharts'), { ssr: false }); // Comentado para teste
+// Chart components agora usam shadcn/ui com Recharts
 
 // Interface para os dados do evento recebidos como props
 interface EventData {
@@ -116,172 +116,40 @@ export default function EventDetailsClient({
     genderStats
 }: EventDetailsClientProps) {
     // Estados
-    const [peakHour, setPeakHour] = useState({ hour: 'N/A', count: 0 });
+    const [peakHour, setPeakHour] = useState<{
+        hour: string;
+        count: number;
+        isMultiple?: boolean;
+        allPeakHours?: Array<{hour: string, count: number}>;
+    }>({ hour: 'N/A', count: 0 });
+    const [allRegistrationHours, setAllRegistrationHours] = useState<Array<{hour: string, count: number, percentage: number}>>([]);
     const [loading, setLoading] = useState(false);
     const [topLocations, setTopLocations] = useState<{code: string, name: string, count: number}[]>([]);
     const [loadingLocations, setLoadingLocations] = useState(false);
     
-    // Estado para o gráfico de localidades - Comentado para teste
-    const [locationChartOptions, setLocationChartOptions] = useState<ApexOptions>({
-        labels: ['Carregando...'],
-        colors: ['#818cf8', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#6366f1'],
-        legend: {
-            position: 'bottom',
-            fontSize: '12px',
-            fontFamily: 'sans-serif',
-            offsetY: 5,
-            formatter: function(seriesName: string, opts: any) {
-                return `${seriesName}: ${opts.w.globals.series[opts.seriesIndex]}`;
-            }
-        },
-        chart: {
-            fontFamily: 'sans-serif',
-            foreColor: '#64748b',
-            animations: {
-                enabled: true,
-                speed: 500
-            }
-        },
-        plotOptions: {
-            pie: {
-                donut: {
-                    size: '60%',
-                    labels: {
-                        show: true,
-                        total: {
-                            show: true,
-                            label: 'Total',
-                            fontSize: '14px',
-                            fontFamily: 'sans-serif',
-                            formatter: function (w: any) {
-                                return w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        dataLabels: {
-            enabled: false
-        },
-        responsive: [{
-            breakpoint: 480,
-            options: {
-                chart: {
-                    height: 280
-                },
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }]
-    });
-    const [locationChartSeries, setLocationChartSeries] = useState<number[]>([100]);
+    // Dados para o gráfico de localizações (formato Recharts)
+    const [locationChartData, setLocationChartData] = useState<{name: string, value: number, fill: string}[]>([]);
     
-    // Estado para o gráfico de gênero - Comentado para teste
-    /*
-    const [genderChartOptions, setGenderChartOptions] = useState<ApexOptions>({
-        labels: ['Carregando...'],
-        colors: ['#3b82f6', '#ec4899', '#8b5cf6'], // Azul, Rosa, Roxo
-        legend: {
-            position: 'bottom',
-            fontSize: '12px',
-            fontFamily: 'sans-serif',
-            offsetY: 5,
-            formatter: function(seriesName: string, opts: any) {
-                const value = opts.w.globals.series[opts.seriesIndex];
-                const label = opts.w.globals.labels[opts.seriesIndex];
-                const genderItem = genderStats.genderData.find(g => g.genderName === label);
-                const count = genderItem?.count || 0;
-                return `${seriesName}: ${value}% (${count})`;
-            }
-        },
-        chart: {
-            fontFamily: 'sans-serif',
-            foreColor: '#64748b',
-            animations: {
-                enabled: true,
-                speed: 500
-            }
-        },
-        plotOptions: {
-            pie: {
-                donut: {
-                    size: '60%',
-                    labels: {
-                        show: true,
-                        total: {
-                            show: true,
-                            label: 'Total',
-                            fontSize: '14px',
-                            fontFamily: 'sans-serif',
-                            formatter: function (w: any) {
-                                return w.globals.seriesTotals.reduce((a: number, b: number) => {
-                                    return a + b;
-                                }, 0);
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        dataLabels: {
-            enabled: false
-        },
-        responsive: [{
-            breakpoint: 480,
-            options: {
-                chart: {
-                    height: 280
-                },
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }]
+    // Preparando dados do gráfico de gênero (cores azuis consistentes)
+    const genderChartData = (genderStats?.genderData || []).map((item, index) => {
+            const colorMap: { [key in GenderCode]?: string } = {
+                'M': '#3b82f6',  // blue-500
+                'F': '#1d4ed8',  // blue-700
+                'O': '#60a5fa'   // blue-400
+            };
+        return {
+            name: item?.genderName || 'Indefinido',
+            value: item?.percentage || 0,
+            count: item?.count || 0,
+            percentage: item?.percentage || 0,
+            fill: colorMap[item?.gender] || '#60a5fa'
+        };
     });
-    const [genderChartSeries, setGenderChartSeries] = useState<number[]>([100]);
-    const [genderChartLabels, setGenderChartLabels] = useState<string[]>(['Carregando...']);
-    */
 
     const eventId = event.id;
 
-    // Efeito para atualizar os dados do gráfico de gênero quando a prop mudar
-    useEffect(() => {
-        if (genderStats && genderStats.genderData && genderStats.genderData.length > 0) {
-            const percentages = genderStats.genderData.map(item => item.percentage);
-            const labels = genderStats.genderData.map(item => item.genderName);
-            
-            const colorMap: { [key in GenderCode]?: string } = {
-                'M': '#3b82f6',
-                'F': '#ec4899',
-                'O': '#8b5cf6'
-            };
-            
-            const colors = genderStats.genderData.map(item => 
-                colorMap[item.gender] || '#8b5cf6'
-            );
-            
-            // setGenderChartSeries(percentages); // Comentado para teste
-            // setGenderChartLabels(labels); // Comentado para teste
-            // setGenderChartOptions(prev => ({ // Comentado para teste
-            //     ...prev,
-            //     labels: labels,
-            //     colors: colors,
-            //     legend: {
-            //         ...prev.legend,
-            //         position: prev.legend?.position || 'bottom',
-            //         formatter: function(seriesName: string, opts: any) {
-            //             const value = opts.w.globals.series[opts.seriesIndex];
-            //             const label = opts.w.globals.labels[opts.seriesIndex];
-            //             const genderItem = genderStats.genderData.find(g => g.genderName === label);
-            //             const count = genderItem?.count || 0;
-            //             return `${label}: ${value}% (${count})`;
-            //         }
-            //     }
-            // }));
-        }
-    }, [genderStats]);
+    // Calcular taxa de check-in
+    const checkInRate = totalGuests > 0 ? Math.round((totalCheckedIn / totalGuests) * 100) : 0;
 
     // Efeito para buscar hora de pico de REGISTRO (não mais check-in)
     useEffect(() => {
@@ -296,36 +164,53 @@ export default function EventDetailsClient({
                 if (error) throw error;
                 
                 if (data && data.length > 0) {
-                    // Encontrar o horário com mais registros
-                    let maxRegistrations = 0;
-                    let peakHourData = { hour: 'N/A', count: 0 };
+                    // Processar TODOS os dados de registos por hora
+                    const hourlyData = data.map((item: any) => ({
+                        hour: new Date(item.registration_hour).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        }),
+                        count: item.count,
+                        percentage: totalGuests > 0 ? (item.count / totalGuests) * 100 : 0
+                    }));
                     
-                    data.forEach((item: any) => {
-                        if (item.count > maxRegistrations) {
-                            maxRegistrations = item.count;
-                            peakHourData = {
-                                hour: new Date(item.registration_hour).toLocaleTimeString('pt-BR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: false
-                                }),
-                                count: item.count
-                            };
+                    // Ordenar por contagem (maior primeiro)
+                    hourlyData.sort((a, b) => b.count - a.count);
+                    
+                    // Armazenar todos os dados
+                    setAllRegistrationHours(hourlyData);
+                    
+                    // Encontrar o VERDADEIRO horário com mais registros (pico real)
+                    if (hourlyData.length > 0) {
+                        // Encontrar a contagem máxima real
+                        const maxCount = Math.max(...hourlyData.map(h => h.count));
+                        // Pegar TODOS os horários com essa contagem máxima (empates)
+                        const peakHours = hourlyData.filter(h => h.count === maxCount);
+                        
+                        if (peakHours.length > 0) {
+                            setPeakHour({
+                                hour: peakHours.length > 1 
+                                    ? `${peakHours.length} horários empatados` 
+                                    : peakHours[0].hour,
+                                count: maxCount,
+                                isMultiple: peakHours.length > 1,
+                                allPeakHours: peakHours
+                            });
+                        } else {
+                            setPeakHour({ hour: 'N/A', count: 0 });
                         }
-                    });
-                    
-                    // Só atualizar se houver pelo menos 1 registro
-                    if (maxRegistrations > 0) {
-                        setPeakHour(peakHourData);
                     } else {
                         setPeakHour({ hour: 'N/A', count: 0 });
                     }
                 } else {
                     setPeakHour({ hour: 'N/A', count: 0 });
+                    setAllRegistrationHours([]);
                 }
             } catch (error) {
                 console.error('Erro ao buscar horário de pico de registro:', error);
                 setPeakHour({ hour: 'N/A', count: 0 });
+                setAllRegistrationHours([]);
                 toast({
                     title: "Erro",
                     description: "Não foi possível carregar o horário de pico de registro.",
@@ -339,7 +224,7 @@ export default function EventDetailsClient({
         if (eventId) {
             fetchPeakHour();
         }
-    }, [eventId]);
+    }, [eventId, totalGuests]);
 
     // Novo efeito para buscar localidades principais
     useEffect(() => {
@@ -364,31 +249,31 @@ export default function EventDetailsClient({
                     
                     setTopLocations(locationData);
 
-                    const labels = locationData.map(loc => 
-                        loc.name === 'Desconhecido' ? 'Desconhecido' : `${loc.name} (${loc.code})`
-                    );
-                    const series = locationData.map(loc => loc.count);
+                    // Cores para o gráfico Recharts
+                    const colors = ['#818cf8', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#6366f1'];
+                    
+                    const chartData = locationData.map((loc, index) => ({
+                        name: loc.name === 'Desconhecido' ? 'Desconhecido' : `${loc.name} (${loc.code})`,
+                        value: loc.count,
+                        fill: colors[index % colors.length]
+                    }));
 
-                    setLocationChartSeries(series);
-                    setLocationChartOptions(prev => ({
-                        ...prev,
-                        labels: labels,
-                    }));
+                    setLocationChartData(chartData);
                 } else {
-                    setLocationChartSeries([0]);
-                    setLocationChartOptions(prev => ({
-                        ...prev,
-                        labels: ["Sem dados de localização"],
-                    }));
+                    setLocationChartData([{
+                        name: "Sem dados de localização",
+                        value: 1,
+                        fill: '#e5e7eb'
+                    }]);
                     setTopLocations([]);
                 }
             } catch (error) {
                 console.error('Erro ao buscar localidades:', error);
-                setLocationChartSeries([0]);
-                setLocationChartOptions(prev => ({
-                    ...prev,
-                    labels: ["Erro ao carregar dados"],
-                }));
+                setLocationChartData([{
+                    name: "Erro ao carregar dados",
+                    value: 1,
+                    fill: '#ef4444'
+                }]);
                 setTopLocations([]);
             } finally {
                 setLoadingLocations(false);
@@ -413,69 +298,72 @@ export default function EventDetailsClient({
         }
     };
 
-    // Calcular taxa de check-in
-    const checkInRate = totalGuests > 0 ? ((totalCheckedIn / totalGuests) * 100).toFixed(1) : '0.0';
-
     // --- Renderização do Componente Cliente com Tabs ---
     return (
         <Tabs defaultValue="estatisticas" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 p-1 rounded-lg">
                 <TabsTrigger 
                     value="estatisticas"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-lime-600 data-[state=active]:shadow-sm"
+                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm"
                 >
                     Estatísticas
                 </TabsTrigger>
                 <TabsTrigger 
                     value="convidados"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-fuchsia-600 data-[state=active]:shadow-sm"
+                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm"
                 >
                     Convidados
                 </TabsTrigger>
                 <TabsTrigger 
                     value="informacoes"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm"
+                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm"
                 >
                     Informações
                 </TabsTrigger>
             </TabsList>
 
             <TabsContent value="estatisticas" className="mt-0">
-                <Card className="border shadow-sm bg-gradient-to-br from-white to-gray-50">
+                <Card className="rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_20px_rgba(0,0,0,0.15)] bg-white border-gray-200 hover:border-gray-300 transition-all duration-300">
                     <CardHeader>
-                        <CardTitle className="text-xl text-gray-800">Visão Geral</CardTitle>
-                        <CardDescription>Métricas principais do evento.</CardDescription>
+                        <CardTitle className="font-semibold text-lg text-gray-900">Visão Geral</CardTitle>
+                        <CardDescription className="text-sm text-gray-500">Métricas principais do evento</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-3">
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-lime-500 to-lime-400 h-1"></div>
-                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Total Convidados</CardTitle></CardHeader>
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-600 h-1"></div>
+                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Total de Guest</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0">
                                 <div className="flex items-baseline">
-                                    <p className="text-2xl font-bold mr-2">{totalGuests}</p>
+                                    <p className="text-2xl font-bold text-gray-900 mr-2 transition-all duration-300 hover:scale-105">
+                                        {totalGuests}
+                                    </p>
                                     <span className="text-xs text-gray-500">pessoas</span>
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-fuchsia-500 to-fuchsia-400 h-1"></div>
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-600 h-1"></div>
                             <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Total Check-ins</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0">
                                 <div className="flex items-baseline">
-                                    <p className="text-2xl font-bold mr-2">{totalCheckedIn}</p>
+                                    <p className="text-2xl font-bold text-gray-900 mr-2 transition-all duration-300 hover:scale-105">
+                                        {totalCheckedIn}
+                                    </p>
                                     <span className="text-xs text-gray-500">check-ins</span>
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-lime-400 to-fuchsia-400 h-1"></div>
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-600 h-1"></div>
                             <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Taxa Check-in</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0">
                                 <div className="flex flex-col">
-                                    <p className="text-2xl font-bold">{checkInRate}%</p>
+                                    <p className="text-2xl font-bold text-gray-900 transition-all duration-300 hover:scale-105">
+                                        {checkInRate}%
+                                    </p>
                                     <div className="mt-2 w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                                         <div 
-                                            className="h-full bg-gradient-to-r from-lime-500 to-fuchsia-500" 
+                                            className="h-full bg-blue-600 transition-all duration-1000 ease-out" 
                                             style={{ width: `${checkInRate}%` }}
                                         />
                                     </div>
@@ -486,14 +374,53 @@ export default function EventDetailsClient({
                     
                     {/* Segunda fileira de Cards - Métricas Adicionais */}
                     <CardContent className="grid gap-4 md:grid-cols-3 mt-4">
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-blue-500 to-blue-400 h-1"></div>
-                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Distribuição por Gênero</CardTitle></CardHeader>
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-500 h-1"></div>
+                            <CardHeader className="p-4">
+                                <CardTitle className="text-sm font-medium text-gray-500">Distribuição por Gênero</CardTitle>
+                                <CardDescription className="text-xs text-gray-400">Análise demográfica</CardDescription>
+                            </CardHeader>
                             <CardContent className="p-4 pt-0">
-                                {genderStats.genderData.length > 0 ? (
-                                    <div className="h-48 flex items-center justify-center text-sm text-gray-500">
-                                        {/* Chart comentado para teste */}
-                                        Gráfico de Gênero Desativado para Teste
+                                {genderChartData && genderChartData.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {/* Bar Chart inspirado na imagem */}
+                                        <div className="flex items-end justify-between h-24 gap-2">
+                                            {(() => {
+                                                const maxCount = Math.max(...genderChartData.map(item => item.count || 0));
+                                                return genderChartData.map((item, index) => {
+                                                    const heightPercentage = maxCount > 0 ? ((item.count || 0) / maxCount) * 100 : 5;
+                                                    // Converter percentual para pixels (container h-24 = 96px, usar 80px max para deixar espaço para label)
+                                                    const heightInPixels = Math.max((heightPercentage / 100) * 80, 8);
+                                                    return (
+                                                        <div key={item.name} className="flex flex-col items-center flex-1">
+                                                            <div 
+                                                                className="w-full bg-blue-400 rounded-t-sm transition-all duration-500 hover:bg-blue-500"
+                                                                style={{ 
+                                                                    height: `${heightInPixels}px`
+                                                                }}
+                                                                title={`${item.name}: ${item.count} (${(item.percentage || 0).toFixed(1)}%)`}
+                                                            ></div>
+                                                            <span className="text-[10px] text-gray-500 mt-1 text-center">
+                                                                {item.name.charAt(0)}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                        
+                                        {/* Legenda compacta */}
+                                        <div className="space-y-1">
+                                            {genderChartData.map((item, index) => (
+                                                <div key={item.name} className="flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                                        <span className="text-gray-600">{item.name}</span>
+                                                    </div>
+                                                    <span className="font-medium text-gray-900">{item.count}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="h-32 flex items-center justify-center text-sm text-gray-500">
@@ -502,9 +429,16 @@ export default function EventDetailsClient({
                                 )}
                             </CardContent>
                         </Card>
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-amber-500 to-amber-400 h-1"></div>
-                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Horário de Pico (Registo)</CardTitle></CardHeader>
+
+                        {/* Card Principal - Horário de Pico */}
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-500 h-1"></div>
+                            <CardHeader className="p-4">
+                                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-1">
+                                    <span>⏰</span> Pico de Registos
+                                </CardTitle>
+                                <CardDescription className="text-xs text-gray-400">Melhor momento para promoção</CardDescription>
+                            </CardHeader>
                             <CardContent className="p-4 pt-0">
                                 {loading ? (
                                     <div className="space-y-2">
@@ -513,27 +447,135 @@ export default function EventDetailsClient({
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex items-baseline">
-                                            <p className="text-2xl font-bold mr-2">{peakHour.hour}</p>
-                                            <span className="text-xs text-gray-500">horário</span>
-                                        </div>
-                                        <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                                            {peakHour.count > 0 ? (
-                                                <>
-                                                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                                                    <span>{peakHour.count} registros neste horário</span>
-                                                </>
-                                            ) : (
-                                                <span>Sem dados de registro disponíveis</span>
-                                            )}
-                                        </div>
+                                        {peakHour.count > 0 ? (
+                                            <div className="space-y-3">
+                                                {/* Horário de Pico Principal */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-baseline">
+                                                        <span className="text-lg font-bold text-blue-600 mr-2">🔥</span>
+                                                        <p className="text-xl font-bold text-gray-900">
+                                                            {peakHour.isMultiple ? `${peakHour.allPeakHours?.length} Picos Empatados` : peakHour.hour}
+                                                        </p>
+                                                    </div>
+                                                    
+                                                    {/* Mostrar todos os horários empatados se houver múltiplos */}
+                                                    {peakHour.isMultiple && peakHour.allPeakHours && (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {peakHour.allPeakHours.map((peak, index) => (
+                                                                <span key={`peak-${index}`} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
+                                                                    {peak.hour}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Estatísticas do Pico */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm text-gray-600">Registos por hora</span>
+                                                        <span className="font-semibold text-gray-900">{peakHour.count}</span>
+                                                    </div>
+                                                    
+                                                    {/* Percentagem do total */}
+                                                    {totalGuests > 0 && (
+                                                        <>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-sm text-gray-600">% do total</span>
+                                                                <span className="font-semibold text-blue-600">
+                                                                    {((peakHour.count / totalGuests) * 100).toFixed(1)}%
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            {/* Barra de progresso visual */}
+                                                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                                                <div 
+                                                                    className="h-full bg-blue-500 transition-all duration-1000 ease-out" 
+                                                                    style={{ width: `${Math.min((peakHour.count / totalGuests) * 100, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-4">
+                                                <p className="text-sm text-gray-500">📊 Sem dados de registo disponíveis</p>
+                                                <p className="text-xs text-gray-400 mt-1">Os dados aparecerão conforme os registos chegam</p>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </CardContent>
                         </Card>
-                        <Card className="overflow-hidden border shadow-sm">
-                            <div className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-1"></div>
-                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Origem dos Convidados</CardTitle></CardHeader>
+
+                        {/* Card Lateral - Análise Temporal */}
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-500 h-1"></div>
+                            <CardHeader className="p-4">
+                                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-1">
+                                    <span>📊</span> Análise Temporal
+                                </CardTitle>
+                                <CardDescription className="text-xs text-gray-400">Distribuição de registos por hora</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4 pt-0">
+                                {loading ? (
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-4 w-3/4" />
+                                        <Skeleton className="h-4 w-1/2" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {allRegistrationHours.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {/* Header com resumo */}
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-xs font-medium text-gray-600">Todos os Registos</h4>
+                                                    <span className="text-xs text-gray-400">{totalGuests} total</span>
+                                                </div>
+                                                
+                                                {/* Lista de todos os horários */}
+                                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                                    {allRegistrationHours.map((hourData, index) => (
+                                                        <div key={`${hourData.hour}-${index}`} className="flex items-center justify-between text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`w-2 h-2 rounded-full ${hourData.count === peakHour.count ? 'bg-blue-500' : 'bg-gray-300'}`}></span>
+                                                                <span className={`font-medium ${hourData.count === peakHour.count ? 'text-blue-600' : 'text-gray-600'}`}>
+                                                                    {hourData.hour}
+                                                                </span>
+                                                                {hourData.count === peakHour.count && <span className="text-xs text-blue-500">🔥</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold text-gray-900">{hourData.count}</span>
+                                                                <span className="text-gray-500">({hourData.percentage.toFixed(1)}%)</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                
+                                                {/* Resumo estatístico */}
+                                                <div className="mt-3 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                                                    <span className="font-medium">Resumo:</span> Registos distribuídos em {allRegistrationHours.length} hora{allRegistrationHours.length > 1 ? 's' : ''} diferente{allRegistrationHours.length > 1 ? 's' : ''}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-4">
+                                                <p className="text-sm text-gray-500">📊 Sem dados temporais disponíveis</p>
+                                                <p className="text-xs text-gray-400 mt-1">A análise aparecerá com mais registos</p>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </CardContent>
+
+                    {/* Terceira fileira - Cidades */}
+                    <CardContent className="mt-4">
+                        <Card className="overflow-hidden rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200 transition-all duration-300">
+                            <div className="bg-blue-500 h-1"></div>
+                            <CardHeader className="p-4"><CardTitle className="text-sm font-medium text-gray-500">Cidades</CardTitle></CardHeader>
                             <CardContent className="p-4 pt-0">
                                 {loadingLocations ? (
                                     <div className="space-y-2">
@@ -542,15 +584,28 @@ export default function EventDetailsClient({
                                 ) : (
                                     <>
                                         {topLocations.length > 0 ? (
-                                            <div className="h-48">
-                                                {typeof window !== 'undefined' && (
-                                                    <Chart
-                                                        options={locationChartOptions}
-                                                        series={locationChartSeries}
-                                                        type="donut"
-                                                        height="100%"
-                                                    />
-                                                )}
+                                            <div className="space-y-3">
+                                                {topLocations.slice(0, 6).map((location, index) => {
+                                                    const maxCount = Math.max(...topLocations.map(l => l.count));
+                                                    const percentage = maxCount > 0 ? (location.count / maxCount) * 100 : 0;
+                                                    
+                                                    return (
+                                                        <div key={`${location.code}-${index}`} className="flex items-center gap-3">
+                                                            <div className="w-20 text-xs font-medium text-blue-600 truncate">
+                                                                {location.name || location.code}
+                                                            </div>
+                                                            <div className="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
+                                                                <div 
+                                                                    className="bg-blue-500 h-full rounded-full transition-all duration-500 ease-out"
+                                                                    style={{ width: `${percentage}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <div className="w-8 text-xs font-medium text-gray-700 text-right">
+                                                                {location.count}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <div className="h-32 flex items-center justify-center text-sm text-gray-500">
@@ -572,27 +627,27 @@ export default function EventDetailsClient({
 
                     {/* Accordion Item Top Equipas */}
                     {topTeamsStats && topTeamsStats.length > 0 && (
-                        <AccordionItem value="top-teams" className="border rounded-md shadow-sm">
-                            <AccordionTrigger className="px-4 py-3 text-base font-semibold hover:no-underline hover:bg-gray-50 rounded-t-md">
+                        <AccordionItem value="top-teams" className="rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200">
+                            <AccordionTrigger className="px-4 py-3 text-base font-semibold text-gray-900 hover:no-underline hover:bg-gray-50 rounded-t-xl">
                                 Top 5 Equipas (por Convidados)
                             </AccordionTrigger>
                             <AccordionContent className="px-4 pb-4 overflow-x-auto">
                                 <Table>
                                     <TableHeader className="bg-gray-50">
                                         <TableRow>
-                                            <TableHead className="w-[50px] font-medium">#</TableHead>
-                                            <TableHead className="font-medium">Equipa</TableHead>
-                                            <TableHead className="text-right font-medium">Convidados</TableHead>
-                                            <TableHead className="text-right font-medium">Check-ins</TableHead>
+                                            <TableHead className="w-[50px] font-medium text-gray-700">#</TableHead>
+                                            <TableHead className="font-medium text-gray-700">Equipa</TableHead>
+                                            <TableHead className="text-right font-medium text-gray-700">Convidados</TableHead>
+                                            <TableHead className="text-right font-medium text-gray-700">Check-ins</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {topTeamsStats.map((team, index) => (
                                             <TableRow key={team.id} className="hover:bg-gray-50">
-                                                <TableCell className="font-medium">{index + 1}</TableCell>
-                                                <TableCell>{team.name}</TableCell>
-                                                <TableCell className="text-right font-medium text-lime-600">{team.total_guests}</TableCell>
-                                                <TableCell className="text-right font-medium text-fuchsia-600">{team.total_checked_in}</TableCell>
+                                                <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+                                                <TableCell className="text-gray-900">{team.name}</TableCell>
+                                                <TableCell className="text-right font-medium text-blue-600">{team.total_guests}</TableCell>
+                                                <TableCell className="text-right font-medium text-blue-600">{team.total_checked_in}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -603,29 +658,29 @@ export default function EventDetailsClient({
 
                     {/* Accordion Item Top Promotores */}
                     {topPromotersStats && topPromotersStats.length > 0 && (
-                        <AccordionItem value="top-promoters" className="border rounded-md shadow-sm">
-                             <AccordionTrigger className="px-4 py-3 text-base font-semibold hover:no-underline hover:bg-gray-50 rounded-t-md">
+                        <AccordionItem value="top-promoters" className="rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] bg-white border-gray-200">
+                             <AccordionTrigger className="px-4 py-3 text-base font-semibold text-gray-900 hover:no-underline hover:bg-gray-50 rounded-t-xl">
                                 Top 5 Promotores (por Convidados)
                              </AccordionTrigger>
                             <AccordionContent className="px-4 pb-4 overflow-x-auto">
                                  <Table>
                                     <TableHeader className="bg-gray-50">
                                          <TableRow>
-                                            <TableHead className="w-[50px] font-medium">#</TableHead>
-                                            <TableHead className="font-medium">Promotor</TableHead>
-                                            <TableHead className="font-medium">Equipa</TableHead>
-                                            <TableHead className="text-right font-medium">Convidados</TableHead>
-                                            <TableHead className="text-right font-medium">Check-ins</TableHead>
+                                            <TableHead className="w-[50px] font-medium text-gray-700">#</TableHead>
+                                            <TableHead className="font-medium text-gray-700">Promotor</TableHead>
+                                            <TableHead className="font-medium text-gray-700">Equipa</TableHead>
+                                            <TableHead className="text-right font-medium text-gray-700">Convidados</TableHead>
+                                            <TableHead className="text-right font-medium text-gray-700">Check-ins</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {topPromotersStats.map((promoter, index) => (
                                             <TableRow key={promoter.id} className="hover:bg-gray-50">
-                                                <TableCell className="font-medium">{index + 1}</TableCell>
-                                                <TableCell>{`${promoter.first_name || ''} ${promoter.last_name || ''}`.trim()}</TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">{promoter.team_name || '-'}</TableCell>
-                                                <TableCell className="text-right font-medium text-lime-600">{promoter.total_guests}</TableCell>
-                                                <TableCell className="text-right font-medium text-fuchsia-600">{promoter.total_checked_in}</TableCell>
+                                                <TableCell className="font-medium text-gray-900">{index + 1}</TableCell>
+                                                <TableCell className="text-gray-900">{`${promoter.first_name || ''} ${promoter.last_name || ''}`.trim()}</TableCell>
+                                                <TableCell className="text-xs text-gray-500">{promoter.team_name || '-'}</TableCell>
+                                                <TableCell className="text-right font-medium text-blue-600">{promoter.total_guests}</TableCell>
+                                                <TableCell className="text-right font-medium text-blue-600">{promoter.total_checked_in}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -649,13 +704,13 @@ export default function EventDetailsClient({
             <TabsContent value="informacoes" className="mt-0">
                 {/* Conteúdo movido para aqui */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border shadow-sm bg-white overflow-hidden">
-                        <div className="bg-gradient-to-r from-lime-500 to-fuchsia-500 h-1"></div>
+                    <Card className="rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_20px_rgba(0,0,0,0.15)] bg-white border-gray-200 hover:border-gray-300 transition-all duration-300 overflow-hidden">
+                        <div className="bg-blue-600 h-1"></div>
                         <CardHeader>
-                            <CardTitle className="text-xl text-gray-800">{event.title}</CardTitle>
+                            <CardTitle className="font-semibold text-lg text-gray-900">{event.title}</CardTitle>
                             <CardDescription>
                                 {event.type === 'guest-list' ? (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-fuchsia-100 text-fuchsia-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                                         Guest List
                                     </span>
                                 ) : 'Evento Padrão'}
@@ -663,41 +718,41 @@ export default function EventDetailsClient({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <h3 className="font-semibold text-sm text-gray-500 mb-1">Descrição</h3>
-                                <p className="text-gray-700">{event.description || 'Sem descrição'}</p>
+                                <h3 className="font-medium text-sm text-gray-500 mb-1">Descrição</h3>
+                                <p className="text-sm text-gray-700">{event.description || 'Sem descrição'}</p>
                             </div>
                             <div className="flex items-center">
-                                <CalendarIcon className="w-4 h-4 mr-2 text-lime-500" />
-                                <span className="text-gray-700">{formatDate(event.date)} {event.time || ''}</span>
+                                <CalendarIcon className="w-4 h-4 mr-2 text-blue-600" />
+                                <span className="text-sm text-gray-700">{formatDate(event.date)} {event.time || ''}</span>
                             </div>
                             {event.end_date && (
                                 <div className="flex items-center">
-                                    <CalendarIcon className="w-4 h-4 mr-2 text-fuchsia-500" />
-                                    <span className="text-gray-700">Fim: {formatDate(event.end_date)} {event.end_time || ''}</span>
+                                    <CalendarIcon className="w-4 h-4 mr-2 text-blue-600" />
+                                    <span className="text-sm text-gray-700">Fim: {formatDate(event.end_date)} {event.end_time || ''}</span>
                                 </div>
                             )}
                             {event.location && (
                                 <div className="flex items-center">
-                                    <MapPinIcon className="w-4 h-4 mr-2 text-lime-500" />
-                                    <span className="text-gray-700">{event.location}</span>
+                                    <MapPinIcon className="w-4 h-4 mr-2 text-blue-600" />
+                                    <span className="text-sm text-gray-700">{event.location}</span>
                                 </div>
                             )}
                         </CardContent>
                         <CardFooter className="pt-0 flex flex-wrap gap-2">
                             <a href={`/app/organizador/checkin?event=${event.id}`}>
-                                <Button className="bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white">
+                                <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 hover:shadow-sm">
                                     <QrCode className="w-4 h-4 mr-2" />
                                     Modo Check-in
                                 </Button>
                             </a>
                             <a href={`/g/${event.id}`} target="_blank" rel="noopener noreferrer">
-                                <Button variant="outline" className="border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50">
+                                <Button variant="outline" className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
                                     <ExternalLink className="w-4 h-4 mr-2" />
                                     Ver Página Pública
                                 </Button>
                             </a>
                             <a href={`/app/organizador/eventos/criar?id=${event.id}`}>
-                                <Button variant="outline" className="border-gray-200 text-gray-700 hover:bg-gray-50">
+                                <Button variant="outline" className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
                                     <PencilIcon className="w-4 h-4 mr-2" />
                                     Editar Evento
                                 </Button>
@@ -707,16 +762,16 @@ export default function EventDetailsClient({
 
                     {/* Bloco de Datas da Guest List (se aplicável) */}
                     {event.type === 'guest-list' && (
-                        <Card className="border shadow-sm bg-white overflow-hidden">
-                            <div className="bg-gradient-to-r from-fuchsia-500 to-lime-500 h-1"></div>
+                        <Card className="rounded-xl shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_20px_rgba(0,0,0,0.15)] bg-white border-gray-200 hover:border-gray-300 transition-all duration-300 overflow-hidden">
+                            <div className="bg-blue-500 h-1"></div>
                             <CardHeader>
-                                <CardTitle className="text-lg text-gray-800">Configurações da Guest List</CardTitle>
-                                <CardDescription>Datas e horários para registro de convidados</CardDescription>
+                                <CardTitle className="font-semibold text-lg text-gray-900">Configurações da Guest List</CardTitle>
+                                <CardDescription className="text-sm text-gray-500">Datas e horários para registro de convidados</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
-                                    <h3 className="font-semibold text-sm text-gray-500 mb-1">Abertura das Inscrições</h3>
-                                    <p className="text-gray-700">
+                                    <h3 className="font-medium text-sm text-gray-500 mb-1">Abertura das Inscrições</h3>
+                                    <p className="text-sm text-gray-700">
                                         {event.guest_list_open_datetime 
                                             ? new Date(event.guest_list_open_datetime).toLocaleString('pt-BR') 
                                             : 'Não definido'
@@ -724,8 +779,8 @@ export default function EventDetailsClient({
                                     </p>
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-sm text-gray-500 mb-1">Fechamento das Inscrições</h3>
-                                    <p className="text-gray-700">
+                                    <h3 className="font-medium text-sm text-gray-500 mb-1">Fechamento das Inscrições</h3>
+                                    <p className="text-sm text-gray-700">
                                         {event.guest_list_close_datetime 
                                             ? new Date(event.guest_list_close_datetime).toLocaleString('pt-BR')
                                             : 'Não definido'

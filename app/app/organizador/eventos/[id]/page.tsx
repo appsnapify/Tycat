@@ -10,28 +10,13 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'; // 
 import Link from 'next/link'; // Importar Link para navegação
 import BackButton from './BackButton'; // Importar o componente cliente separado
 
-// Client Component para o botão de voltar
-const BackButton = () => {
-  return (
-    <Link href="/app/organizador/eventos" className="inline-block">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="flex items-center space-x-2"
-      >
-        <ArrowLeftIcon className="h-4 w-4" />
-        <span>Voltar</span>
-      </Button>
-    </Link>
-  );
-}
-
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // Simplificar generateMetadata para evitar buscas complexas aqui
-export async function generateMetadata({ params: routeParams }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const routeParams = await params;
   const eventId = routeParams.id;
   if (!eventId) return { title: 'Evento não encontrado' };
   return { title: `Evento ${eventId} - Detalhes` };
@@ -59,98 +44,60 @@ async function fetchEvent(id: string, supabaseClient: any) {
   return data;
 }
 
-// Nova Função para buscar estatísticas básicas de convidados
+// Função para buscar estatísticas básicas de convidados (usando RPC)
 async function fetchGuestStats(eventId: string, supabaseClient: any) {
-  console.log(`[Stats] Buscando estatísticas para evento: ${eventId}`);
+  // console.log(`[Stats] Buscando estatísticas via RPC para evento: ${eventId}`);
 
-  // Buscar IDs para contar total
-  const { data: guestsData, error: totalError } = await supabaseClient
-    .from('guests')
-    .select('id') // Selecionar apenas o ID
-    .eq('event_id', eventId);
-
-  // Buscar contagem para check-in (manter como estava, pois funcionava)
-  const { count: totalCheckedIn, error: checkedInError } = await supabaseClient
-    .from('guests')
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('checked_in', true);
-
-  if (totalError) {
-    console.error("[Stats] Erro ao buscar convidados para contagem total:", totalError);
-    // Não lançar erro, apenas retornar 0 ou null para permitir que a página carregue
-  }
-  if (checkedInError) {
-    console.error("[Stats] Erro ao contar check-ins:", checkedInError);
-     // Não lançar erro
-  }
-
-  // Calcular total a partir dos dados buscados
-  const calculatedTotalGuests = guestsData?.length ?? 0;
-
-  console.log(`[Stats] Total (calculado): ${calculatedTotalGuests}, CheckedIn: ${totalCheckedIn ?? 0}`);
-  return {
-    totalGuests: calculatedTotalGuests, // Usar contagem manual
-    totalCheckedIn: totalCheckedIn ?? 0,
-  };
-}
-
-// Nova Função para buscar Top 5 Equipas
-async function fetchTopTeamsStats(eventId: string, supabaseClient: any) {
-  console.log(`[Stats] Buscando Top Equipas para evento: ${eventId}`);
-  const { data, error } = await supabaseClient
-    .from('guests')
-    .select(`
-      team_id,
-      teams!inner ( id, name ),
-      checked_in
-    `)
-    .eq('event_id', eventId)
-    .not('team_id', 'is', null); // Ainda manter para otimização inicial
+  const { data, error } = await supabaseClient.rpc(
+    'get_guest_stats_for_event', 
+    { p_event_id: eventId }
+  );
 
   if (error) {
-    console.error("[Stats] Erro ao buscar dados de equipas:", error);
-    return []; // Retorna array vazio em caso de erro
+    console.error("[Stats] Erro ao chamar RPC get_guest_stats_for_event:", error);
+    return { totalGuests: 0, totalCheckedIn: 0 };
   }
 
   if (!data || data.length === 0) {
-    console.log("[Stats] Nenhum convidado com equipa encontrado.");
+    console.log("[Stats] RPC get_guest_stats_for_event retornou dados vazios.");
+    return { totalGuests: 0, totalCheckedIn: 0 };
+  }
+
+  const stats = data[0];
+      // console.log(`[Stats] RPC - Total: ${stats.total_guests}, CheckedIn: ${stats.total_checked_in}`);
+  
+  return {
+    totalGuests: parseInt(stats.total_guests) || 0,
+    totalCheckedIn: parseInt(stats.total_checked_in) || 0,
+  };
+}
+
+// Função para buscar Top 5 Equipas (usando RPC)
+async function fetchTopTeamsStats(eventId: string, supabaseClient: any) {
+  // console.log(`[Stats] Buscando Top Equipas via RPC para evento: ${eventId}`);
+
+  const { data, error } = await supabaseClient.rpc(
+    'get_top_teams_for_event', 
+    { p_event_id: eventId }
+  );
+
+  if (error) {
+    console.error("[Stats] Erro ao chamar RPC get_top_teams_for_event:", error);
     return [];
   }
 
-  // Agrupar e contar manualmente no lado do servidor
-  const statsMap = new Map<string, { id: string; name: string; total_guests: number; total_checked_in: number }>();
+  if (!data) {
+    console.log("[Stats] RPC get_top_teams_for_event retornou null/undefined data.");
+    return [];
+  }
 
-  data.forEach((guest: any) => {
-    const teamName = guest.teams?.name; 
-    if (!guest.teams || !teamName) {
-        console.warn(`[Stats] Guest ${guest.id} tem team_id ${guest.team_id} mas não foi possível obter dados da equipa.`);
-        return; // Skip se o join falhou ou equipa não existe/sem nome
-    }
-
-    const teamId = guest.team_id;
-
-    if (!statsMap.has(teamId)) {
-      statsMap.set(teamId, { id: teamId, name: teamName, total_guests: 0, total_checked_in: 0 });
-    }
-
-    const currentStats = statsMap.get(teamId)!;
-    currentStats.total_guests += 1;
-    if (guest.checked_in) {
-      currentStats.total_checked_in += 1;
-    }
-  });
-
-  // Converter para array, ordenar e limitar
-  const sortedStats = Array.from(statsMap.values()).sort((a, b) => b.total_guests - a.total_guests);
-
-  console.log(`[Stats] Top Equipas encontradas: ${sortedStats.slice(0, 5).length}`);
-  return sortedStats.slice(0, 5); // Retorna Top 5
+      // console.log(`[Stats] Top Equipas (RPC) encontradas: ${data.length}`);
+  return data; // Retorna diretamente os dados da função RPC
 }
 
 // Função para buscar Top 5 Promotores (agora usando RPC)
 async function fetchTopPromotersStats(eventId: string, supabaseClient: any) {
-  console.log(`[Stats] Buscando Top Promotores via RPC para evento: ${eventId}`);
+  // console.log(`[Stats] Buscando Top Promotores via RPC para evento: ${eventId}`);
 
   const { data, error } = await supabaseClient.rpc(
     'get_top_promoters_for_event', 
@@ -168,70 +115,47 @@ async function fetchTopPromotersStats(eventId: string, supabaseClient: any) {
   }
 
   // A função RPC já retorna os dados no formato correto (Array de PromoterStat)
-  console.log(`[Stats] Top Promotores (RPC) encontrados: ${data.length}`);
+      // console.log(`[Stats] Top Promotores (RPC) encontrados: ${data.length}`);
   return data; // Retorna diretamente os dados da função RPC
 }
 
-// Nova Função para buscar estatísticas de gênero
+// Função para buscar estatísticas de gênero (usando RPC)
 async function fetchGenderStats(eventId: string, supabaseClient: any) {
-  console.log(`[Stats] Buscando estatísticas de gênero para evento: ${eventId}`);
-  
-  // Corrigindo a consulta para buscar todos os gêneros, não apenas M e F
-  const { data: allGuests, error: allError } = await supabaseClient
-    .from('guests')
-    .select('gender')
-    .eq('event_id', eventId)
-    .not('gender', 'is', null);
-    
-  if (allError) {
-    console.error("[Stats] Erro ao buscar todos os dados de gênero:", allError);
-    return { 
-      genderData: [] 
-    };
+  // console.log(`[Stats] Buscando estatísticas de gênero via RPC para evento: ${eventId}`);
+
+  const { data, error } = await supabaseClient.rpc(
+    'get_gender_stats_for_event', 
+    { p_event_id: eventId }
+  );
+
+  if (error) {
+    console.error("[Stats] Erro ao chamar RPC get_gender_stats_for_event:", error);
+    return { genderData: [] };
   }
-  
-  if (!allGuests || allGuests.length === 0) {
-    console.log("[Stats] Nenhum dado de gênero encontrado.");
-    return { 
-      genderData: [] 
-    };
+
+  if (!data || data.length === 0) {
+    console.log("[Stats] RPC get_gender_stats_for_event retornou dados vazios.");
+    return { genderData: [] };
   }
-  
-  // Calcular contagens para todos os gêneros presentes nos dados
-  const genderCounts = {};
-  allGuests.forEach(guest => {
-    const gender = guest.gender;
-    genderCounts[gender] = (genderCounts[gender] || 0) + 1;
-  });
-  
-  // Calcular o total
-  const total = allGuests.length;
-  
-  // Transformar em array com percentuais
-  const genderData = Object.entries(genderCounts).map(([gender, count]) => {
-    const percentage = total > 0 ? Math.round((count as number / total) * 100) : 0;
-    
+
+  // Transformar dados da RPC no formato esperado
+  const genderData = data.map((item: any) => {
     // Converter códigos de gênero para nomes descritivos
     let genderName = 'Outro';
-    if (gender === 'M') genderName = 'Masculino';
-    else if (gender === 'F') genderName = 'Feminino';
+    if (item.gender === 'M') genderName = 'Masculino';
+    else if (item.gender === 'F') genderName = 'Feminino';
     
     return {
-      gender,
+      gender: item.gender,
       genderName,
-      count,
-      percentage
+      count: parseInt(item.count) || 0,
+      percentage: parseFloat(item.percentage) || 0
     };
   });
+
+  // console.log(`[Stats] Dados de gênero (RPC): ${JSON.stringify(genderData)}`);
   
-  // Ordenar por contagem (maior para menor)
-  genderData.sort((a, b) => b.count as number - a.count as number);
-  
-  console.log(`[Stats] Dados de gênero: ${JSON.stringify(genderData)}`);
-  
-  return {
-    genderData
-  };
+  return { genderData };
 }
 
 // Removido fetchOrganizationTeams
@@ -239,11 +163,12 @@ async function fetchGenderStats(eventId: string, supabaseClient: any) {
 
 
 // Componente da Página Principal
-export default async function EventoDetalhesPage({ params: routeParams }: PageProps) {
+export default async function EventoDetalhesPage({ params }: PageProps) {
   // Inicializar cookies e supabaseClient aqui
   const cookieStore = await cookies();
   const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
+  const routeParams = await params;
   const eventId = routeParams.id;
   if (!eventId) {
     notFound();
@@ -263,8 +188,11 @@ export default async function EventoDetalhesPage({ params: routeParams }: PagePr
 
     return (
       <div className="container mx-auto p-4 md:p-6 lg:p-8">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <BackButton />
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900 text-right truncate">
+            {eventData.title}
+          </h1>
         </div>
         <EventDetailsClient 
           event={eventData} 

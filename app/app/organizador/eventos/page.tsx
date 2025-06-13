@@ -489,8 +489,7 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
         const response = await fetch(`/api/guest-count?eventId=${event.id}`, {
           method: 'GET',
           headers: {
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
+            'Cache-Control': 'max-age=300', // Aceitar cache de 5 minutos
           },
         });
         
@@ -529,7 +528,13 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
   useEffect(() => {
     if (event.type === 'guest-list' && !isInitialized && !isLoading) {
       setIsInitialized(true);
-      refreshGuestCount();
+      
+      // Debounce de 300ms para evitar chamadas simultâneas
+      const timeoutId = setTimeout(() => {
+        refreshGuestCount();
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [event.id]);
 

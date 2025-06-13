@@ -71,8 +71,8 @@ export default function RootLayout({
       <body className="overscroll-none">
         {children}
         <Toaster />
-        <Analytics />
-        <SpeedInsights />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && <SpeedInsights />}
       </body>
     </html>
   )

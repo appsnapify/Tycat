@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin } from 'lucide-react';
@@ -26,7 +26,7 @@ export function GuestPassQRCode() {
   const { user } = useClientAuth();
   const [passes, setPasses] = useState<GuestPass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClientComponentClient();
+      const supabase = createClient();
 
   useEffect(() => {
     const fetchPasses = async () => {

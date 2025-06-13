@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Users, Plus, Smartphone, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useOrganization } from '@/app/contexts/organization-context'
+import { useGuestCount } from '@/hooks/useGuestCount'
 
 // Inicializar o cliente Supabase
 const supabase = createClient();
@@ -41,10 +42,21 @@ export default function CheckInPage() {
   // Estados principais
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
   const [events, setEvents] = useState<Event[]>([])
-  const [stats, setStats] = useState({
+  
+  // Usar novo hook para guest count com fallback seguro
+  const { data: guestCountData, loading: guestCountLoading, error: guestCountError } = useGuestCount(selectedEvent)
+  
+  // Manter estado local como fallback (compatibilidade)
+  const [fallbackStats, setFallbackStats] = useState({
     total: 0,
     checkedIn: 0
   })
+  
+  // Combinar dados do hook com fallback
+  const stats = guestCountData ? {
+    total: guestCountData.count,
+    checkedIn: guestCountData.checkedIn
+  } : fallbackStats
 
   // Estados para scanners móveis
   const [scanners, setScanners] = useState<Scanner[]>([])
@@ -107,10 +119,11 @@ export default function CheckInPage() {
     fetchEvents()
   }, [currentOrganization])
 
-  // Buscar estatísticas
+  // Fallback: Buscar estatísticas se hook falhar
   useEffect(() => {
-    async function fetchStats() {
-      if (!selectedEvent) return;
+    async function fetchFallbackStats() {
+      // Só usar fallback se hook não tiver dados e houver erro
+      if (!selectedEvent || guestCountData || !guestCountError) return;
 
       try {
         const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
@@ -122,20 +135,20 @@ export default function CheckInPage() {
         const data = await response.json();
         
         if (data.success) {
-          setStats({
+          setFallbackStats({
             total: data.count || 0,
             checkedIn: data.checkedIn || 0
           });
         } else {
-          console.error("Erro ao buscar estatísticas:", data.error);
+          console.error("Erro ao buscar estatísticas (fallback):", data.error);
         }
       } catch (err) {
-        console.error('Erro ao buscar estatísticas:', err);
+        console.error('Erro ao buscar estatísticas (fallback):', err);
       }
     }
     
-    fetchStats();
-  }, [selectedEvent]);
+    fetchFallbackStats();
+  }, [selectedEvent, guestCountData, guestCountError]);
 
   // Buscar scanners quando evento selecionado
   useEffect(() => {
