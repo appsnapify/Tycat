@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/app/app/_providers/auth-provider'
@@ -122,13 +122,10 @@ export default function OrganizadorDashboardPage() {
   const [loadingError, setLoadingError] = useState(false)
   const [activities, setActivities] = useState<Activity[]>([])
   
-  useEffect(() => {
-    if (user && currentOrganization) {
-      loadOrganizationAndData()
-    }
-  }, [user, currentOrganization])
+  // Cache para verificações de tabela - evita consultas repetitivas
+  const [tableCache] = useState(() => new Map<string, boolean>())
   
-  const loadOrganizationAndData = async () => {
+  const loadOrganizationAndData = useCallback(async () => {
     if (!user) return
     
     try {
@@ -238,7 +235,13 @@ export default function OrganizadorDashboardPage() {
       setLoading(false)
       setLoadingError(true)
     }
-  }
+  }, [user, currentOrganization, supabase])
+
+  useEffect(() => {
+    if (user && currentOrganization) {
+      loadOrganizationAndData()
+    }
+  }, [user, currentOrganization, loadOrganizationAndData])
   
   const generateOrganizationCode = (organizationId: string) => {
     const generatedOrgCode = `ORG-${organizationId.substring(0, 6).toUpperCase()}`
@@ -246,7 +249,7 @@ export default function OrganizadorDashboardPage() {
   }
   
   // Função de KPIs atualizada para buscar dados corretos
-  const loadKpis = async (organizationId: string) => {
+  const loadKpis = useCallback(async (organizationId: string) => {
     setLoadingKpis(true);
     
     try {
@@ -377,10 +380,10 @@ export default function OrganizadorDashboardPage() {
       setLoadingKpis(false);
       setLoading(false);
     }
-  };
+  }, [supabase]);
   
   // Função para carregar equipes com tratamento robusto de erros
-  const loadTeams = async (organizationId: string) => {
+  const loadTeams = useCallback(async (organizationId: string) => {
     setLoadingTeams(true);
     
     try {
@@ -442,9 +445,9 @@ export default function OrganizadorDashboardPage() {
       setLoadingTeams(false);
       setLoading(false);
     }
-  };
+  }, [supabase]);
   
-  const loadActivities = async (organizationId: string) => {
+  const loadActivities = useCallback(async (organizationId: string) => {
     try {
       if (!organizationId) {
         setActivities(getMockActivities())
@@ -490,7 +493,7 @@ export default function OrganizadorDashboardPage() {
       console.error('Erro ao carregar atividades:', e)
       setActivities(getMockActivities())
     }
-  }
+  }, [supabase])
   
   // Função auxiliar para obter mock de atividades, para evitar repetição
   const getMockActivities = (): Activity[] => {
@@ -567,8 +570,13 @@ export default function OrganizadorDashboardPage() {
     }
   };
 
-  // Verificação de existência de tabelas mantida para estabilidade
-  const checkTableExists = async (tableName) => {
+  // Verificação de existência de tabelas com cache para performance
+  const checkTableExists = useCallback(async (tableName) => {
+    // Verificar cache primeiro
+    if (tableCache.has(tableName)) {
+      return tableCache.get(tableName);
+    }
+
     try {
       // Usamos uma consulta simples para verificar se a tabela existe
       const response = await supabase
@@ -576,23 +584,30 @@ export default function OrganizadorDashboardPage() {
         .select('*')
         .limit(0);
       
+      let exists = true;
+      
       // Se não houve erro, a tabela existe
       if (!response.error) {
-        return true;
+        exists = true;
       }
-      
       // Se o código de erro for 42P01, a tabela não existe
-      if (response.error.code === '42P01') {
-        return false;
+      else if (response.error.code === '42P01') {
+        exists = false;
       }
-      
       // Para outros erros, assumimos que a tabela existe mas há um problema de permissão
-      return true;
+      else {
+        exists = true;
+      }
+
+      // Armazenar no cache
+      tableCache.set(tableName, exists);
+      return exists;
     } catch (e) {
       console.error(`Erro ao verificar se a tabela ${tableName} existe:`, e);
+      // Em caso de erro, não cachear e retornar false
       return false;
     }
-  };
+  }, [supabase, tableCache]);
 
   const checkColumnExists = async (tableName, columnName) => {
     try {
