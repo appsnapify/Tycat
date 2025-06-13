@@ -309,7 +309,7 @@ export default function CheckInPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5 text-blue-600" />
                   Scanners Ativos
                 </CardTitle>
               </CardHeader>
@@ -339,7 +339,7 @@ export default function CheckInPage() {
                 <CardTitle className="text-lg">Scans Bem-sucedidos</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-3xl font-bold text-blue-600">
                   {scanners.reduce((sum, s) => sum + s.stats.successful_scans, 0)}
                 </p>
               </CardContent>
@@ -349,7 +349,10 @@ export default function CheckInPage() {
           {/* Cabeçalho lista scanners */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Scanners do Evento</h3>
-            <Button onClick={() => setShowCreateScanner(true)} className="gap-2">
+            <Button 
+              onClick={() => setShowCreateScanner(true)} 
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
+            >
               <Plus className="h-4 w-4" />
               Criar Scanner
             </Button>
@@ -368,12 +371,15 @@ export default function CheckInPage() {
             <Card>
               <CardContent className="py-8">
                 <div className="text-center">
-                  <Smartphone className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <Smartphone className="h-12 w-12 mx-auto text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Nenhum scanner criado</h3>
                   <p className="text-gray-600 mb-4">
                     Crie scanners móveis para que sua equipe possa fazer check-in dos convidados
                   </p>
-                  <Button onClick={() => setShowCreateScanner(true)} className="gap-2">
+                  <Button 
+                    onClick={() => setShowCreateScanner(true)} 
+                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
+                  >
                     <Plus className="h-4 w-4" />
                     Criar Primeiro Scanner
                   </Button>
@@ -388,7 +394,7 @@ export default function CheckInPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="flex items-center gap-2">
-                          <Smartphone className="h-5 w-5" />
+                          <Smartphone className="h-5 w-5 text-blue-600" />
                           {scanner.scanner_name}
                         </CardTitle>
                         <CardDescription>
@@ -412,7 +418,7 @@ export default function CheckInPage() {
                       </div>
                       <div>
                         <Label className="text-muted-foreground">Bem-sucedidos</Label>
-                        <p className="font-medium text-green-600">{scanner.stats.successful_scans}</p>
+                        <p className="font-medium text-blue-600">{scanner.stats.successful_scans}</p>
                       </div>
                       <div>
                         <Label className="text-muted-foreground">Última Atividade</Label>
@@ -432,7 +438,11 @@ export default function CheckInPage() {
                       </Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+                      >
                         <Settings className="h-4 w-4" />
                         Configurar
                       </Button>
@@ -504,6 +514,7 @@ export default function CheckInPage() {
                   <Button 
                     onClick={createScanner}
                     disabled={!newScanner.scanner_name || !newScanner.username || !newScanner.password}
+                    className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
                   >
                     Criar Scanner
                   </Button>
