@@ -41,12 +41,79 @@ function cleanupCorruptedCookies() {
   }
 }
 
+// Proxy SSR-safe que evita erros durante prerendering
+function createSSRSafeProxy() {
+  const emptyPromise = Promise.resolve({ data: null, error: null })
+  const emptySession = Promise.resolve({ data: { session: null }, error: null })
+  
+  return {
+    // Auth methods
+    auth: {
+      getSession: () => emptySession,
+      getUser: () => emptyPromise,
+      onAuthStateChange: () => ({ data: { subscription: null } }),
+      signOut: () => emptyPromise,
+      signInWithPassword: () => emptyPromise,
+      signUp: () => emptyPromise,
+    },
+    
+    // Database methods - retorna estrutura que não quebra encadeamento
+    from: (table: string) => ({
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
+          single: () => emptyPromise,
+          order: () => ({
+            limit: () => emptyPromise,
+          }),
+        }),
+        order: (column: string, options?: any) => emptyPromise,
+        limit: (count: number) => emptyPromise,
+        single: () => emptyPromise,
+      }),
+      insert: (values: any) => ({
+        select: () => ({
+          single: () => emptyPromise,
+        }),
+      }),
+      update: (values: any) => ({
+        eq: (column: string, value: any) => emptyPromise,
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => emptyPromise,
+      }),
+      upsert: (values: any) => emptyPromise,
+    }),
+    
+    // Storage methods
+    storage: {
+      from: (bucket: string) => ({
+        upload: () => emptyPromise,
+        download: () => emptyPromise,
+        remove: () => emptyPromise,
+        list: () => emptyPromise,
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+      }),
+    },
+    
+    // RPC methods
+    rpc: (fn: string, args?: any) => emptyPromise,
+    
+    // Channel/Realtime methods
+    channel: (name: string) => ({
+      on: () => ({}),
+      subscribe: () => ({}),
+      unsubscribe: () => ({}),
+    }),
+  } as any
+}
+
 export const createClient = () => {
+  // Durante SSR/SSG, retornar proxy seguro que não quebra
   if (typeof window === 'undefined') {
-    throw new Error('createClient deve ser usado apenas no navegador. Use createServerClient para o servidor.')
+    return createSSRSafeProxy()
   }
 
-  // Retornar instância existente se já criada
+  // Retornar instância existente se já criada (browser)
   if (clientInstance) {
     return clientInstance
   }
