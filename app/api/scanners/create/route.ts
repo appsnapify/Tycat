@@ -40,17 +40,70 @@ export async function POST(request: NextRequest) {
     // Para organizadores, assumimos que se eles conseguem acessar a página,
     // eles têm permissão para criar scanners (verificação será feita no middleware/RLS)
     
-    // Verificar se o username já existe para este evento
-    const { data: existingScanner, error: checkError } = await supabase
+    // ✅ VALIDAÇÃO INTELIGENTE DE USERNAME (considera eventos terminados há 48h)
+    const { data: conflictingScanners, error: checkError } = await supabase
       .from('event_scanners')
-      .select('id')
-      .eq('event_id', event_id)
+      .select(`
+        id, 
+        username,
+        scanner_name,
+        event_id,
+        events!inner(
+          title, 
+          date, 
+          end_date, 
+          end_time,
+          is_active
+        )
+      `)
       .eq('username', username)
-      .single()
+      .eq('is_active', true)
 
-    if (existingScanner) {
+    if (checkError) {
+      console.error('Erro ao verificar username:', checkError)
       return NextResponse.json({ 
-        error: 'Username já existe para este evento' 
+        error: 'Erro ao verificar disponibilidade do username' 
+      }, { status: 500 })
+    }
+
+    // Verificar se há conflito real (eventos ainda ativos ou terminados há menos de 48h)
+    const activeConflicts = conflictingScanners?.filter(scanner => {
+      const event = scanner.events
+      if (!event.end_date || !event.end_time) return true // Sem data fim = assumir ativo
+      
+      const eventEndDate = new Date(`${event.end_date}T${event.end_time}`)
+      const now = new Date()
+      const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+      
+
+      
+      // Conflito APENAS se evento terminou há menos de 48h
+      return eventEndDate > fortyEightHoursAgo
+    })
+
+    if (activeConflicts && activeConflicts.length > 0) {
+      const conflict = activeConflicts[0]
+      let details = ''
+      
+      if (conflict.events.end_date && conflict.events.end_time) {
+        const eventEndDate = new Date(`${conflict.events.end_date}T${conflict.events.end_time}`)
+        const now = new Date()
+        const hoursAgo = Math.round((now.getTime() - eventEndDate.getTime()) / (1000 * 60 * 60))
+        
+
+        
+        if (hoursAgo > 0) {
+          const hoursRemaining = 48 - hoursAgo
+          details = `Em uso no evento "${conflict.events.title}" (terminou há ${hoursAgo}h, libera em ${hoursRemaining}h)`
+        } else {
+          details = `Em uso no evento ativo "${conflict.events.title}"`
+        }
+      } else {
+        details = `Em uso no evento ativo "${conflict.events.title}"`
+      }
+
+      return NextResponse.json({ 
+        error: "Username em uso, tente outro"
       }, { status: 409 })
     }
 

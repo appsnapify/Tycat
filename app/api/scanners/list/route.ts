@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
           id,
           status,
           created_at,
+          expires_at,
           last_activity,
           total_scans,
           successful_scans,
@@ -66,12 +67,24 @@ export async function GET(request: NextRequest) {
       const now = new Date()
       const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
       
-      // Contar APENAS sessões realmente ativas (não expiradas + atividade recente)
-      const realActiveSessions = scanner.scanner_sessions?.filter(s => 
-        s.status === 'active' && 
-        new Date(s.last_activity) > fiveMinutesAgo &&
-        new Date(s.expires_at || s.created_at) > now
-      ).length || 0
+      // Contar APENAS sessões realmente ativas (não expiradas + atividade recente OU recém-criadas)
+      const realActiveSessions = scanner.scanner_sessions?.filter(s => {
+        if (s.status !== 'active') return false
+        
+        // Verificar se a sessão não expirou
+        const sessionExpiry = s.expires_at ? 
+          new Date(s.expires_at) : 
+          new Date(new Date(s.created_at).getTime() + 24 * 60 * 60 * 1000)
+        
+        if (sessionExpiry <= now) return false
+        
+        // Para scanners recém-criados, considerar como ativos se foram criados nos últimos 5 minutos
+        const recentlyCreated = new Date(s.created_at) > fiveMinutesAgo
+        const hasRecentActivity = s.last_activity && new Date(s.last_activity) > fiveMinutesAgo
+        
+        // Considerar ativo se: tem atividade recente OU foi criado recentemente
+        return hasRecentActivity || recentlyCreated
+      }).length || 0
       
       const totalScans = scanner.scanner_sessions?.reduce((sum, s) => sum + (s.total_scans || 0), 0) || 0
       const successfulScans = scanner.scanner_sessions?.reduce((sum, s) => sum + (s.successful_scans || 0), 0) || 0

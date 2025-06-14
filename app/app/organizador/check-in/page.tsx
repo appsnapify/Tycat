@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
-import { Users, Plus, Smartphone, Settings } from 'lucide-react'
+import { Users, Plus, Smartphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { useGuestCount } from '@/hooks/useGuestCount'
@@ -66,7 +66,7 @@ export default function CheckInPage() {
     scanner_name: '',
     username: '',
     password: '',
-    max_concurrent_sessions: 1
+    max_concurrent_sessions: 5
   })
 
   const { currentOrganization } = useOrganization()
@@ -220,8 +220,9 @@ export default function CheckInPage() {
       fetchScanners();
     } catch (err: any) {
       console.error('Erro ao criar scanner:', err);
+      
       toast({
-        title: "Erro",
+        title: "Aviso",
         description: err.message || "Não foi possível criar o scanner",
         variant: "destructive"
       });
@@ -431,21 +432,11 @@ export default function CheckInPage() {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex justify-between">
+                  <CardFooter>
                     <div className="flex gap-2">
                       <Badge variant={scanner.stats.active_sessions > 0 ? "default" : "outline"}>
                         {scanner.stats.active_sessions > 0 ? "Online" : "Offline"}
                       </Badge>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="gap-2 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
-                      >
-                        <Settings className="h-4 w-4" />
-                        Configurar
-                      </Button>
                     </div>
                   </CardFooter>
                 </Card>
@@ -497,10 +488,10 @@ export default function CheckInPage() {
                     <Input
                       id="sessions"
                       type="number"
-                      min="1"
-                      max="5"
+                      min="5"
+                      max="10"
                       value={newScanner.max_concurrent_sessions}
-                      onChange={e => setNewScanner(prev => ({ ...prev, max_concurrent_sessions: parseInt(e.target.value) || 1 }))}
+                      onChange={e => setNewScanner(prev => ({ ...prev, max_concurrent_sessions: parseInt(e.target.value) || 5 }))}
                     />
                   </div>
                 </CardContent>

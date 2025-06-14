@@ -32,6 +32,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Debounce para evitar loop de re-renders durante Fast Refresh
+    const timeoutId = setTimeout(() => {
+      loadOrganizations()
+    }, 300)
+    
     async function loadOrganizations() {
       if (!user) {
         // Throttle logs para evitar spam durante fast refresh
@@ -152,7 +157,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    loadOrganizations()
+    // Cleanup timeout on unmount or dependency change
+    return () => clearTimeout(timeoutId)
   }, [user?.id])
 
   return (

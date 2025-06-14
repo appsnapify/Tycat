@@ -84,7 +84,6 @@ export default function OrganizadorEquipesPage() {
   }, [teams, searchQuery])
 
   const loadOrganizationAndTeams = async () => {
-    console.log('Iniciando carregamento de equipes via RPC...');
     setLoading(true);
     
     try {
@@ -92,7 +91,7 @@ export default function OrganizadorEquipesPage() {
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user?.id)
-        .in('role', ['owner', 'organizador'])
+        .in('role', ['owner', 'admin'])
         .limit(1);
 
       if (orgError) {
@@ -122,7 +121,6 @@ export default function OrganizadorEquipesPage() {
 
       const orgData = orgDataArray[0];
       const organizationId = orgData.organization_id;
-      console.log('ID da organização a ser usado na RPC:', organizationId);
       
       setOrganization({ id: organizationId, name: '', slug: '' });
 
@@ -131,10 +129,8 @@ export default function OrganizadorEquipesPage() {
           org_id: organizationId 
         });
       
-      console.log('Resposta COMPLETA da RPC:', { data: teamsWithCounts, error: rpcError });
-
       if (rpcError) {
-        console.error('Erro DETALHADO ao chamar RPC:', JSON.stringify(rpcError, null, 2)); 
+        console.error('Erro ao chamar RPC:', rpcError.message); 
         requestAnimationFrame(() => {
           const errorMessage = rpcError.message || 'Erro ao carregar equipes via RPC.';
           toast.error(errorMessage);
@@ -143,13 +139,10 @@ export default function OrganizadorEquipesPage() {
         return;
       }
 
-      console.log('Equipes com contagem recebidas da RPC (sem erro detectado):', teamsWithCounts);
-
       if (teamsWithCounts && teamsWithCounts.length > 0) {
         setTeams(teamsWithCounts);
         setFilteredTeams(teamsWithCounts);
           } else {
-        console.log('Nenhuma equipe encontrada pela RPC para esta organização');
         setTeams([]);
         setFilteredTeams([]);
       }
@@ -448,4 +441,4 @@ export default function OrganizadorEquipesPage() {
       )}
     </div>
   )
-} 
+}

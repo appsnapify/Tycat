@@ -1,27 +1,36 @@
 "use server"; // MARCA TODO O FICHEIRO COMO SERVER-SIDE
 
 import { createClient } from '@supabase/supabase-js' 
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs' 
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
 // Função exportada para ser usada em Client Components
 export async function associateTeamAction(formData: FormData): Promise<{ success: boolean; message: string; teamName?: string }> {
     
-    const cookieStore = cookies()
-    const supabaseUserClient = createServerActionClient({ cookies: () => cookieStore }) // Cliente agindo como o user logado
+    // CORREÇÃO: Usar cliente moderno com await
+    const supabaseUserClient = await createServerClient()
 
-    // 1. Obter dados da sessão e do formulário
-    const { data: { session }, error: sessionError } = await supabaseUserClient.auth.getSession();
-    if (sessionError || !session?.user) {
-        console.error("Server Action: Erro de sessão", sessionError);
-        return { success: false, message: "Erro de autenticação." };
+    // 1. CORREÇÃO DE SEGURANÇA: Usar getUser() em vez de getSession()
+    const { data: { user }, error: userError } = await supabaseUserClient.auth.getUser();
+    if (userError || !user) {
+        console.error("Server Action: Erro de autenticação", userError);
+        return { success: false, message: "Erro de autenticação. Por favor, faça login novamente." };
     }
-    const userId = session.user.id;
+    const userId = user.id;
     const teamCode = formData.get('teamCode') as string;
     const organizationId = formData.get('organizationId') as string;
 
     if (!teamCode || !organizationId) {
          return { success: false, message: "Código da equipa ou ID da organização em falta." };
+    }
+
+    // NOVA VALIDAÇÃO: Verificar formato do código da equipe
+    const teamCodePattern = /^TEAM-[A-Z0-9]{5}$/;
+    if (!teamCodePattern.test(teamCode.trim())) {
+        return { 
+            success: false, 
+            message: "Formato do código inválido. O código deve ter o formato TEAM-XXXXX (ex: TEAM-A1B2C)." 
+        };
     }
 
     console.log(`Server Action: Associando ${teamCode} a ${organizationId} por ${userId}`);
@@ -42,23 +51,38 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
 
         if (findError) {
             console.error("Server Action: Erro ao buscar equipa (Admin):", findError);
-            return { success: false, message: "Erro ao verificar código da equipa." };
+            return { 
+                success: false, 
+                message: "Erro interno ao verificar código da equipa. Tente novamente em alguns instantes." 
+            };
         }
 
         if (!teamData) {
-            return { success: false, message: "Código da equipa inválido ou equipa não encontrada." };
+            return { 
+                success: false, 
+                message: `Código "${teamCode}" não encontrado. Verifique se o código está correto e se a equipa existe.` 
+            };
         }
 
         if (!teamData.created_by) {
              console.error("Server Action: Erro - Equipa encontrada mas sem created_by ID:", teamData.id);
-             return { success: false, message: "Erro interno ao processar dados da equipa." };
+             return { 
+                success: false, 
+                message: "Erro nos dados da equipa. Contacte o suporte técnico." 
+            };
         }
 
         if (teamData.organization_id !== null) {
             if (teamData.organization_id === organizationId) {
-                console.warn(`Server Action: Equipa ${teamData.name} já está associada a esta organização (${organizationId}). Garantindo outras ligações...`)
+                return { 
+                    success: false, 
+                    message: `A equipa "${teamData.name}" já está associada a esta organização.` 
+                };
             } else {
-                return { success: false, message: `A equipa \"${teamData.name}\" já pertence a outra organização.` };
+                return { 
+                    success: false, 
+                    message: `A equipa "${teamData.name}" já pertence a outra organização e não pode ser transferida.` 
+                };
             }
         }
 
@@ -75,7 +99,10 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
 
         if (updateError) {
             console.error("Server Action: FALHA CRÍTICA ao associar equipa (Admin Client):", updateError);
-            return { success: false, message: "Erro crítico ao atualizar dados da equipa." };
+            return { 
+                success: false, 
+                message: "Erro crítico ao associar equipa. Contacte o suporte técnico." 
+            };
         }
         console.log(`Server Action: UPDATE em teams bem-sucedido.`);
 
@@ -93,34 +120,47 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
                  console.warn(`Server Action: Ligação equipa-org já existe para ${teamIdToAssociate}-${organizationId}.`);
             } else {
                  console.error("Server Action: Erro ao inserir em organization_teams (Admin):", orgTeamInsertError);
-                 return { success: false, message: "Erro ao registar a ligação da equipa à organização." };
+                 return { 
+                    success: false, 
+                    message: "Erro ao registar a ligação da equipa à organização. Contacte o suporte." 
+                };
             }
         } else {
              console.log(`Server Action: Inserção em organization_teams bem-sucedida.`);
         }
 
-        // 6. Insert into organization_members (Admin Client)
+        // 6. Insert into user_organizations (Admin Client)
         const { error: orgMemberInsertError } = await supabaseAdmin
-             .from('organization_members')
-             .insert({ organization_id: organizationId, user_id: teamCreatorId, role: 'membro' });
+             .from('user_organizations')
+             .insert({ organization_id: organizationId, user_id: teamCreatorId, role: 'member' });
 
         if (orgMemberInsertError) {
             if (orgMemberInsertError.code === '23505') {
                  console.warn(`Server Action: Criador da equipa (${teamCreatorId}) já é membro da organização (${organizationId}).`);
             } else {
-                 console.error("Server Action: Erro ao inserir em organization_members (Admin):", orgMemberInsertError);
-                 return { success: false, message: "Erro ao adicionar o chefe de equipa como membro da organização." };
+                 console.error("Server Action: Erro ao inserir em user_organizations (Admin):", orgMemberInsertError);
+                 return { 
+                    success: false, 
+                    message: "Erro ao adicionar o chefe de equipa como membro da organização." 
+                };
             }
         } else {
-             console.log(`Server Action: Inserção em organization_members bem-sucedida.`);
+             console.log(`Server Action: Inserção em user_organizations bem-sucedida.`);
         }
 
         console.log(`Server Action: Processo completo para ${teamIdToAssociate}.`);
-        return { success: true, message: "Equipa associada com sucesso!", teamName: teamNameToAssociate || 'Equipa' };
+        return { 
+            success: true, 
+            message: `Equipa "${teamNameToAssociate}" associada com sucesso à sua organização!`, 
+            teamName: teamNameToAssociate || 'Equipa' 
+        };
 
     } catch (error) {
         console.error("Server Action: Erro inesperado:", error);
-        return { success: false, message: "Ocorreu um erro inesperado." };
+        return { 
+            success: false, 
+            message: "Ocorreu um erro inesperado. Tente novamente ou contacte o suporte." 
+        };
     }
 }
 
