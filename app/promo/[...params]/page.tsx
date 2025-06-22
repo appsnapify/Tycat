@@ -51,6 +51,7 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
         event={data.event}
         params={urlParams}
         hasAssociation={data.hasAssociation}
+        guestListStatus={data.guestListStatus}
       />
     );
   } catch (error) {

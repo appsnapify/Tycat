@@ -40,6 +40,7 @@ type EventForList = {
   tracking_team_id: string | null;
   is_active: boolean;
   is_published: boolean;
+  org_name?: string | null;
 };
 
 // Helper function to get initials
@@ -48,6 +49,65 @@ const getInitials = (firstName?: string | null, lastName?: string | null): strin
   const lastInitial = lastName?.charAt(0)?.toUpperCase() || '';
   return `${firstInitial}${lastInitial}`;
 };
+
+// Shared background component with festival image - VERSION 6.0 FIXED PATH
+function SharedBackground() {
+  return (
+    <>
+      {/* Festival Hero Background Image with Correct Path */}
+      <div 
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            url("/images/festival-hero-bg.jpg"),
+            linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)
+          `,
+          backgroundSize: 'cover, cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundColor: '#1a1a2e',
+        }}
+      >
+        {/* Overlay for text legibility */}
+        <div className="absolute inset-0 bg-black/25"></div>
+      </div>
+
+      {/* Floating orbs for visual interest */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/8 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-32 right-16 w-96 h-96 bg-purple-500/8 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-indigo-500/8 rounded-full blur-3xl animate-pulse delay-500"></div>
+      </div>
+    </>
+  );
+}
+
+// Shared header component with enhanced contrast
+function SharedHeader() {
+  return (
+    <div className="px-4 sm:px-6 pt-8 pb-6">
+      <div className="text-left">
+        <h1 className="text-xl font-bold text-white mb-2 tracking-tight drop-shadow-lg">
+          TYCAT
+        </h1>
+        <p className="text-white/80 text-sm italic drop-shadow-md">
+          "Where the night comes alive"
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Hero section component with enhanced contrast
+function PromoterHero({ userData }: { userData: any }) {
+  return (
+    <div className="px-4 sm:px-6 py-16 text-center">
+      <h1 className="text-6xl md:text-8xl font-black text-white mb-8 tracking-tight drop-shadow-2xl [text-shadow:_0_4px_8px_rgb(0_0_0_/_0.8)]">
+        {userData.first_name?.toUpperCase()} {userData.last_name?.toUpperCase()}
+      </h1>
+    </div>
+  );
+}
 
 // Validation constants
 const MAX_EVENTS_PER_PAGE = 50;
@@ -66,9 +126,19 @@ function isValidEventType(type: string): type is ValidEventType {
 // Error component
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-      <p className="font-medium">Ocorreu um erro</p>
-      <p className="text-sm">{message}</p>
+    <div className="min-h-screen bg-white relative flex items-center justify-center">
+      {/* Overlay Pattern Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
+                         radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
+        backgroundSize: '100px 100px'
+      }}></div>
+      
+      <div className="relative z-10 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-2xl max-w-md mx-4">
+        <p className="font-medium">Ocorreu um erro</p>
+        <p className="text-sm">{message}</p>
+      </div>
     </div>
   );
 }
@@ -113,7 +183,22 @@ export default async function PromoterPublicPage({ params }: PageProps) {
 
     if (eventsError) {
       console.error('[ERROR] Erro ao buscar eventos:', eventsError);
-      return <div>Ocorreu um erro ao buscar os eventos. Por favor, tente novamente mais tarde.</div>;
+      return (
+        <div className="min-h-screen bg-white relative flex items-center justify-center">
+          {/* Overlay Pattern Background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
+          <div className="absolute inset-0 opacity-[0.03]" style={{
+            backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
+                             radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
+            backgroundSize: '100px 100px'
+          }}></div>
+          
+          <div className="relative z-10 text-center text-gray-900 max-w-md mx-4">
+            <p className="text-lg">Ocorreu um erro ao buscar os eventos.</p>
+            <p className="text-gray-500 text-sm mt-2">Por favor, tente novamente mais tarde.</p>
+          </div>
+        </div>
+      );
     }
 
     // Map RPC data to EventsList format
@@ -129,60 +214,139 @@ export default async function PromoterPublicPage({ params }: PageProps) {
     // Se não houver eventos futuros, mostrar página sem eventos
     if (!futureEvents || futureEvents.length === 0) {
       return (
-        <div className="container mx-auto p-4">
-          <div className="text-center mb-8">
-            <Avatar className="w-24 h-24 mx-auto mb-4">
-              <AvatarImage src={userData.avatar_url || undefined} />
-              <AvatarFallback>{getInitials(userData.first_name, userData.last_name)}</AvatarFallback>
-            </Avatar>
-            <h1 className="text-3xl font-bold">
-              {userData.first_name} {userData.last_name}
-            </h1>
-            <p className="text-muted-foreground">Promotor</p>
+        <div className="min-h-screen bg-black">
+          {/* Hero Section com imagem de fundo */}
+          <div className="relative overflow-hidden">
+            <SharedBackground />
+            
+            <div className="relative z-20">
+              <SharedHeader />
+              <PromoterHero userData={userData} />
+            </div>
+            
+            {/* Gradiente de transição suave para branco */}
+            <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
+            
+            {/* Gradiente adicional para transição super suave */}
+            <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
+            
+            {/* Gradiente final para garantir transição perfeita */}
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
           </div>
 
-          <div className="text-center p-8 bg-gray-50 rounded-lg">
-            <p className="text-lg text-gray-600">Este promotor não tem eventos ativos no momento.</p>
+          {/* Events Section sem imagem de fundo */}
+          <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
+            <div className="text-center">
+              <h2 className="text-4xl font-black text-black mb-8">Eventos</h2>
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 max-w-md mx-auto shadow-sm">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 border border-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <span className="text-3xl">📅</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">Sem eventos ativos</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">Este promotor não tem eventos disponíveis no momento.</p>
+              </div>
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="container mx-auto p-4">
-        <div className="text-center mb-8">
-          <Avatar className="w-24 h-24 mx-auto mb-4">
-            <AvatarImage src={userData.avatar_url || undefined} />
-            <AvatarFallback>{getInitials(userData.first_name, userData.last_name)}</AvatarFallback>
-          </Avatar>
-          <h1 className="text-3xl font-bold">
-            {userData.first_name} {userData.last_name}
-          </h1>
-          <p className="text-muted-foreground">Promotor</p>
+      <div className="min-h-screen bg-black">
+        {/* Hero Section com imagem de fundo */}
+        <div className="relative overflow-hidden">
+          <SharedBackground />
+          
+          <div className="relative z-20">
+            <SharedHeader />
+            <PromoterHero userData={userData} />
+          </div>
+          
+          {/* Gradiente de transição suave para branco */}
+          <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
+          
+          {/* Gradiente adicional para transição super suave */}
+          <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
+          
+          {/* Gradiente final para garantir transição perfeita */}
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
         </div>
 
-        <EventsList events={futureEvents} />
+        {/* Events Section sem imagem de fundo */}
+        <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-black text-black mb-8">Eventos</h2>
+          </div>
+          <EventsList events={futureEvents} />
+        </div>
       </div>
     );
   } catch (error) {
     console.error('[ERROR] Erro não tratado:', error);
-    return <div>Ocorreu um erro ao carregar a página. Por favor, tente novamente mais tarde.</div>;
+    return (
+      <div className="min-h-screen bg-white relative flex items-center justify-center">
+        {/* Overlay Pattern Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
+                           radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
+          backgroundSize: '100px 100px'
+        }}></div>
+        
+        <div className="relative z-10 text-center text-gray-900 max-w-md mx-4">
+          <p className="text-lg">Ocorreu um erro ao carregar a página.</p>
+          <p className="text-gray-500 text-sm mt-2">Por favor, tente novamente mais tarde.</p>
+        </div>
+      </div>
+    );
   }
 }
 
 // Loading component for events
 function EventsLoading() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md shadow-black/20 h-full">
-          <Skeleton className="h-40 w-full rounded-t-xl" />
-          <div className="p-6">
-            <Skeleton className="h-6 w-3/4 mb-4" />
-            <Skeleton className="h-4 w-1/2" />
+    <div className="min-h-screen bg-black">
+      {/* Hero Section com imagem de fundo */}
+      <div className="relative overflow-hidden">
+        <SharedBackground />
+        
+        <div className="relative z-20 space-y-6">
+          {/* Header skeleton */}
+          <div className="px-4 sm:px-6 pt-8 pb-6">
+            <Skeleton className="h-6 w-16 bg-white/20 rounded" />
+            <Skeleton className="h-4 w-32 bg-white/10 rounded mt-2" />
+          </div>
+          
+          {/* Hero skeleton */}
+          <div className="px-4 sm:px-6 py-16 text-center">
+            <Skeleton className="h-20 md:h-32 w-3/4 mx-auto bg-white/20 rounded mb-8" />
+            <Skeleton className="h-4 w-48 mx-auto bg-white/10 rounded" />
           </div>
         </div>
-      ))}
+        
+        {/* Gradiente de transição suave para branco */}
+        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
+        
+        {/* Gradiente adicional para transição super suave */}
+        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
+        
+        {/* Gradiente final para garantir transição perfeita */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
+      </div>
+      
+      {/* Events Section sem imagem de fundo */}
+      <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
+        <Skeleton className="h-12 w-32 mx-auto bg-gray-300 rounded mb-8" />
+        
+        {/* Events grid skeleton */}
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-80 rounded-3xl bg-gray-200" />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -201,7 +365,8 @@ function mapRPCDataToEventsList(rpcData: RPCEventData[]): EventForList[] {
     event_type: event.event_type,
     tracking_promoter_id: event.tracking_promoter_id,
     tracking_team_id: event.tracking_team_id,
-    is_active: true, // Assumed true from RPC filter
-    is_published: true, // Assumed true from RPC filter
+    is_active: true, // Assume active from RPC
+    is_published: true, // Assume published from RPC
+    org_name: event.org_name, // Nome do organizador
   }));
 } 

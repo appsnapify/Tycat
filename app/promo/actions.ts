@@ -23,6 +23,13 @@ interface PromoData {
     last_name: string | null;
   } | null;
   hasAssociation: boolean;
+  guestListStatus: {
+    isOpen: boolean;
+    status: 'BEFORE_OPENING' | 'OPEN' | 'CLOSED' | 'NO_SCHEDULE';
+    message: string;
+    openDateTime?: string;
+    closeDateTime?: string;
+  };
 }
 
 // Função para validar UUID
@@ -168,10 +175,73 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
       }
     }
 
+    // Verificação do período de guest list
+    const now = new Date();
+    let guestListStatus = {
+      isOpen: false,
+      status: 'NO_SCHEDULE' as const,
+      message: 'Período da guest list não configurado.',
+      openDateTime: eventData.guest_list_open_datetime,
+      closeDateTime: eventData.guest_list_close_datetime
+    };
+
+    if (eventData.guest_list_open_datetime && eventData.guest_list_close_datetime) {
+      const openTime = new Date(eventData.guest_list_open_datetime);
+      const closeTime = new Date(eventData.guest_list_close_datetime);
+
+      if (now < openTime) {
+        guestListStatus = {
+          isOpen: false,
+          status: 'BEFORE_OPENING',
+          message: `A guest list abre em ${openTime.toLocaleString('pt-PT', { 
+            timeZone: 'Europe/Lisbon',
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}.`,
+          openDateTime: eventData.guest_list_open_datetime,
+          closeDateTime: eventData.guest_list_close_datetime
+        };
+      } else if (now >= closeTime) {
+        guestListStatus = {
+          isOpen: false,
+          status: 'CLOSED',
+          message: `O período para entrar na guest list terminou em ${closeTime.toLocaleString('pt-PT', { 
+            timeZone: 'Europe/Lisbon',
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}.`,
+          openDateTime: eventData.guest_list_open_datetime,
+          closeDateTime: eventData.guest_list_close_datetime
+        };
+      } else {
+        guestListStatus = {
+          isOpen: true,
+          status: 'OPEN',
+          message: `Guest list aberta até ${closeTime.toLocaleString('pt-PT', { 
+            timeZone: 'Europe/Lisbon',
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}.`,
+          openDateTime: eventData.guest_list_open_datetime,
+          closeDateTime: eventData.guest_list_close_datetime
+        };
+      }
+    }
+
     const result = {
       event: eventData,
       promoter: promoterData || null,
-      hasAssociation
+      hasAssociation,
+      guestListStatus
     };
     
     return result;

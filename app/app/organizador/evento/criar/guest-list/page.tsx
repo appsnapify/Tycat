@@ -34,6 +34,25 @@ import { v4 as uuidv4 } from 'uuid'
 import { createClient } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// Função para sanitizar nomes de arquivos
+function sanitizeFileName(fileName: string): string {
+  // Extrair nome e extensão
+  const lastDot = fileName.lastIndexOf('.');
+  const name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+  const extension = lastDot > 0 ? fileName.substring(lastDot) : '';
+  
+  // Sanitizar apenas o nome, preservando a extensão
+  const sanitizedName = name
+    .normalize('NFD') // Decomposição Unicode
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-zA-Z0-9.-]/g, '-') // Substitui caracteres especiais
+    .replace(/-+/g, '-') // Remove hífens duplos
+    .replace(/^-|-$/g, '') // Remove hífens no início/fim
+    .toLowerCase();
+    
+  return sanitizedName + extension;
+}
+
 // --- Funções Auxiliares para Data/Hora ---
 function combineDateTime(date: Date | undefined, time: string | undefined): Date | null {
   if (!date || !time) return null;
@@ -487,7 +506,7 @@ export default function GuestListPage() {
         if (data.flyer && data.flyer.length > 0 && data.flyer[0].name !== 'flyer-placeholder.png') {
           console.log("Modo Edição: Novo flyer selecionado. Iniciando upload...");
           const file = data.flyer[0];
-          const fileName = `${uuidv4()}-${file.name}`;
+          const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
           const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('event-flyers')
@@ -517,7 +536,7 @@ export default function GuestListPage() {
         if (data.flyer && data.flyer.length > 0) {
           console.log("Modo Criação: Flyer selecionado. Iniciando upload...");
           const file = data.flyer[0];
-          const fileName = `${uuidv4()}-${file.name}`;
+          const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
           const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('event-flyers')
@@ -627,7 +646,7 @@ export default function GuestListPage() {
             const BUCKET_NAME = 'promotional-materials-images';
 
             const uploadPromises = promotionalFiles.map(async (file, index) => {
-                const fileName = `${uuidv4()}-${file.name}`;
+                const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
                 const filePath = `${currentOrganization.id}/${savedEventId}/${fileName}`;
                 try {
                     console.log(`Uploading ${index + 1}/${promotionalFiles.length}: ${filePath} para o bucket ${BUCKET_NAME}`);
