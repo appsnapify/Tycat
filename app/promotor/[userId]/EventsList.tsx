@@ -23,7 +23,7 @@ type Event = {
 
 // Constants
 const ANIMATION_DELAY_INCREMENT = 100; // ms
-const EVENT_CARD_HEIGHT = 'h-80';
+const EVENT_CARD_HEIGHT = 'h-64 md:h-80'; // Responsivo: menor em mobile
 const TRANSITION_DURATION = 'duration-500';
 
 export function EventsList({ events }: { events: Event[] }) {
@@ -107,7 +107,7 @@ export function EventsList({ events }: { events: Event[] }) {
                 </div>
 
                 {/* Content */}
-                <div className={`relative p-8 ${EVENT_CARD_HEIGHT} flex flex-col justify-between`}>
+                <div className={`relative p-4 md:p-8 ${EVENT_CARD_HEIGHT} flex flex-col justify-between`}>
                   {/* Top Section */}
                   <div className="flex justify-between items-start">
                     <div className="text-white/80 text-sm font-medium tracking-wider">
@@ -117,7 +117,7 @@ export function EventsList({ events }: { events: Event[] }) {
 
                   {/* Center Section */}
                   <div className="text-center">
-                    <h3 className={`text-2xl font-black text-white mb-2 tracking-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-300 transition-all ${TRANSITION_DURATION} line-clamp-2`}>
+                    <h3 className={`text-xl md:text-2xl font-black text-white mb-2 tracking-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-300 transition-all ${TRANSITION_DURATION} line-clamp-2`}>
                       {event.event_title}
                     </h3>
                     {event.location && (
@@ -130,12 +130,12 @@ export function EventsList({ events }: { events: Event[] }) {
                   {/* Bottom Section */}
                   <div className="flex justify-between items-end">
                     <div className="text-white">
-                      <div className="text-3xl font-black leading-none">{date.day}</div>
+                      <div className="text-2xl md:text-3xl font-black leading-none">{date.day}</div>
                       <div className="text-xs font-mono text-white/60 tracking-widest">{date.month}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-white/60 text-xs font-mono tracking-wider">GUEST</div>
-                      <div className="text-2xl font-black text-white">LIST</div>
+                      <div className="text-xl md:text-2xl font-black text-white">LIST</div>
                     </div>
                   </div>
 

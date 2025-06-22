@@ -16,6 +16,8 @@ interface PromoData {
     guest_list_open_datetime: string | null;
     guest_list_close_datetime: string | null;
     organization_id: string | null;
+    org_name?: string;
+    organizations?: { name: string }[] | { name: string };
   };
   promoter: {
     id: string;
@@ -67,7 +69,7 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
 
     const supabase = await createReadOnlyClient();
 
-    // Buscar dados do evento
+    // Buscar dados do evento com nome da organização
     const { data: eventData, error: eventError } = await supabase
       .from('events')
       .select(`
@@ -81,7 +83,8 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
         is_published,
         guest_list_open_datetime,
         guest_list_close_datetime,
-        organization_id
+        organization_id,
+        organizations(name)
       `)
       .eq('id', eventId)
       .eq('is_published', true)
@@ -237,8 +240,34 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
       }
     }
 
+    // Processar nome da organização - lidar com objeto ou array
+    let orgName = null;
+    
+    if (eventData.organizations) {
+      if (Array.isArray(eventData.organizations) && eventData.organizations[0]?.name) {
+        orgName = eventData.organizations[0].name;
+      } else if (typeof eventData.organizations === 'object' && 'name' in eventData.organizations) {
+        orgName = (eventData.organizations as { name: string }).name;
+      }
+    }
+    
+    // Debug apenas em development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DEBUG] Dados da organização:', {
+        organizations: eventData.organizations,
+        organizationsType: typeof eventData.organizations,
+        isArray: Array.isArray(eventData.organizations),
+        orgName: orgName
+      });
+    }
+    
+    const processedEventData = {
+      ...eventData,
+      org_name: orgName
+    };
+
     const result = {
-      event: eventData,
+      event: processedEventData,
       promoter: promoterData || null,
       hasAssociation,
       guestListStatus

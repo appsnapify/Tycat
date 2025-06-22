@@ -19,13 +19,15 @@ interface GuestRequestProps {
   promoterId: string;
   teamId: string;
   className?: string;
+  buttonStyle?: React.CSSProperties;
 }
 
 export function GuestRequestClient({
   eventId,
   promoterId,
   teamId,
-  className = ''
+  className = '',
+  buttonStyle
 }: GuestRequestProps) {
   const [currentUser, setCurrentUser] = useState<ClientUser | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,14 +43,7 @@ export function GuestRequestClient({
   const [loadingMessage, setLoadingMessage] = useState('');
   const [loadingSubmessage, setLoadingSubmessage] = useState('');
   
-  // 🔧 DEBUG: Monitor state changes
-  useEffect(() => {
-    console.log('🔧 [DEBUG] STATE CHANGE - currentUser:', currentUser?.firstName || 'null');
-  }, [currentUser]);
-  
-  useEffect(() => {
-    console.log('🔧 [DEBUG] STATE CHANGE - dialogOpen:', dialogOpen);
-  }, [dialogOpen]);
+  // Monitor state changes
   
   // Função para solicitar acesso ao evento (gerar QR code)
   const requestAccess = async () => {
@@ -209,15 +204,12 @@ export function GuestRequestClient({
 
   // Handler para sucesso no registro
   const handleRegisterSuccess = async (userData: any) => {
-    console.log('🔧 [DEBUG] Registro bem-sucedido - INÍCIO:', userData);
     try {
       // Marcar step de auth como completo
       setCompletedSteps(['phone', 'auth']);
-      console.log('🔧 [DEBUG] Steps marcados como completos');
       
-      // CORRIGIDO: Extrair dados do user que vem dentro de userData
-      const user = userData.user || userData; // userData.user se a API retorna { success: true, user: {...} }
-      console.log('🔧 [DEBUG] User extraído:', user);
+      // Extrair dados do user que vem dentro de userData
+      const user = userData.user || userData;
       
       // Normalizar dados do usuário
       const normalizedUser = {
@@ -228,31 +220,18 @@ export function GuestRequestClient({
         phone: user.phone || phone
       };
       
-      console.log('🔧 [DEBUG] Dados normalizados do usuário:', {
-        id: normalizedUser.id?.substring(0, 8) + '...',
-        firstName: normalizedUser.firstName,
-        lastName: normalizedUser.lastName,
-        phone: normalizedUser.phone?.substring(0, 3) + '****'
-      });
-      
-      // Atualizar state local (sem useClientAuth)
-      console.log('🔧 [DEBUG] ANTES setCurrentUser - currentUser atual:', currentUser);
+      // Atualizar state local
       setCurrentUser(normalizedUser);
-      console.log('🔧 [DEBUG] DEPOIS setCurrentUser chamado');
       
       // Fechar o diálogo de autenticação
-      console.log('🔧 [DEBUG] ANTES setDialogOpen(false) - dialogOpen atual:', dialogOpen);
       setDialogOpen(false);
-      console.log('🔧 [DEBUG] DEPOIS setDialogOpen(false) chamado');
       
       // Resetar authStep para evitar problemas
-      console.log('🔧 [DEBUG] Resetando authStep para phone');
       setAuthStep('phone');
       
       toast.success('Registro realizado com sucesso');
-      console.log('🔧 [DEBUG] Toast mostrado - FIM handleRegisterSuccess');
     } catch (error) {
-      console.error('🔧 [DEBUG] ERRO ao processar registro:', error);
+      console.error('Erro ao processar registro:', error);
       toast.error('Ocorreu um erro ao processar o registro. Tente novamente.');
     }
   };
@@ -269,14 +248,14 @@ export function GuestRequestClient({
       message={loadingMessage} 
       submessage={loadingSubmessage}
     >
-      <Card className={`w-full ${className}`}>
-        <CardHeader>
-          <CardTitle className="text-xl text-center">
-            {currentUser 
-              ? `Olá, ${currentUser.firstName || 'Convidado'}!` 
-              : 'Acesse a lista de convidados'}
-          </CardTitle>
-        </CardHeader>
+      <Card className={`w-full bg-transparent border-0 shadow-none ${className}`}>
+        {currentUser && (
+          <CardHeader>
+            <CardTitle className="text-xl text-center">
+              Olá, {currentUser.firstName || 'Convidado'}!
+            </CardTitle>
+          </CardHeader>
+        )}
         
         <CardContent>
         {showQRCode && qrCodeUrl ? (
@@ -314,6 +293,7 @@ export function GuestRequestClient({
                 onClick={requestAccess} 
           disabled={isSubmitting}
                 className="w-full"
+                style={buttonStyle}
         >
           {isSubmitting ? (
             <>
@@ -329,16 +309,13 @@ export function GuestRequestClient({
           </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                <Phone className="h-5 w-5" />
-                <span>Informe seu número para acessar</span>
-              </div>
+            <div className="flex justify-center">
               <Button
                 onClick={startPhoneVerification}
                 className="w-full"
+                style={buttonStyle}
               >
-                Entrar com telefone
+                Entrar com o Telemovel
               </Button>
             </div>
           )}
