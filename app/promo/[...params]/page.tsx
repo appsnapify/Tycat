@@ -23,11 +23,6 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
     notFound();
   }
 
-  // Debug apenas em development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[DEBUG] PromoterGuestListPage - Parâmetros recebidos:', urlParams);
-  }
-
   try {
     // Processar parâmetros e buscar dados
     const data = await processPromoParams(urlParams);
@@ -35,15 +30,6 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
     if (!data || !data.event) {
       console.error('[ERROR] Dados do evento não encontrados');
       notFound();
-    }
-
-    // Debug apenas em development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DEBUG] Dados processados com sucesso:', {
-        hasEvent: !!data.event,
-        hasPromoter: !!data.promoter,
-        hasAssociation: data.hasAssociation
-      });
     }
 
     return (

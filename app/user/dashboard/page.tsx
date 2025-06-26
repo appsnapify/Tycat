@@ -29,6 +29,7 @@ export default function ClientDashboardPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Verificação de autenticação simples
   useEffect(() => {
@@ -68,8 +69,35 @@ export default function ClientDashboardPage() {
   };
 
   const handleLogout = async () => {
-    await logout();
-    router.push('/login/cliente');
+    if (isLoggingOut) return; // Evitar múltiplos cliques
+    
+    try {
+      setIsLoggingOut(true);
+      console.log('🔄 Iniciando handleLogout...');
+      
+      // Timeout de segurança: se logout demorar mais de 5s, força redirecionamento
+      const logoutPromise = logout();
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Logout timeout após 5 segundos')), 5000)
+      );
+      
+      await Promise.race([logoutPromise, timeoutPromise]);
+      
+      console.log('✅ Logout concluído com sucesso, redirecionando...');
+      router.push('/login/cliente');
+      
+    } catch (error) {
+      console.error('❌ Erro no handleLogout:', error);
+      
+      // Mesmo com erro, forçar redirecionamento após limpar estado
+      setIsLoggingOut(false);
+      
+      console.log('🔄 Forçando redirecionamento após erro...');
+      // Pequeno delay para garantir que o estado foi atualizado
+      setTimeout(() => {
+        router.push('/login/cliente');
+      }, 100);
+    }
   };
 
   const openQrModal = (event: EventGuest) => {
@@ -166,11 +194,16 @@ export default function ClientDashboardPage() {
             <Button
               variant="ghost"
               onClick={handleLogout}
-              className="text-gray-400 hover:text-red-400 hover:bg-red-500/10 w-10 h-10 sm:w-12 sm:h-12 rounded-2xl transition-all"
+              disabled={isLoggingOut}
+              className={`${isLoggingOut ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-400 hover:bg-red-500/10'} text-gray-400 w-10 h-10 sm:w-12 sm:h-12 rounded-2xl transition-all`}
             >
-              <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              {isLoggingOut ? (
+                <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-current"></div>
+              ) : (
+                <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              )}
             </Button>
           </div>
         </div>

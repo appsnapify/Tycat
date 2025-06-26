@@ -11,7 +11,7 @@ interface ClientAuthContextType {
   isLoading: boolean;
   error: string | null;
   updateUser: (user: ClientUser) => Promise<ClientUser>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth?: () => Promise<ClientUser | null>;
 }
 
@@ -21,7 +21,7 @@ const ClientAuthContext = createContext<ClientAuthContextType>({
   isLoading: true,
   error: null,
   updateUser: () => Promise.resolve({} as ClientUser),
-  logout: () => {}
+  logout: () => Promise.resolve()
 });
 
 // Hook para usar o contexto de autenticação
@@ -300,25 +300,66 @@ export const ClientAuthProvider = ({
   };
   
   // Função para fazer logout
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
+    console.log('🔄 Iniciando processo de logout...');
+    
     try {
+      // Tentar limpar cookies problemáticos antes do logout
+      if (typeof window !== 'undefined') {
+        console.log('🔄 Limpando cookies problemáticos...');
+        
+        // Limpar cookies Supabase malformados
+        document.cookie.split(";").forEach(cookie => {
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name.includes('supabase') && document.cookie.includes('base64-')) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+            console.log(`🧹 Cookie problemático removido: ${name}`);
+          }
+        });
+      }
+      
       const supabaseClient = getSupabaseClient();
       
       if (supabaseClient) {
-        await supabaseClient.auth.signOut();
+        console.log('🔄 Tentando signOut no Supabase com timeout curto...');
+        
+        // Timeout mais curto para signOut específico
+        const signOutPromise = supabaseClient.auth.signOut();
+        const quickTimeout = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('SignOut timeout')), 2000)
+        );
+        
+        try {
+          await Promise.race([signOutPromise, quickTimeout]);
+          console.log('✅ SignOut do Supabase concluído');
+        } catch (signOutError) {
+          console.log('⚠️ SignOut do Supabase falhou, prosseguindo com limpeza local:', signOutError);
+        }
+      } else {
+        console.log('⚠️ Cliente Supabase não disponível, prosseguindo com limpeza local');
       }
       
+      // SEMPRE limpar estado local
+      console.log('🔄 Limpando estado local...');
       setAuthState({
         user: null,
         isLoading: false,
         error: null
       });
+      console.log('✅ Estado local limpo com sucesso');
+      
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-      setAuthState(prev => ({
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Erro ao fazer logout'
-      }));
+      console.error('❌ Erro durante logout:', error);
+      
+      // FORÇAR limpeza local mesmo com erro
+      console.log('🔄 Forçando limpeza local após erro...');
+      setAuthState({
+        user: null,
+        isLoading: false,
+        error: null
+      });
+      console.log('✅ Limpeza local forçada concluída');
     }
   };
 

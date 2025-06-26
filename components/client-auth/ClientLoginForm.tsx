@@ -55,7 +55,6 @@ export default function ClientLoginForm({
       
       // Se temos um userId, usar o endpoint de login direto
       if (userId) {
-        console.log('Usando login direto com ID:', userId);
         requestBody = {
           userId,
           password: data.password
@@ -63,15 +62,12 @@ export default function ClientLoginForm({
         endpoint = '/api/client-auth/direct-login';
       } else {
         // Login normal por telefone
-        console.log('Usando login por telefone:', data.phone);
         requestBody = {
           phone: data.phone,
           password: data.password
         };
         endpoint = '/api/client-auth/login';
       }
-      
-      console.log(`Enviando requisição para ${endpoint}`);
       
       // Tente fazer a requisição com um timeout para evitar esperas indefinidas
       const controller = new AbortController();
@@ -88,7 +84,6 @@ export default function ClientLoginForm({
         });
         
         clearTimeout(timeoutId);
-        console.log(`Resposta de ${endpoint} recebida com status:`, response.status);
       } catch (fetchError: any) {
         console.error(`Erro ao fazer fetch para ${endpoint}:`, fetchError);
         if (fetchError.name === 'AbortError') {
@@ -128,7 +123,6 @@ export default function ClientLoginForm({
         throw new Error('Resposta incompleta do servidor');
       }
       
-      console.log('Login bem-sucedido:', result.user);
       onSuccess(result.user);
       
     } catch (err: any) {
@@ -140,10 +134,10 @@ export default function ClientLoginForm({
   };
   
   return (
-    <div className="space-y-4 w-full max-w-md">
+    <div className="space-y-3 sm:space-y-4 w-full max-w-md px-4 sm:px-6 pb-4 sm:pb-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold">Iniciar Sessão</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h2 className="text-xl sm:text-2xl font-bold">Iniciar Sessão</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Entra com o teu telefone e palavra-passe
         </p>
         {userId && (
@@ -153,43 +147,45 @@ export default function ClientLoginForm({
         )}
       </div>
       
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4">
         {error && (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
           </Alert>
         )}
         
-        <div className="space-y-2">
-          <Label htmlFor="phone">Telefone</Label>
+        <div className="space-y-1 sm:space-y-2">
+          <Label htmlFor="phone" className="text-xs sm:text-sm">Telefone</Label>
           <Input
             id="phone"
             type="tel"
             placeholder="O teu telefone"
             {...register('phone')}
             disabled={isLoading || !!phone}
+            className="text-sm sm:text-base"
           />
           {errors.phone && (
-            <p className="text-sm text-destructive">{errors.phone.message}</p>
+            <p className="text-xs text-destructive">{errors.phone.message}</p>
           )}
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="password">Palavra-passe</Label>
+        <div className="space-y-1 sm:space-y-2">
+          <Label htmlFor="password" className="text-xs sm:text-sm">Palavra-passe</Label>
           <Input
             id="password"
             type="password"
             placeholder="A tua palavra-passe"
             {...register('password')}
             disabled={isLoading}
+            className="text-sm sm:text-base"
           />
           {errors.password && (
-            <p className="text-sm text-destructive">{errors.password.message}</p>
+            <p className="text-xs text-destructive">{errors.password.message}</p>
           )}
         </div>
         
         <div className="flex flex-col gap-2 pt-2">
-          <Button type="submit" disabled={isLoading} className="w-full">
+          <Button type="submit" disabled={isLoading} className="w-full text-sm sm:text-base">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -200,13 +196,7 @@ export default function ClientLoginForm({
             )}
           </Button>
           
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onBack}
-            disabled={isLoading}
-            className="w-full"
-          >
+          <Button type="button" variant="outline" onClick={onBack} disabled={isLoading} className="text-xs sm:text-sm">
             Voltar
           </Button>
         </div>

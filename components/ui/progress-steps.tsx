@@ -46,7 +46,7 @@ export function ProgressSteps({ currentStep, completedSteps, className }: Progre
   }
 
   return (
-    <div className={cn('w-full py-4', className)}>
+    <div className={cn('w-full py-2 sm:py-4', className)}>
       <div className="flex items-center justify-between">
         {steps.map((step, index) => {
           const status = getStepStatus(step.id)
@@ -58,7 +58,7 @@ export function ProgressSteps({ currentStep, completedSteps, className }: Progre
                 {/* Ícone do step */}
                 <div
                   className={cn(
-                    'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200',
+                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200',
                     {
                       'bg-green-100 text-green-600 border-2 border-green-600': status === 'completed',
                       'bg-blue-100 text-blue-600 border-2 border-blue-600 ring-2 ring-blue-200': status === 'current',
@@ -67,14 +67,14 @@ export function ProgressSteps({ currentStep, completedSteps, className }: Progre
                   )}
                 >
                   {status === 'completed' ? (
-                    <Check className="w-5 h-5" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                   ) : (
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                 </div>
                 
                 {/* Título e descrição */}
-                <div className="mt-2 text-center">
+                <div className="mt-1 sm:mt-2 text-center">
                   <p className={cn(
                     'text-xs font-medium',
                     {
@@ -85,7 +85,7 @@ export function ProgressSteps({ currentStep, completedSteps, className }: Progre
                   )}>
                     {step.title}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">
                     {step.description}
                   </p>
                 </div>
@@ -95,7 +95,7 @@ export function ProgressSteps({ currentStep, completedSteps, className }: Progre
               {index < steps.length - 1 && (
                 <div
                   className={cn(
-                    'flex-1 h-0.5 mx-4 transition-all duration-200',
+                    'flex-1 h-0.5 mx-2 sm:mx-4 transition-all duration-200',
                     {
                       'bg-green-600': completedSteps.includes(step.id),
                       'bg-gray-200': !completedSteps.includes(step.id)

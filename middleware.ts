@@ -53,12 +53,7 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   
-  // Reduzir logging excessivo - apenas log essencial
-  const isDebugMode = process.env.NODE_ENV === 'development' && pathname.startsWith('/app/');
-  
-  if (isDebugMode) {
-    console.log(`[Middleware] ${pathname}`);
-  }
+  // Logging removido para performance em produção
 
   // Permitir acesso direto a rotas públicas específicas dentro de /app
   const publicAppRoutes = ['/app/dashboard1'];

@@ -87,8 +87,6 @@ export default function ClientRegistrationForm({
     };
     
     try {
-      console.log('Enviando dados de registro:', { ...apiData, password: '***' });
-      
       // 1. Primeiro, registrar o usuário via API
       const response = await fetch('/api/client-auth/register', {
         method: 'POST',
@@ -128,12 +126,9 @@ export default function ClientRegistrationForm({
         throw new Error(errorMessage);
       }
       
-      console.log('Registro bem-sucedido:', result);
-      
       // CORRIGIDO: Chamar onSuccess PRIMEIRO, antes do login automático
       try {
         onSuccess(result);
-        console.log('✅ onSuccess chamado com sucesso');
       } catch (successError) {
         console.error('🚨 Erro ao chamar onSuccess:', successError);
       }
@@ -159,12 +154,8 @@ export default function ClientRegistrationForm({
           
           if (retryError) {
             console.error('Falha na segunda tentativa de login:', retryError);
-          } else {
-            console.log('Login automático bem-sucedido após segunda tentativa');
           }
           
-        } else {
-          console.log('Login automático após registro bem-sucedido');
         }
         
       } catch (loginErr) {
@@ -186,9 +177,9 @@ export default function ClientRegistrationForm({
   };
   
   return (
-    <div className="space-y-2 w-full max-w-md auth-dialog">
+    <div className="space-y-2 w-full max-w-md auth-dialog px-3 sm:px-6 pb-4 sm:pb-6">
       <div className="text-center mb-2">
-        <h2 className="text-xl font-bold">Criar Conta</h2>
+        <h2 className="text-lg sm:text-xl font-bold">Criar Conta</h2>
         <p className="text-xs text-muted-foreground">
           Preenche os campos obrigatórios (*)
         </p>
@@ -201,16 +192,47 @@ export default function ClientRegistrationForm({
           </Alert>
         )}
         
-        {/* Informações Básicas - nome e sobrenome */}
+        {/* Telefone - Readonly */}
+        <div className="space-y-1">
+          <Label htmlFor="phone" className="text-xs">Telefone *</Label>
+          <Input
+            id="phone"
+            type="tel"
+            {...register('phone')}
+            disabled={true}
+            className="bg-muted text-xs sm:text-sm"
+          />
+          {errors.phone && (
+            <p className="text-xs text-destructive">{errors.phone.message}</p>
+          )}
+        </div>
+        
+        {/* Email */}
+        <div className="space-y-1">
+          <Label htmlFor="email" className="text-xs">Email *</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="o.teu.email@exemplo.com"
+            {...register('email')}
+            disabled={isLoading}
+            className="text-xs sm:text-sm"
+          />
+          {errors.email && (
+            <p className="text-xs text-destructive">{errors.email.message}</p>
+          )}
+        </div>
+        
+        {/* Nome e Apelido */}
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <Label htmlFor="firstName" className="text-xs font-medium">Nome*</Label>
+            <Label htmlFor="firstName" className="text-xs">Nome *</Label>
             <Input
               id="firstName"
               placeholder="Nome"
-              className="h-8 text-sm py-1"
               {...register('firstName')}
               disabled={isLoading}
+              className="text-xs sm:text-sm"
             />
             {errors.firstName && (
               <p className="text-xs text-destructive">{errors.firstName.message}</p>
@@ -218,13 +240,13 @@ export default function ClientRegistrationForm({
           </div>
           
           <div className="space-y-1">
-            <Label htmlFor="lastName" className="text-xs font-medium">Apelido*</Label>
+            <Label htmlFor="lastName" className="text-xs">Apelido *</Label>
             <Input
               id="lastName"
               placeholder="Apelido"
-              className="h-8 text-sm py-1"
               {...register('lastName')}
               disabled={isLoading}
+              className="text-xs sm:text-sm"
             />
             {errors.lastName && (
               <p className="text-xs text-destructive">{errors.lastName.message}</p>
@@ -232,134 +254,77 @@ export default function ClientRegistrationForm({
           </div>
         </div>
         
-        {/* Contato - telefone e email */}
+        {/* Data de Nascimento e Género */}
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <Label htmlFor="phone" className="text-xs font-medium">Telefone*</Label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="Telefone"
-              className="h-8 text-sm py-1"
-              {...register('phone')}
-              disabled={isLoading || !!phone}
-            />
-            {errors.phone && (
-              <p className="text-xs text-destructive">{errors.phone.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1">
-            <Label htmlFor="email" className="text-xs font-medium">Email*</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="Email"
-              className="h-8 text-sm py-1"
-              {...register('email')}
-              disabled={isLoading}
-            />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            )}
-          </div>
-        </div>
-        
-        {/* Código postal e data de nascimento */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="postalCode" className="text-xs font-medium">Código Postal*</Label>
-            <Input
-              id="postalCode"
-              placeholder="0000-000"
-              className="h-8 text-sm py-1"
-              pattern="\d{4}-\d{3}"
-              inputMode="numeric"
-              maxLength={8}
-              {...register('postalCode', {
-                onChange: (e) => {
-                  // Formatar automaticamente com o hífen após 4 dígitos
-                  const value = e.target.value.replace(/[^\d]/g, '');
-                  if (value.length > 4) {
-                    e.target.value = `${value.slice(0, 4)}-${value.slice(4, 7)}`;
-                  } else if (value.length === 4) {
-                    e.target.value = `${value}-`;
-                  } else {
-                    e.target.value = value;
-                  }
-                }
-              })}
-              disabled={isLoading}
-            />
-            {!errors.postalCode && (
-              <p className="text-[10px] text-muted-foreground">Formato: 0000-000</p>
-            )}
-            {errors.postalCode && (
-              <p className="text-xs text-destructive">{errors.postalCode.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1">
-            <Label htmlFor="birthDate" className="text-xs font-medium">Data Nascimento</Label>
+            <Label htmlFor="birthDate" className="text-xs">Data Nasc.</Label>
             <Input
               id="birthDate"
               type="date"
-              className="h-8 text-sm py-1"
               {...register('birthDate')}
               disabled={isLoading}
-              placeholder="dd/mm/aaaa"
+              className="text-xs"
             />
             {errors.birthDate && (
               <p className="text-xs text-destructive">{errors.birthDate.message}</p>
             )}
           </div>
-        </div>
-        
-        {/* Género e senha */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="gender" className="text-xs font-medium">Género</Label>
-            <Select onValueChange={handleGenderChange} disabled={isLoading}>
-              <SelectTrigger id="gender" className="h-8 text-sm py-0">
-                <SelectValue placeholder="Seleciona" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="M">Masculino</SelectItem>
-                <SelectItem value="F">Feminino</SelectItem>
-                <SelectItem value="O">Outro</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.gender && (
-              <p className="text-xs text-destructive">{errors.gender.message}</p>
-            )}
-          </div>
           
           <div className="space-y-1">
-            <Label htmlFor="password" className="text-xs font-medium">Palavra-passe*</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Palavra-passe"
-              className="h-8 text-sm py-1"
-              {...register('password')}
-              disabled={isLoading}
-            />
-            {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            )}
+            <Label htmlFor="gender" className="text-xs">Género</Label>
+            <Select onValueChange={handleGenderChange} disabled={isLoading}>
+              <SelectTrigger className="text-xs">
+                <SelectValue placeholder="Escolher" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="M" className="text-xs">Masculino</SelectItem>
+                <SelectItem value="F" className="text-xs">Feminino</SelectItem>
+                <SelectItem value="O" className="text-xs">Outro</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         
-        {/* Confirmar senha */}
+        {/* Código Postal */}
         <div className="space-y-1">
-          <Label htmlFor="confirmPassword" className="text-xs font-medium">Confirmar Palavra-passe*</Label>
+          <Label htmlFor="postalCode" className="text-xs">Código Postal *</Label>
+          <Input
+            id="postalCode"
+            placeholder="4750-850"
+            {...register('postalCode')}
+            disabled={isLoading}
+            className="text-xs sm:text-sm"
+          />
+          {errors.postalCode && (
+            <p className="text-xs text-destructive">{errors.postalCode.message}</p>
+          )}
+        </div>
+        
+        {/* Palavras-passe */}
+        <div className="space-y-1">
+          <Label htmlFor="password" className="text-xs">Palavra-passe *</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Mínimo 8 caracteres"
+            {...register('password')}
+            disabled={isLoading}
+            className="text-xs sm:text-sm"
+          />
+          {errors.password && (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          )}
+        </div>
+        
+        <div className="space-y-1">
+          <Label htmlFor="confirmPassword" className="text-xs">Confirmar Palavra-passe *</Label>
           <Input
             id="confirmPassword"
             type="password"
-            placeholder="Confirmar palavra-passe"
-            className="h-8 text-sm py-1"
+            placeholder="Repetir palavra-passe"
             {...register('confirmPassword')}
             disabled={isLoading}
+            className="text-xs sm:text-sm"
           />
           {errors.confirmPassword && (
             <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
@@ -367,26 +332,26 @@ export default function ClientRegistrationForm({
         </div>
         
         {/* Botões */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-col gap-2 pt-3">
+          <Button type="submit" disabled={isLoading} className="w-full text-xs sm:text-sm">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                A criar conta...
+              </>
+            ) : (
+              'Criar Conta'
+            )}
+          </Button>
+          
           <Button
             type="button"
             variant="outline"
             onClick={onBack}
             disabled={isLoading}
-            className="w-1/3 h-8 text-xs"
+            className="text-xs"
           >
             Voltar
-          </Button>
-          
-          <Button type="submit" disabled={isLoading} className="w-2/3 h-8 text-xs">
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                A registar...
-              </>
-            ) : (
-              'Criar Conta'
-            )}
           </Button>
         </div>
       </form>

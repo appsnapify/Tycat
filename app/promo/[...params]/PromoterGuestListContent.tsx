@@ -17,8 +17,8 @@ interface PromoterGuestListContentProps {
     time: string | null;
     location: string | null;
     flyer_url: string | null;
-    org_name?: string; // Nome da organização
-    organizations?: { name: string }[] | { name: string }; // Dados da organização via JOIN
+    org_name?: string;
+    organizations?: { name: string }[] | { name: string };
   };
   params: string[];
   hasAssociation?: boolean;
@@ -32,55 +32,42 @@ interface PromoterGuestListContentProps {
 }
 
 export default function PromoterGuestListContent({ event, params, hasAssociation = false, guestListStatus }: PromoterGuestListContentProps) {
-  // Estados para extração de cor dominante - sem cor inicial para evitar flash
   const [dominantColor, setDominantColor] = useState<{ r: number; g: number; b: number } | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Formatar data e hora do evento
   const eventDate = event.date ? format(new Date(event.date), 'PPP', { locale: pt }) : 'Data não definida';
   const eventTime = event.time || 'Horário não definido';
 
-  // Obter nome da organização com fallbacks (objeto ou array)
   const getOrganizationName = () => {
-    // Primeiro, tentar org_name processado
     if (event.org_name) return event.org_name;
-    
-    // Se organizations for array
     if (Array.isArray(event.organizations) && event.organizations[0]?.name) {
       return event.organizations[0].name;
     }
-    
-    // Se organizations for objeto direto
     if (event.organizations && typeof event.organizations === 'object' && 'name' in event.organizations) {
       return (event.organizations as { name: string }).name;
     }
-    
     return 'Organizador';
   };
   
   const organizationName = getOrganizationName();
 
-  // Função para truncar descrição
-  const getTruncatedDescription = (text: string, maxLength: number = 150) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength).trim() + '...';
+  const getTruncatedDescription = (text: string) => {
+    const words = text.split(' ');
+    if (words.length <= 50) return text;
+    return words.slice(0, 50).join(' ') + '...';
   };
 
-  // Organização processada
+  const shouldShowReadMore = (text: string) => {
+    return text.split(' ').length > 50;
+  };
 
-  // Extrair cor dominante da imagem
   useEffect(() => {
     if (!event.flyer_url) return;
 
     const extractDominantColor = (url: string) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
-      
-      // Aplicar cor imediatamente quando a imagem começar a carregar
-      img.onloadstart = () => {
-        // Imagem iniciando carregamento
-      };
       
       img.onload = () => {
         const canvas = canvasRef.current;
@@ -97,7 +84,6 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
         const imageData = ctx.getImageData(0, 0, analyzeSize, analyzeSize);
         const data = imageData.data;
 
-        // Coletar todas as cores com suas frequências
         const colorMap = new Map<string, {count: number, r: number, g: number, b: number, saturation: number, brightness: number}>();
 
         for (let i = 0; i < data.length; i += 4) {
@@ -105,14 +91,12 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
           const green = data[i + 1];
           const blue = data[i + 2];
           
-          // Quantizar cores para reduzir variações mínimas
           const qR = Math.round(red / 8) * 8;
           const qG = Math.round(green / 8) * 8;
           const qB = Math.round(blue / 8) * 8;
           
           const colorKey = `${qR},${qG},${qB}`;
           
-          // Calcular propriedades da cor
           const max = Math.max(qR, qG, qB);
           const min = Math.min(qR, qG, qB);
           const saturation = max === 0 ? 0 : (max - min) / max;
@@ -132,19 +116,16 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
           }
         }
 
-        // Encontrar a cor mais "ativa" - combinação de frequência, saturação e contraste
         let bestColor = null;
         let bestScore = 0;
 
         for (const [key, color] of colorMap) {
-          // Filtrar cores muito escuras ou muito claras
           if (color.brightness < 20 || color.brightness > 235) continue;
           
-          // Calcular score híbrido
-          const frequencyScore = color.count / (analyzeSize * analyzeSize); // 0-1
-          const saturationScore = Math.pow(color.saturation, 1.5); // Priorizar saturação
-          const brightnessScore = Math.min(color.brightness / 128, 2 - color.brightness / 128); // Preferir brilho médio
-          const contrastScore = color.saturation > 0.4 ? 2 : 1; // Boost para cores muito saturadas
+          const frequencyScore = color.count / (analyzeSize * analyzeSize);
+          const saturationScore = Math.pow(color.saturation, 1.5);
+          const brightnessScore = Math.min(color.brightness / 128, 2 - color.brightness / 128);
+          const contrastScore = color.saturation > 0.4 ? 2 : 1;
           
           const totalScore = frequencyScore * saturationScore * brightnessScore * contrastScore;
           
@@ -154,7 +135,6 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
           }
         }
 
-        // Fallback: se não encontrar cor ativa, usar a mais frequente que não seja preto/branco
         if (!bestColor) {
           let maxCount = 0;
           for (const [key, color] of colorMap) {
@@ -166,9 +146,8 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
         }
 
         if (bestColor) {
-          // Aplicar cor dominante extraída
           setDominantColor({
-            r: Math.min(bestColor.r, 255), // Corrigir valores RGB máximos
+            r: Math.min(bestColor.r, 255),
             g: Math.min(bestColor.g, 255),
             b: Math.min(bestColor.b, 255)
           });
@@ -180,88 +159,33 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
     extractDominantColor(event.flyer_url);
   }, [event.flyer_url]);
 
-  // Gerar estilos consistentes baseados na cor dominante
   const generateBackgroundStyle = () => {
-    if (!dominantColor) {
-      return { background: 'rgba(250, 250, 250, 1)' };
-    }
-    
-    const { r, g, b } = dominantColor;
-    return {
-      background: `linear-gradient(180deg, 
-        rgba(${r},${g},${b},0.4) 0%,
-        rgba(${r},${g},${b},0.35) 15%,
-        rgba(${r},${g},${b},0.25) 30%,
-        rgba(${r},${g},${b},0.15) 45%,
-        rgba(${r},${g},${b},0.05) 50%,
-        rgba(255,255,255,1) 55%,
-        rgba(255,255,255,1) 100%
-      )`,
-    };
-  };
-
-  // Header agora faz parte do gradiente principal - sem cor separada
-
-  // Gerar estilo para cards/elementos - mesma cor base
-  const generateCardStyle = () => {
-    if (!dominantColor) {
-      return {};
-    }
-    
-    const { r, g, b } = dominantColor;
-    return {
-      backgroundColor: `rgba(${r},${g},${b},0.05)`,
-      borderColor: `rgba(${r},${g},${b},0.2)`,
-    };
-  };
-
-  // Gerar estilo para botões - cor dinâmica do evento
-  const generateButtonStyle = () => {
-    if (!dominantColor) {
-      return {
-        backgroundColor: '#8B5A3C', // cor padrão marrom
-        color: 'white'
-      };
-    }
-    
-    const { r, g, b } = dominantColor;
-    // Determinar se a cor é clara ou escura para ajustar o texto
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
-    
-    return {
-      backgroundColor: `rgba(${r},${g},${b},0.9)`,
-      color: textColor,
-      border: `1px solid rgba(${r},${g},${b},1)`,
+    return { 
+      background: 'linear-gradient(to bottom right, #111827, #1f2937, #000000)'
     };
   };
 
   return (
     <div className="min-h-screen" style={generateBackgroundStyle()}>
-      {/* Canvas oculto para análise de cor */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       
-      {/* Header TYCAT - transparente para integrar com gradiente */}
       <div className="backdrop-blur-sm">
         <div className="px-6 py-6">
-          <h1 className="text-xl font-bold text-gray-900 drop-shadow-sm">TYCAT</h1>
+          <h1 className="text-2xl font-black text-white">TYCAT</h1>
         </div>
       </div>
       
-      {/* Aviso se não há associação - integrado no gradiente */}
       {!hasAssociation && (
-        <div className="backdrop-blur-sm border-b border-orange-200/50 px-6 py-3">
-          <div className="flex items-center gap-2 text-orange-700">
+        <div className="backdrop-blur-sm border-b border-orange-500/20 px-6 py-3">
+          <div className="flex items-center gap-2 text-orange-300">
             <AlertTriangle className="h-4 w-4" />
             <span className="text-sm">Este link pode não estar ativo ou ter funcionalidades limitadas.</span>
           </div>
         </div>
       )}
 
-      {/* Layout principal - EXATAMENTE COMO REFERÊNCIA SNAP */}
       <main className="max-w-7xl mx-auto px-4 pb-12 pt-8">
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Event Image - ESTILO EXATO DA REFERÊNCIA */}
           {event.flyer_url && (
             <div className="order-1 md:order-2 relative rounded-lg">
               <div 
@@ -289,55 +213,53 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
               </div>
             </div>
           )}
-
-          {/* Event Details - TIPOGRAFIA EXATA */}
+          
           <div className="order-2 md:order-1 space-y-6">
-            <h1 className="text-3xl md:text-5xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-3xl md:text-5xl font-bold text-white leading-tight">
               {event.title.toUpperCase()}
             </h1>
             
-            <p className="text-gray-600">Por <span className="text-gray-900">{organizationName}</span></p>
+            <p className="text-gray-400">Por <span className="text-blue-400">{organizationName}</span></p>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-gray-600">
-                <CalendarIcon className="w-5 h-5 flex-shrink-0" />
-                <span className="text-gray-900">{eventDate}</span>
+              <div className="flex items-center gap-2 text-gray-300">
+                <CalendarIcon className="w-5 h-5 flex-shrink-0 text-blue-400" />
+                <span className="text-white">{eventDate}</span>
                 {event.time && (
                   <>
                     <span>às</span>
-                    <span className="text-gray-900">{eventTime}</span>
+                    <span className="text-white">{eventTime}</span>
                   </>
                 )}
               </div>
 
               {event.location && (
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-900">
-                    <MapPin className="w-5 h-5 flex-shrink-0" />
+                  <div className="flex items-center gap-2 text-white">
+                    <MapPin className="w-5 h-5 flex-shrink-0 text-blue-400" />
                     <span>{event.location}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Descrição do evento */}
             {event.description && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-gray-700" />
-                  <h3 className="text-lg font-semibold text-gray-900">Descrição</h3>
+                  <FileText className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-semibold text-white">Descrição</h3>
                 </div>
-                <div className="text-gray-600 leading-relaxed pl-7">
+                <div className="text-gray-300 leading-relaxed pl-7">
                   <p>
                     {isDescriptionExpanded 
                       ? event.description 
                       : getTruncatedDescription(event.description)
                     }
                   </p>
-                  {event.description.length > 150 && (
+                  {shouldShowReadMore(event.description) && (
                     <button
                       onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                      className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors"
+                      className="mt-2 text-blue-400 hover:text-blue-300 font-medium text-sm transition-colors"
                     >
                       {isDescriptionExpanded ? 'Ver menos' : 'Ver mais'}
                     </button>
@@ -348,79 +270,87 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
           </div>
         </div>
       </main>
-
-      {/* SEÇÃO GUEST LIST - fundo branco fixo */}
-      <div 
-        className="max-w-2xl mx-auto px-4 pb-8 rounded-lg bg-white"
-      >
-        <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center pt-8">
-          Aceder guest list
-        </h2>
-        
-        {guestListStatus.isOpen ? (
-          <GuestRequestClient
-            eventId={params[0]}
-            promoterId={params[1]}
-            teamId={params[2]}
-            buttonStyle={generateButtonStyle()}
-          />
-        ) : (
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              {guestListStatus.status === 'CLOSED' && <XCircle className="h-10 w-10 text-red-500" />}
-              {guestListStatus.status === 'BEFORE_OPENING' && <ClockIcon className="h-10 w-10 text-orange-500" />}
-              {guestListStatus.status === 'NO_SCHEDULE' && <AlertTriangle className="h-10 w-10 text-yellow-500" />}
-              <h3 className="text-2xl font-bold text-gray-900">
-                {guestListStatus.status === 'CLOSED' && 'Guest List Fechada'}
-                {guestListStatus.status === 'BEFORE_OPENING' && 'Guest List em Breve'}
-                {guestListStatus.status === 'NO_SCHEDULE' && 'Guest List Indisponível'}
-              </h3>
-            </div>
-            
-            <div className={`p-6 rounded-lg mb-6 ${
-              guestListStatus.status === 'CLOSED' ? 'bg-red-50 border border-red-200' :
-              guestListStatus.status === 'BEFORE_OPENING' ? 'bg-orange-50 border border-orange-200' :
-              'bg-yellow-50 border border-yellow-200'
-            }`}>
-              <p className={`text-lg ${
-                guestListStatus.status === 'CLOSED' ? 'text-red-700' :
-                guestListStatus.status === 'BEFORE_OPENING' ? 'text-orange-700' :
-                'text-yellow-700'
-              }`}>
-                {guestListStatus.message}
-              </p>
-            </div>
-            
-            {guestListStatus.status === 'BEFORE_OPENING' && (
-              <div className="text-base text-gray-500">
-                <p>Volte quando a guest list abrir para garantir o seu lugar!</p>
-                <Button 
-                  disabled 
-                  className="w-full mt-4 opacity-50"
-                  style={generateButtonStyle()}
-                >
-                  Aguardando Abertura
-                </Button>
-              </div>
-            )}
-            
-            {guestListStatus.status === 'CLOSED' && (
-              <div className="text-base text-gray-500">
-                <p>O período de inscrição para este evento já terminou.</p>
-                <Button 
-                  disabled 
-                  className="w-full mt-4 opacity-50"
-                  style={generateButtonStyle()}
-                >
-                  Guest List Encerrada
-                </Button>
+      
+      <div className="max-w-sm mx-auto px-6 pb-10 pt-6">
+        <div className="px-4 py-4">
+          <div className="flex justify-center">
+            {guestListStatus.isOpen ? (
+              <GuestRequestClient
+                eventId={params[0]}
+                promoterId={params[1]}
+                teamId={params[2]}
+                buttonStyle={{
+                  background: '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'none',
+                  letterSpacing: 'normal',
+                  width: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              />
+            ) : (
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  {guestListStatus.status === 'CLOSED' && <XCircle className="h-6 w-6 text-red-500" />}
+                  {guestListStatus.status === 'BEFORE_OPENING' && <ClockIcon className="h-6 w-6 text-orange-500" />}
+                  {guestListStatus.status === 'NO_SCHEDULE' && <AlertTriangle className="h-6 w-6 text-yellow-500" />}
+                  <h3 className="text-lg font-semibold text-white">
+                    {guestListStatus.status === 'CLOSED' && 'Guest List Fechada'}
+                    {guestListStatus.status === 'BEFORE_OPENING' && 'Guest List em Breve'}
+                    {guestListStatus.status === 'NO_SCHEDULE' && 'Guest List Indisponível'}
+                  </h3>
+                </div>
+              
+                <div className="p-3 rounded-lg mb-4 bg-gray-800/50 backdrop-blur-sm border border-gray-700">
+                  <p className={`text-sm ${
+                      guestListStatus.status === 'CLOSED' ? 'text-red-400' :
+                      guestListStatus.status === 'BEFORE_OPENING' ? 'text-orange-400' :
+                      'text-yellow-400'
+                    }`}>
+                      {guestListStatus.message}
+                    </p>
+                  </div>
+              
+                  {guestListStatus.status === 'BEFORE_OPENING' && (
+                    <div className="text-xs text-gray-300">
+                      <p className="mb-2">Volte quando a guest list abrir para garantir o seu lugar!</p>
+                      <Button 
+                        disabled 
+                        className="px-3 py-1.5 bg-gray-700 text-gray-400 rounded-full text-xs font-medium cursor-not-allowed"
+                      >
+                        🕐 Aguardando Abertura
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {guestListStatus.status === 'CLOSED' && (
+                    <div className="text-xs text-gray-300">
+                      <p className="mb-2">O período de inscrição para este evento já terminou.</p>
+                      <Button 
+                        disabled 
+                        className="px-3 py-1.5 bg-gray-700 text-gray-400 rounded-full text-xs font-medium cursor-not-allowed"
+                      >
+                        ❌ Guest List Encerrada
+                      </Button>
+                    </div>
+                  )}
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Canvas oculto para extração de cor dominante */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );

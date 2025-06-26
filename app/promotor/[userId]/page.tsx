@@ -1,11 +1,11 @@
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Database } from '@/lib/database.types';
-import { Suspense } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { EventsList } from './EventsList';
+import { Card, CardContent } from '@/components/ui/card';
+import { MapPin, Calendar, Users } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 // Define the expected return type from our RPC
 type RPCEventData = {
@@ -50,92 +50,50 @@ const getInitials = (firstName?: string | null, lastName?: string | null): strin
   return `${firstInitial}${lastInitial}`;
 };
 
-// Shared background component with festival image - VERSION 6.0 FIXED PATH
-function SharedBackground() {
-  return (
-    <>
-      {/* Festival Hero Background Image with Correct Path */}
-      <div 
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `
-            url("/images/festival-hero-bg.jpg"),
-            linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)
-          `,
-          backgroundSize: 'cover, cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#1a1a2e',
-        }}
-      >
-        {/* Overlay for text legibility */}
-        <div className="absolute inset-0 bg-black/25"></div>
-      </div>
+// Helper function to format date
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('pt-PT', { 
+    day: 'numeric', 
+    month: 'short' 
+  });
+};
 
-      {/* Floating orbs for visual interest */}
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/8 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-32 right-16 w-96 h-96 bg-purple-500/8 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-indigo-500/8 rounded-full blur-3xl animate-pulse delay-500"></div>
-      </div>
-    </>
-  );
-}
-
-// Shared header component with enhanced contrast
-function SharedHeader() {
+// Promoter Header Component - Simplified for Server Component
+function PromoterHeader({ userData }: { userData: { first_name: string | null; last_name: string | null } }) {
+  const initials = getInitials(userData.first_name, userData.last_name);
+  
   return (
-    <div className="px-4 sm:px-6 pt-8 pb-6">
-      <div className="text-left">
-        <h1 className="text-xl font-bold text-white mb-2 tracking-tight drop-shadow-lg">
-          TYCAT
-        </h1>
-        <p className="text-white/80 text-sm italic drop-shadow-md">
-          "Where the night comes alive"
-        </p>
+    <div className="px-4 sm:px-6 pt-8 sm:pt-12 pb-4 sm:pb-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+            <span className="text-lg sm:text-xl font-bold text-white">
+              {initials}
+            </span>
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs sm:text-sm">Promotor</p>
+            <h1 className="text-lg sm:text-xl font-bold text-white">
+              {userData.first_name || 'Promotor'} {userData.last_name || ''}
+            </h1>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl sm:text-3xl font-black text-white">
+            TYCAT
+          </div>
+        </div>
       </div>
     </div>
   );
-}
-
-// Hero section component with enhanced contrast
-function PromoterHero({ userData }: { userData: any }) {
-  return (
-    <div className="px-4 sm:px-6 py-16 text-center">
-      <h1 className="text-6xl md:text-8xl font-black text-white mb-8 tracking-tight drop-shadow-2xl [text-shadow:_0_4px_8px_rgb(0_0_0_/_0.8)]">
-        {userData.first_name?.toUpperCase()} {userData.last_name?.toUpperCase()}
-      </h1>
-    </div>
-  );
-}
-
-// Validation constants
-const MAX_EVENTS_PER_PAGE = 50;
-const VALID_EVENT_TYPES = ['guest-list', 'regular', 'vip'] as const;
-type ValidEventType = typeof VALID_EVENT_TYPES[number];
-
-// Validation functions
-function isValidUUID(uuid: string): boolean {
-  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(uuid);
-}
-
-function isValidEventType(type: string): type is ValidEventType {
-  return VALID_EVENT_TYPES.includes(type as ValidEventType);
 }
 
 // Error component
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <div className="min-h-screen bg-white relative flex items-center justify-center">
-      {/* Overlay Pattern Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
-      <div className="absolute inset-0 opacity-[0.03]" style={{
-        backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
-                         radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
-        backgroundSize: '100px 100px'
-      }}></div>
-      
-      <div className="relative z-10 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-2xl max-w-md mx-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative flex items-center justify-center">
+      <div className="relative z-10 bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-2xl max-w-md mx-4">
         <p className="font-medium">Ocorreu um erro</p>
         <p className="text-sm">{message}</p>
       </div>
@@ -154,7 +112,6 @@ export default async function PromoterPublicPage({ params }: PageProps) {
   const resolvedParams = await params;
   
   if (!resolvedParams?.userId) {
-    console.error('[ERROR] ID do usuário não fornecido');
     notFound();
   }
 
@@ -166,12 +123,11 @@ export default async function PromoterPublicPage({ params }: PageProps) {
     // Buscar dados do usuário
     const { data: userData, error: userError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, first_name, last_name')
       .eq('id', resolvedParams.userId)
       .single();
 
     if (userError || !userData) {
-      console.error('[ERROR] Erro ao buscar dados do usuário:', userError);
       notFound();
     }
 
@@ -182,18 +138,9 @@ export default async function PromoterPublicPage({ params }: PageProps) {
       }) as { data: RPCEventData[] | null, error: any };
 
     if (eventsError) {
-      console.error('[ERROR] Erro ao buscar eventos:', eventsError);
       return (
-        <div className="min-h-screen bg-white relative flex items-center justify-center">
-          {/* Overlay Pattern Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
-          <div className="absolute inset-0 opacity-[0.03]" style={{
-            backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
-                             radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
-            backgroundSize: '100px 100px'
-          }}></div>
-          
-          <div className="relative z-10 text-center text-gray-900 max-w-md mx-4">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white relative flex items-center justify-center">
+          <div className="relative z-10 text-center text-gray-300 max-w-md mx-4">
             <p className="text-lg">Ocorreu um erro ao buscar os eventos.</p>
             <p className="text-gray-500 text-sm mt-2">Por favor, tente novamente mais tarde.</p>
           </div>
@@ -201,8 +148,28 @@ export default async function PromoterPublicPage({ params }: PageProps) {
       );
     }
 
-    // Map RPC data to EventsList format
-    const mappedEvents = eventsData ? mapRPCDataToEventsList(eventsData) : [];
+    // Map RPC data to EventsList format  
+    let mappedEvents = eventsData ? mapRPCDataToEventsList(eventsData) : [];
+
+    // Buscar locations dos eventos se houver eventos
+    if (mappedEvents.length > 0) {
+      const eventIds = mappedEvents.map(event => event.event_id);
+      const { data: locationData } = await supabase
+        .from('events')
+        .select('id, location')
+        .in('id', eventIds);
+
+      // Adicionar locations aos eventos mapeados
+      if (locationData) {
+        mappedEvents = mappedEvents.map(event => {
+          const locationInfo = locationData.find(loc => loc.id === event.event_id);
+          return {
+            ...event,
+            location: locationInfo?.location || null
+          };
+        });
+      }
+    }
 
     // Filtrar apenas eventos futuros
     const currentDate = new Date();
@@ -214,36 +181,24 @@ export default async function PromoterPublicPage({ params }: PageProps) {
     // Se não houver eventos futuros, mostrar página sem eventos
     if (!futureEvents || futureEvents.length === 0) {
       return (
-        <div className="min-h-screen bg-black">
-          {/* Hero Section com imagem de fundo */}
-          <div className="relative overflow-hidden">
-            <SharedBackground />
-            
-            <div className="relative z-20">
-              <SharedHeader />
-              <PromoterHero userData={userData} />
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+          <PromoterHeader userData={userData} />
+          
+          {/* Eventos Section */}
+          <div className="px-4 sm:px-6 pb-16 sm:pb-20">
+            <div className="mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-blue-400">Eventos</h2>
             </div>
             
-            {/* Gradiente de transição suave para branco */}
-            <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
-            
-            {/* Gradiente adicional para transição super suave */}
-            <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
-            
-            {/* Gradiente final para garantir transição perfeita */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
-          </div>
-
-          {/* Events Section sem imagem de fundo */}
-          <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
-            <div className="text-center">
-              <h2 className="text-4xl font-black text-black mb-8">Eventos</h2>
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 max-w-md mx-auto shadow-sm">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 border border-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <span className="text-3xl">📅</span>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">Sem eventos ativos</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">Este promotor não tem eventos disponíveis no momento.</p>
+            <div className="text-center py-16">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Calendar className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-300 mb-3">Nenhum evento disponível</h3>
+              <p className="text-gray-400 mb-6">Este promotor ainda não tem eventos publicados.</p>
+              <div className="text-sm text-gray-500">
+                <p>• Os eventos aparecerão aqui quando forem publicados</p>
+                <p>• Certifique-se de que tem eventos associados</p>
               </div>
             </div>
           </div>
@@ -251,122 +206,112 @@ export default async function PromoterPublicPage({ params }: PageProps) {
       );
     }
 
+    // Renderizar página com eventos - Server Component Safe
     return (
-      <div className="min-h-screen bg-black">
-        {/* Hero Section com imagem de fundo */}
-        <div className="relative overflow-hidden">
-          <SharedBackground />
-          
-          <div className="relative z-20">
-            <SharedHeader />
-            <PromoterHero userData={userData} />
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+        <PromoterHeader userData={userData} />
+        
+        {/* Eventos Section */}
+        <div className="px-4 sm:px-6 pb-16 sm:pb-20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-bold text-blue-400 mb-2 sm:mb-0">Eventos</h2>
+            <span className="text-gray-400 text-sm">{futureEvents.length} evento{futureEvents.length !== 1 ? 's' : ''}</span>
           </div>
           
-          {/* Gradiente de transição suave para branco */}
-          <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
-          
-          {/* Gradiente adicional para transição super suave */}
-          <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
-          
-          {/* Gradiente final para garantir transição perfeita */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
-        </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {futureEvents.map((event, index) => (
+              <Link 
+                key={event.event_id}
+                href={`/promo/${event.event_id}/${event.tracking_promoter_id}/${event.tracking_team_id}`}
+                target="_blank"
+                className="block"
+              >
+                <Card className="bg-gradient-to-br from-blue-600 to-purple-600 border-0 overflow-hidden rounded-2xl cursor-pointer hover:scale-[1.02] transition-transform">
+                  <CardContent className="p-0 relative">
+                    {/* Background Image */}
+                    <div className="relative h-48 sm:h-56 overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600">
+                      {event.event_flyer_url && (
+                        <Image
+                          src={event.event_flyer_url}
+                          alt={event.event_title}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover"
+                          priority={index === 0}
+                          loading={index === 0 ? "eager" : "lazy"}
+                          placeholder="blur"
+                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-        {/* Events Section sem imagem de fundo */}
-        <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-black text-black mb-8">Eventos</h2>
-          </div>
-          <EventsList events={futureEvents} />
-        </div>
-      </div>
-    );
-  } catch (error) {
-    console.error('[ERROR] Erro não tratado:', error);
-    return (
-      <div className="min-h-screen bg-white relative flex items-center justify-center">
-        {/* Overlay Pattern Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-gray-100/40"></div>
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: `radial-gradient(circle at 25px 25px, rgba(59, 130, 246, 0.5) 2px, transparent 0), 
-                           radial-gradient(circle at 75px 75px, rgba(99, 102, 241, 0.3) 1px, transparent 0)`,
-          backgroundSize: '100px 100px'
-        }}></div>
-        
-        <div className="relative z-10 text-center text-gray-900 max-w-md mx-4">
-          <p className="text-lg">Ocorreu um erro ao carregar a página.</p>
-          <p className="text-gray-500 text-sm mt-2">Por favor, tente novamente mais tarde.</p>
-        </div>
-      </div>
-    );
-  }
-}
+                      {/* Data */}
+                      <div className="absolute top-3 sm:top-4 left-3 sm:left-4">
+                        <div className="bg-blue-500/90 backdrop-blur rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
+                          <div className="text-center">
+                            <div className="text-xs text-white uppercase font-medium">
+                              {formatDate(event.event_date).split(' ')[1]}
+                            </div>
+                            <div className="text-sm sm:text-lg font-bold text-white">
+                              {formatDate(event.event_date).split(' ')[0]}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-// Loading component for events
-function EventsLoading() {
-  return (
-    <div className="min-h-screen bg-black">
-      {/* Hero Section com imagem de fundo */}
-      <div className="relative overflow-hidden">
-        <SharedBackground />
-        
-        <div className="relative z-20 space-y-6">
-          {/* Header skeleton */}
-          <div className="px-4 sm:px-6 pt-8 pb-6">
-            <Skeleton className="h-6 w-16 bg-white/20 rounded" />
-            <Skeleton className="h-4 w-32 bg-white/10 rounded mt-2" />
-          </div>
-          
-          {/* Hero skeleton */}
-          <div className="px-4 sm:px-6 py-16 text-center">
-            <Skeleton className="h-20 md:h-32 w-3/4 mx-auto bg-white/20 rounded mb-8" />
-            <Skeleton className="h-4 w-48 mx-auto bg-white/10 rounded" />
-          </div>
-        </div>
-        
-        {/* Gradiente de transição suave para branco */}
-        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-b from-transparent via-transparent to-white"></div>
-        
-        {/* Gradiente adicional para transição super suave */}
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent via-black/5 to-white/95"></div>
-        
-        {/* Gradiente final para garantir transição perfeita */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-white"></div>
-      </div>
-      
-      {/* Events Section sem imagem de fundo */}
-      <div className="bg-white px-4 sm:px-6 pt-4 pb-12">
-        <Skeleton className="h-12 w-32 mx-auto bg-gray-300 rounded mb-8" />
-        
-        {/* Events grid skeleton */}
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-80 rounded-3xl bg-gray-200" />
+                      {/* Conteúdo */}
+                      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                        <h3 className="font-bold text-white text-base sm:text-lg mb-2 line-clamp-2">
+                          {event.event_title}
+                        </h3>
+                        
+                        <div className="flex items-center text-gray-200 text-xs sm:text-sm mb-3 sm:mb-4">
+                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          <span className="truncate">{event.location || 'Local não especificado'}</span>
+                        </div>
+
+                        {/* Organizacão */}
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-300">
+                            <Users className="h-3 w-3 inline mr-1" />
+                            {event.org_name || 'Organização'}
+                          </div>
+                          <div className="bg-blue-500/90 text-white font-semibold px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm">
+                            Aceder Guest List
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+
+  } catch (error) {
+    return <ErrorMessage message="Erro interno do servidor" />;
+  }
 }
 
-// Function to map RPC data to EventsList format
+// Map RPC data to EventsList format
 function mapRPCDataToEventsList(rpcData: RPCEventData[]): EventForList[] {
-  return rpcData.map(event => ({
-    event_id: event.event_id,
-    event_title: event.event_title,
-    event_flyer_url: event.event_flyer_url,
-    event_date: event.event_date,
-    event_time: event.event_time,
-    end_date: null, // Not available from RPC
-    end_time: null, // Not available from RPC
-    location: null, // Not available from RPC
-    event_type: event.event_type,
-    tracking_promoter_id: event.tracking_promoter_id,
-    tracking_team_id: event.tracking_team_id,
-    is_active: true, // Assume active from RPC
-    is_published: true, // Assume published from RPC
-    org_name: event.org_name, // Nome do organizador
+  return rpcData.map(item => ({
+    event_id: item.event_id,
+    event_title: item.event_title,
+    event_flyer_url: item.event_flyer_url,
+    event_date: item.event_date,
+    event_time: item.event_time,
+    end_date: null,
+    end_time: null,
+    location: null,
+    event_type: item.event_type,
+    tracking_promoter_id: item.tracking_promoter_id,
+    tracking_team_id: item.tracking_team_id,
+    is_active: true,
+    is_published: true,
+    org_name: item.org_name
   }));
 } 

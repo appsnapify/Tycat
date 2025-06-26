@@ -74,6 +74,8 @@ export default function ClientDashboardPage() {
       router.push('/');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
+      // Fallback: redirecionar mesmo com erro
+      router.push('/');
     }
   };
   

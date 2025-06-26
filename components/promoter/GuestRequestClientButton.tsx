@@ -63,7 +63,6 @@ export function GuestRequestClient({
       if (!teamId) throw new Error('ID da equipe não fornecido');
       if (!currentUser.id) throw new Error('ID do usuário não fornecido');
       
-      console.log('Solicitando acesso para o evento');
       setLoadingSubmessage('Conectando com o servidor...');
       
       // Dados do usuário para enviar para a API
@@ -104,7 +103,6 @@ export function GuestRequestClient({
       
       // Processar resposta com sucesso
       const result = await response.json();
-      console.log('Resposta da API de criação de convidado:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Erro desconhecido na API');
@@ -156,8 +154,6 @@ export function GuestRequestClient({
   
   // Handler para quando o telefone é verificado
   const handlePhoneVerified = (phone: string, exists: boolean, userId: string | null = null) => {
-    console.log(`Telefone verificado: ${phone}, Usuário existe: ${exists ? 'Sim' : 'Não'}`);
-    
     // Marcar step de telefone como completo
     setCompletedSteps(['phone']);
     
@@ -175,7 +171,6 @@ export function GuestRequestClient({
   
   // Handler para sucesso no login
   const handleLoginSuccess = async (userData: any) => {
-    console.log('Login bem-sucedido:', userData);
     try {
       // Marcar step de auth como completo
       setCompletedSteps(['phone', 'auth']);
@@ -250,45 +245,42 @@ export function GuestRequestClient({
     >
       <Card className={`w-full bg-transparent border-0 shadow-none ${className}`}>
         {currentUser && (
-          <CardHeader>
-            <CardTitle className="text-xl text-center">
+        <CardHeader>
+          <CardTitle className="text-xl text-center text-white">
               Olá, {currentUser.firstName || 'Convidado'}!
-            </CardTitle>
-          </CardHeader>
+          </CardTitle>
+        </CardHeader>
         )}
         
         <CardContent>
         {showQRCode && qrCodeUrl ? (
           <div className="flex flex-col items-center gap-4">
-            <div className="bg-white p-4 rounded-lg shadow-lg">
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-lg">
               <Image 
                 src={qrCodeUrl} 
                 alt="QR Code de acesso" 
-                width={250} 
-                height={250} 
+                width={200} 
+                height={200} 
                 priority
-                className="rounded-md"
+                className="rounded-md w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]"
               />
             </div>
-            <div className="text-center">
-              <p className="text-green-600 font-medium">Acesso aprovado!</p>
-              <p className="text-sm text-muted-foreground">
+            <div className="text-center px-4">
+              <p className="text-green-600 font-medium text-sm sm:text-base">Acesso aprovado!</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Apresente este QR code na entrada do evento
               </p>
             </div>
             <Button 
               variant="outline" 
               onClick={() => setShowQRCode(false)}
+              className="text-xs sm:text-sm px-3 sm:px-4"
             >
               Esconder QR
             </Button>
           </div>
           ) : currentUser ? (
             <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center gap-2 text-green-600">
-                <Phone className="h-6 w-6" />
-                <span className="font-medium">Autenticado como {currentUser.firstName}</span>
-              </div>
         <Button 
                 onClick={requestAccess} 
           disabled={isSubmitting}
@@ -315,7 +307,8 @@ export function GuestRequestClient({
                 className="w-full"
                 style={buttonStyle}
               >
-                Entrar com o Telemovel
+                <Phone className="mr-2 h-4 w-4" />
+                Entrar com o Telemóvel
               </Button>
             </div>
           )}
@@ -323,14 +316,14 @@ export function GuestRequestClient({
         
         {/* Dialog para autenticação */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="w-full max-w-md p-0 mx-auto max-h-[80vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-md p-0 mx-auto max-h-[90vh] overflow-y-auto">
             <DialogTitle className="sr-only">Acesso à Guest List</DialogTitle>
             <DialogDescription className="sr-only">
               Processo de autenticação para acesso à lista de convidados. Siga as etapas para verificar seu telefone e obter seu QR code de entrada.
             </DialogDescription>
             
             {/* Progress Steps */}
-            <div className="p-6 pb-0">
+            <div className="p-4 sm:p-6 pb-0">
               <ProgressSteps 
                 currentStep={authStep === 'phone' ? 'phone' : authStep === 'login' || authStep === 'register' ? 'auth' : 'qr'} 
                 completedSteps={completedSteps}
@@ -338,20 +331,24 @@ export function GuestRequestClient({
             </div>
             
             {authStep === 'phone' && (
-              <PhoneVerificationForm onVerified={handlePhoneVerified} />
+              <div className="p-2 sm:p-0">
+                <PhoneVerificationForm onVerified={handlePhoneVerified} />
+              </div>
             )}
             
             {authStep === 'login' && (
-              <ClientLoginForm 
-                phone={phone} 
-                userId={userId}
-                onSuccess={handleLoginSuccess} 
-                onBack={() => setAuthStep('phone')} 
-              />
+              <div className="p-2 sm:p-0">
+                <ClientLoginForm 
+                  phone={phone} 
+                  userId={userId}
+                  onSuccess={handleLoginSuccess} 
+                  onBack={() => setAuthStep('phone')} 
+                />
+              </div>
             )}
             
             {authStep === 'register' && (
-              <div className="py-1 px-2">
+              <div className="p-2 sm:p-0">
                 <ClientRegistrationForm 
                   phone={phone} 
                   onSuccess={handleRegisterSuccess}

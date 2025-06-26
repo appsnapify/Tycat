@@ -67,20 +67,11 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
 
   const verifyPhone = async (): Promise<{exists: boolean, userId: string | null} | null> => {
     try {
-      // REDUZIDO: Log apenas essencial em development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Verificando telefone:', phone);
-      }
-      
       setIsSubmitting(true);
       setError(null);
       
       // Usar o telefone diretamente (já vem formatado do react-phone-number-input)
       const phoneToVerify = phone;
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Iniciando fetch de verificação de telefone');
-      }
       
       const response = await fetch('/api/client-auth-v2/check-phone', {
         method: 'POST',
@@ -90,10 +81,6 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
         body: JSON.stringify({ phone: phoneToVerify }),
       });
       
-      if (process.env.NODE_ENV === 'development') {
-      console.log('Resposta recebida da API de verificação:', response.status);
-      }
-      
       if (!response.ok) {
           const errorData = await response.json();
         throw new Error(errorData.error || `Erro na verificação: ${response.status}`);
@@ -102,18 +89,10 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
       let responseData;
       try {
         const responseText = await response.text();
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Resposta em texto:', responseText);
-        }
         responseData = JSON.parse(responseText);
       } catch (parseError) {
         console.error('Erro ao fazer parse da resposta JSON:', parseError);
         throw new Error('Erro ao processar resposta do servidor');
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Resposta da verificação de telefone:', responseData);
-        console.log('Verificando userId retornado:', responseData.userId || 'não encontrado');
       }
       
       // Garantir que exists seja um booleano válido
@@ -324,80 +303,98 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
   }
 
   return (
-    <Card className="border-0 shadow-none auth-dialog">
-      <CardHeader className="text-center pb-2">
-        <CardTitle className="text-2xl font-bold">Acesso à Guest List</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">
-          Introduz o teu número de telemóvel para continuar
+    <Card className="border-0 shadow-none bg-transparent">
+      <CardHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 sm:pb-4">
+        <CardTitle className="text-center text-lg sm:text-xl">Verificar Telemóvel</CardTitle>
+        <CardDescription className="text-center text-xs sm:text-sm">
+          Introduz o teu número para continuares
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="phone" className="text-sm font-medium">
-              {translations['Telefone']}
+      
+      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+          <div className="space-y-1 sm:space-y-2">
+            <label htmlFor="phone" className="text-xs sm:text-sm font-medium">
+              Número de telemóvel
             </label>
-            <PhoneInput
-              international={false}
-              countryCallingCodeEditable={false}
-              defaultCountry="PT"
-              flags={flags}
-              value={phone}
-              onChange={handlePhoneChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            {error && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-destructive">{error}</p>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleRetry}
-                  className="h-6 px-2"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  <span className="text-xs">{translations['Tentar novamente']}</span>
-                </Button>
+            <div className="relative">
+              <PhoneInput
+                placeholder="Introduz o teu número"
+                value={phone}
+                onChange={handlePhoneChange}
+                flags={flags}
+                defaultCountry="PT"
+                international={false}
+                countryCallingCodeEditable={false}
+                className="w-full"
+                style={{
+                  '--PhoneInput-color--focus': '#2563eb',
+                  '--PhoneInput-background': 'transparent'
+                } as React.CSSProperties}
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            {/* Validação em tempo real */}
+            {phone && (
+              <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2">
+                {isPhoneValid ? (
+                  <>
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-xs text-green-600">{translations['Formato de número válido!']}</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-xs text-orange-600">{translations['Formato de número incompleto ou inválido']}</span>
+                  </>
+                )}
               </div>
             )}
-            {!error && phone && !isPhoneValid && (
-              <p className="text-xs text-amber-500">{translations['Formato de número incompleto ou inválido']}</p>
-            )}
-            {!error && isPhoneValid && (
-              <p className="text-xs text-green-500">{translations['Formato de número válido!']}</p>
+            
+            {error && (
+              <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-500 rounded-full"></div>
+                <span className="text-xs text-red-600">{error}</span>
+              </div>
             )}
           </div>
           
+          {/* Progress bar durante a verificação */}
           {isSubmitting && (
-            <div className="space-y-1 my-2">
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between items-center">
-                <p className="text-xs text-muted-foreground">
-                  {statusMessage}
-                </p>
-                {retryCount > 0 && (
-                  <span className="text-xs text-amber-500">Tentativa {retryCount}</span>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Progress value={progress} className="h-1.5 sm:h-2" />
+              <p className="text-xs text-center text-muted-foreground">{statusMessage}</p>
             </div>
           )}
           
-          <div className="pt-4 pb-2 button-container">
-          <Button 
-            type="submit" 
-            className="w-full text-white font-medium"
-            disabled={isSubmitting || !phone || !isPhoneValid}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {translations['A verificar...']}
-              </>
-            ) : (
-              translations['Continuar']
+          <div className="pt-2 sm:pt-4">
+            {retryCount > 0 && !isSubmitting && (
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleRetry}
+                className="w-full mb-2 text-xs sm:text-sm"
+              >
+                <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                {translations['Tentar novamente']}
+              </Button>
             )}
-          </Button>
+            
+            <Button 
+              type="submit" 
+              disabled={!isPhoneValid || isSubmitting}
+              className="w-full text-xs sm:text-sm"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                  {translations['A verificar...']}
+                </>
+              ) : (
+                translations['Continuar']
+              )}
+            </Button>
           </div>
         </form>
       </CardContent>

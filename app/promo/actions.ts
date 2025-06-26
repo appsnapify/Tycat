@@ -251,16 +251,6 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
       }
     }
     
-    // Debug apenas em development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DEBUG] Dados da organização:', {
-        organizations: eventData.organizations,
-        organizationsType: typeof eventData.organizations,
-        isArray: Array.isArray(eventData.organizations),
-        orgName: orgName
-      });
-    }
-    
     const processedEventData = {
       ...eventData,
       org_name: orgName
