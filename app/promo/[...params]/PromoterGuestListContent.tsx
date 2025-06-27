@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { GuestRequestClient } from '@/components/promoter/GuestRequestClientButton';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 interface PromoterGuestListContentProps {
   event: {
@@ -32,9 +32,7 @@ interface PromoterGuestListContentProps {
 }
 
 export default function PromoterGuestListContent({ event, params, hasAssociation = false, guestListStatus }: PromoterGuestListContentProps) {
-  const [dominantColor, setDominantColor] = useState<{ r: number; g: number; b: number } | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const eventDate = event.date ? format(new Date(event.date), 'PPP', { locale: pt }) : 'Data não definida';
   const eventTime = event.time || 'Horário não definido';
@@ -62,103 +60,6 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
     return text.split(' ').length > 50;
   };
 
-  useEffect(() => {
-    if (!event.flyer_url) return;
-
-    const extractDominantColor = (url: string) => {
-      const img = new Image();
-      img.crossOrigin = "Anonymous";
-      
-      img.onload = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const analyzeSize = 50;
-        canvas.width = analyzeSize;
-        canvas.height = analyzeSize;
-        
-        ctx.drawImage(img, 0, 0, analyzeSize, analyzeSize);
-        const imageData = ctx.getImageData(0, 0, analyzeSize, analyzeSize);
-        const data = imageData.data;
-
-        const colorMap = new Map<string, {count: number, r: number, g: number, b: number, saturation: number, brightness: number}>();
-
-        for (let i = 0; i < data.length; i += 4) {
-          const red = data[i];
-          const green = data[i + 1];
-          const blue = data[i + 2];
-          
-          const qR = Math.round(red / 8) * 8;
-          const qG = Math.round(green / 8) * 8;
-          const qB = Math.round(blue / 8) * 8;
-          
-          const colorKey = `${qR},${qG},${qB}`;
-          
-          const max = Math.max(qR, qG, qB);
-          const min = Math.min(qR, qG, qB);
-          const saturation = max === 0 ? 0 : (max - min) / max;
-          const brightness = (qR + qG + qB) / 3;
-          
-          if (colorMap.has(colorKey)) {
-            colorMap.get(colorKey)!.count++;
-          } else {
-            colorMap.set(colorKey, {
-              count: 1,
-              r: qR,
-              g: qG,
-              b: qB,
-              saturation,
-              brightness
-            });
-          }
-        }
-
-        let bestColor = null;
-        let bestScore = 0;
-
-        for (const [key, color] of colorMap) {
-          if (color.brightness < 20 || color.brightness > 235) continue;
-          
-          const frequencyScore = color.count / (analyzeSize * analyzeSize);
-          const saturationScore = Math.pow(color.saturation, 1.5);
-          const brightnessScore = Math.min(color.brightness / 128, 2 - color.brightness / 128);
-          const contrastScore = color.saturation > 0.4 ? 2 : 1;
-          
-          const totalScore = frequencyScore * saturationScore * brightnessScore * contrastScore;
-          
-          if (totalScore > bestScore) {
-            bestScore = totalScore;
-            bestColor = color;
-          }
-        }
-
-        if (!bestColor) {
-          let maxCount = 0;
-          for (const [key, color] of colorMap) {
-            if (color.brightness > 30 && color.brightness < 225 && color.count > maxCount) {
-              maxCount = color.count;
-              bestColor = color;
-            }
-          }
-        }
-
-        if (bestColor) {
-          setDominantColor({
-            r: Math.min(bestColor.r, 255),
-            g: Math.min(bestColor.g, 255),
-            b: Math.min(bestColor.b, 255)
-          });
-        }
-      };
-      img.src = url;
-    };
-
-    extractDominantColor(event.flyer_url);
-  }, [event.flyer_url]);
-
   const generateBackgroundStyle = () => {
     return { 
       background: 'linear-gradient(to bottom right, #111827, #1f2937, #000000)'
@@ -167,8 +68,6 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
 
   return (
     <div className="min-h-screen" style={generateBackgroundStyle()}>
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-      
       <div className="backdrop-blur-sm">
         <div className="px-6 py-6">
           <h1 className="text-2xl font-black text-white">TYCAT</h1>
@@ -194,8 +93,8 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
                   aspectRatio: '16/9',
                   maxWidth: '100%',
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
-                  border: dominantColor ? `1px solid rgba(${dominantColor.r},${dominantColor.g},${dominantColor.b},0.2)` : '1px solid rgba(0,0,0,0.1)',
-                  backgroundColor: dominantColor ? `rgba(${dominantColor.r},${dominantColor.g},${dominantColor.b},0.05)` : 'rgba(255,255,255,0.9)'
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  backgroundColor: 'rgba(255,255,255,0.05)'
                 }}
               >
                 <NextImage
@@ -350,8 +249,6 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
           </div>
         </div>
       </div>
-
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 } 

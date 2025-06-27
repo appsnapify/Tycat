@@ -1,3 +1,4 @@
+// 🚀 OTIMIZAÇÃO FASE 3: Manter apenas Toaster sonner (usado pelos componentes /promo)
 import { Toaster } from 'sonner';
 
 export default function PromoLayout({
@@ -8,7 +9,7 @@ export default function PromoLayout({
   return (
     <div className="min-h-screen">
       {children}
-      <Toaster />
+      <Toaster position="top-center" />
     </div>
   );
 } 

@@ -1,4 +1,5 @@
 import { LRUCache } from 'lru-cache';
+import { NextRequest } from 'next/server';
 
 type Options = {
   uniqueTokenPerInterval?: number;
@@ -12,22 +13,15 @@ export function rateLimit(options?: Options) {
   });
 
   return {
-    check: async (token: string) => {
-      const tokenCount = (tokenCache.get(token) as number[]) || [0];
-      if (tokenCount[0] === 0) {
-        tokenCache.set(token, [1]);
-        return Promise.resolve();
+    check: async (req: NextRequest, limit: number, token: string) => {
+      const identifier = token || req.ip || 'anonymous';
+      const tokenCount = (tokenCache.get(identifier) as number) || 0;
+      
+      if (tokenCount >= limit) {
+        throw new Error('Rate limit exceeded');
       }
       
-      tokenCount[0] += 1;
-      const currentCount = tokenCount[0];
-      
-      tokenCache.set(token, tokenCount);
-
-      if (currentCount > 5) { // Máximo de 5 requisições por intervalo
-        return Promise.reject();
-      }
-
+      tokenCache.set(identifier, tokenCount + 1);
       return Promise.resolve();
     },
   };

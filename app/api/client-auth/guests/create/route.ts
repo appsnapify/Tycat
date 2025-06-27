@@ -42,14 +42,8 @@ export async function POST(request: NextRequest) {
       phone 
     } = body;
     
-    console.log('[CLIENT-AUTH-GUESTS] Dados recebidos:', {
-      event_id: event_id?.substring(0, 8) + '...',
-      client_user_id: client_user_id?.substring(0, 8) + '...',
-      promoter_id: promoter_id?.substring(0, 8) + '...',
-      team_id: team_id?.substring(0, 8) + '...',
-      name: name || 'não informado',
-      phone: phone ? phone.substring(0, 3) + '****' : 'não informado'
-    });
+    // 🔒 CORREÇÃO CRÍTICA: Logs sensíveis removidos para produção
+    console.log('[CLIENT-AUTH-GUESTS] Processando criação de guest via client-auth');
     
     // Validação obrigatória
     if (!event_id || !client_user_id) {
@@ -100,7 +94,7 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
       
-      console.log('[CLIENT-AUTH-GUESTS] Evento válido:', event.title);
+      console.log('[CLIENT-AUTH-GUESTS] Evento validado com sucesso');
       
     } catch (eventCheckError) {
       console.error('[CLIENT-AUTH-GUESTS] Erro ao verificar evento:', eventCheckError);
@@ -128,8 +122,7 @@ export async function POST(request: NextRequest) {
         }, { status: 404 });
       }
       
-      console.log('[CLIENT-AUTH-GUESTS] Client user válido:', 
-        `${clientUser.first_name} ${clientUser.last_name}`);
+      console.log('[CLIENT-AUTH-GUESTS] Client user validado com sucesso');
       
     } catch (userCheckError) {
       console.error('[CLIENT-AUTH-GUESTS] Erro ao verificar client_user:', userCheckError);
@@ -161,8 +154,7 @@ export async function POST(request: NextRequest) {
       
       // Se encontrou guest existente, retornar os dados dele
       if (existingGuest) {
-        console.log('[CLIENT-AUTH-GUESTS] Guest já existe! Retornando QR code existente:', 
-          existingGuest.id?.substring(0, 8) + '...');
+        console.log('[CLIENT-AUTH-GUESTS] Guest já existe! Retornando QR code existente');
         
         return NextResponse.json({
           success: true,
@@ -216,8 +208,7 @@ export async function POST(request: NextRequest) {
       }
       
       const guestData = result[0];
-      console.log('[CLIENT-AUTH-GUESTS] Convidado criado com sucesso:', 
-        guestData.id?.substring(0, 8) + '...');
+      console.log('[CLIENT-AUTH-GUESTS] Convidado criado com sucesso');
       
       return NextResponse.json({
         success: true,

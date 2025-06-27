@@ -14,7 +14,7 @@ interface PageProps {
 
 // Server Component que captura parâmetros da URL
 export default async function PromoterGuestListPage({ params }: PageProps) {
-  // Await params before using its properties (Next.js 15 requirement)
+  // 🚀 OTIMIZAÇÃO FASE 3: Simplificação para evitar recarregamentos desnecessários
   const resolvedParams = await params;
   const urlParams = resolvedParams?.params;
   

@@ -69,8 +69,8 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
 
     const supabase = await createReadOnlyClient();
 
-    // Buscar dados do evento com nome da organização
-    const { data: eventData, error: eventError } = await supabase
+    // 🚀 OTIMIZAÇÃO: Query unificada (6 consultas → 1 consulta)
+    const { data: unifiedData, error: unifiedError } = await supabase
       .from('events')
       .select(`
         id,
@@ -90,91 +90,82 @@ export async function processPromoParams(params: string[]): Promise<PromoData | 
       .eq('is_published', true)
       .maybeSingle();
 
-    if (eventError) {
-      console.error('[ERROR] Erro ao buscar evento:', eventError);
+    if (unifiedError) {
+      console.error('[ERROR] Erro ao buscar evento:', unifiedError);
       return null;
     }
 
-    if (!eventData) {
+    if (!unifiedData) {
       console.error('[ERROR] Evento não encontrado:', eventId);
       return null;
     }
 
-    // Buscar dados do promotor
-    const { data: promoterData, error: promoterError } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name')
-      .eq('id', promoterId)
-      .maybeSingle();
+    const eventData = unifiedData;
 
+    // Buscar dados do promotor e verificações de associação em paralelo
+    const [promoterResult, directAssocResult, teamMemberResult, orgTeamResult] = await Promise.all([
+      // 1. Dados do promotor
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', promoterId)
+        .maybeSingle(),
+      
+      // 2. Verificação de associação direta
+      supabase
+        .from('event_promoters')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('promoter_id', promoterId)
+        .eq('team_id', teamId)
+        .maybeSingle(),
+      
+      // 3. Verificação se promotor é membro da equipe
+      supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', promoterId)
+        .eq('team_id', teamId)
+        .maybeSingle(),
+      
+      // 4. Verificação se equipe está vinculada à organização
+      eventData.organization_id ? supabase
+        .from('organization_teams')
+        .select('organization_id')
+        .eq('team_id', teamId)
+        .eq('organization_id', eventData.organization_id)
+        .maybeSingle() : Promise.resolve({ data: null, error: null })
+    ]);
+
+    // Processar dados do promotor
+    const { data: promoterData, error: promoterError } = promoterResult;
     if (promoterError) {
       console.error('[ERROR] Erro ao buscar promotor:', promoterError);
       return null;
     }
 
-    // Verificar associação - PRIORIDADE 1: Associação direta na tabela event_promoters
-    const { data: directAssociation, error: directError } = await supabase
-      .from('event_promoters')
-      .select('id')
-      .eq('event_id', eventId)
-      .eq('promoter_id', promoterId)
-      .eq('team_id', teamId)
-      .maybeSingle();
-
-    if (directError) {
-      console.error('[ERROR] Erro ao verificar associação direta:', directError);
-    }
-
-    let hasAssociation = !!directAssociation;
+    // Determinar hasAssociation com lógica otimizada
+    let hasAssociation = false;
     
-    if (!hasAssociation) {
-      // PRIORIDADE 2: Verificar associação via equipa
-      // 1. Verificar se o promotor é membro da equipa
-      const { data: teamMember, error: teamMemberError } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', promoterId)
+    // PRIORIDADE 1: Associação direta
+    if (directAssocResult.data) {
+      hasAssociation = true;
+    }
+    // PRIORIDADE 2: Membro da equipe + equipe vinculada à organização
+    else if (teamMemberResult.data && orgTeamResult.data) {
+      hasAssociation = true;
+    }
+    // PRIORIDADE 3: Verificar se equipe está associada ao evento
+    else if (teamMemberResult.data) {
+      const { data: teamEventAssociation, error: teamEventError } = await supabase
+        .from('event_promoters')
+        .select('id')
+        .eq('event_id', eventId)
         .eq('team_id', teamId)
-        .maybeSingle();
-
-      if (teamMemberError) {
-        console.error('[ERROR] Erro ao verificar membro da equipa:', teamMemberError);
-      }
-
-      if (teamMember) {
-        // 2. Verificar se a equipa está associada ao evento via event_promoters
-        const { data: teamEventAssociation, error: teamEventError } = await supabase
-          .from('event_promoters')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('team_id', teamId)
-          .limit(1);
-
-        if (teamEventError) {
-          console.error('[ERROR] Erro ao verificar associação equipa-evento:', teamEventError);
-        }
-
-        if (teamEventAssociation && teamEventAssociation.length > 0) {
-          hasAssociation = true;
-        } else {
-          // 3. Verificar se a equipa está vinculada à organização do evento
-          if (eventData.organization_id) {
-            const { data: orgAssociation, error: orgError } = await supabase
-              .from('organization_teams')
-              .select('organization_id')
-              .eq('team_id', teamId)
-              .eq('organization_id', eventData.organization_id)
-              .maybeSingle();
-
-            if (orgError) {
-              console.error('[ERROR] Erro ao verificar associação equipa-organização:', orgError);
-            }
-
-            if (orgAssociation) {
-              hasAssociation = true;
-            }
-          }
-        }
+        .limit(1);
+      
+      if (!teamEventError && teamEventAssociation && teamEventAssociation.length > 0) {
+        hasAssociation = true;
       }
     }
 
