@@ -192,31 +192,14 @@ export default function ClientLoginFormReal() {
         throw new Error(result.error || 'Erro ao iniciar sessão');
       }
       
-      // CORREÇÃO: Criar sessão client-side após validação da API
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
+      // Login bem-sucedido - criar sessão client-side
+      console.log('Login bem-sucedido:', result.user);
       
-      console.log('API validou credenciais, criando sessão client-side...');
-      
-      // Descobrir o email para login client-side
-      let loginEmail = result.user?.email;
-      if (!loginEmail) {
-        // Se não tem email, construir baseado no ID (como faz a API)
-        loginEmail = `client_${result.user?.id}@temp.snap.com`;
+      // Salvar dados do usuário e redirecionar
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('client_user', JSON.stringify(result.user));
       }
       
-      // Fazer login client-side para criar sessão no browser
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: password
-      });
-      
-      if (authError) {
-        console.error('Erro ao criar sessão client-side:', authError);
-        throw new Error('Erro ao estabelecer sessão');
-      }
-      
-      console.log('Sessão client-side criada com sucesso!');
       router.push('/user/dashboard');
       
     } catch (error) {

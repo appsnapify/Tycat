@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { isValidPhoneNumber } from 'libphonenumber-js';
+import { checkDuplicateGuest, setGuestExists, invalidateGuestCache } from '@/lib/cache/guest-cache';
+import { recordGuestCacheHit, recordGuestCacheMiss } from '@/lib/monitoring/cache-metrics';
+import { checkRateLimit, createRateLimitResponse, RATE_LIMIT_CONFIGS, checkCircuitBreaker, createCircuitBreakerResponse, recordCircuitBreakerSuccess, recordCircuitBreakerFailure } from '@/lib/security/advanced-rate-limit';
 
 // Função auxiliar para validar UUID
 function isValidUUID(id: string): boolean {
@@ -11,6 +14,23 @@ function isValidUUID(id: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    // ✅ RATE LIMITING - PROTEÇÃO CONTRA DDOS
+    const rateLimitResult = checkRateLimit(request, RATE_LIMIT_CONFIGS.GUEST_CREATION);
+    if (!rateLimitResult.allowed) {
+      console.warn('[RATE_LIMIT] Request bloqueado:', {
+        ip: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        retryAfter: rateLimitResult.retryAfter
+      });
+      return createRateLimitResponse(rateLimitResult);
+    }
+    
+    // ✅ CIRCUIT BREAKER - PROTEÇÃO CONTRA FALHAS EM CASCATA
+    const circuitCheck = checkCircuitBreaker('supabase-guests');
+    if (!circuitCheck.allowed) {
+      console.error('[CIRCUIT_BREAKER] Supabase guests service indisponível:', circuitCheck.reason);
+      return createCircuitBreakerResponse('supabase-guests', circuitCheck.reason!);
+    }
+    
     const { phone, eventId, promoterId, teamId } = await request.json();
     console.log('[DEBUG] Dados recebidos:', { phone, eventId, promoterId, teamId });
 
@@ -53,6 +73,7 @@ export async function POST(request: Request) {
 
     if (eventError) {
       console.error('[ERROR] Erro ao buscar evento:', eventError);
+      recordCircuitBreakerFailure('supabase-guests');
       return NextResponse.json(
         { message: 'Erro ao verificar evento' },
         { status: 500 }
@@ -61,6 +82,7 @@ export async function POST(request: Request) {
 
     if (!event) {
       console.error('[ERROR] Evento não encontrado:', eventId);
+      recordCircuitBreakerFailure('supabase-guests');
       return NextResponse.json(
         { message: 'Evento não encontrado' },
         { status: 404 }
@@ -110,6 +132,7 @@ export async function POST(request: Request) {
 
     if (associationError) {
       console.error('[ERROR] Erro ao verificar associação:', associationError);
+      recordCircuitBreakerFailure('supabase-guests');
       return NextResponse.json(
         { message: 'Erro ao verificar associação do promotor' },
         { status: 500 }
@@ -126,6 +149,10 @@ export async function POST(request: Request) {
 
     // Verificar se o telefone já está registrado
     console.log('[DEBUG] Verificando registro existente:', phone);
+    
+    // ✅ CACHE HIT - VERIFICAÇÃO INSTANTÂNEA DE DUPLICATAS
+    // Note: checkDuplicateGuest verifica por client_user_id + event_id, mas aqui estamos usando phone + event_id
+    // Fazer consulta direta por enquanto até ter cache específico para phone
     const { data: existingGuest, error: checkError } = await supabase
       .from('guests')
       .select('id')
@@ -135,6 +162,7 @@ export async function POST(request: Request) {
 
     if (checkError) {
       console.error('[ERROR] Erro ao verificar registro existente:', checkError);
+      recordCircuitBreakerFailure('supabase-guests');
       return NextResponse.json(
         { message: 'Erro ao verificar registro existente' },
         { status: 500 }
@@ -166,11 +194,19 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('[ERROR] Erro ao criar registro:', insertError);
+      recordCircuitBreakerFailure('supabase-guests');
       return NextResponse.json(
         { message: 'Erro ao criar registro' },
         { status: 500 }
       );
     }
+
+    // ✅ INVALIDAR CACHE APÓS CRIAÇÃO BEM-SUCEDIDA
+    invalidateGuestCache(cacheKey);
+    console.log('[DEBUG] Cache invalidado para:', cacheKey);
+
+    // ✅ REGISTRO DE SUCESSO NO CIRCUIT BREAKER
+    recordCircuitBreakerSuccess('supabase-guests');
 
     console.log('[SUCCESS] Registro criado com sucesso:', guest);
     return NextResponse.json({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,92 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase'
 import NextLink from 'next/link'
 import { Badge } from '@/components/ui/badge'
+
+// ✅ NOVO: Cache global para guest counts
+const guestCountCache = new Map<string, { count: number; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const pendingRequests = new Map<string, Promise<number>>();
+
+// ✅ NOVO: Função para invalidar cache específico
+const invalidateGuestCountCache = (eventId: string) => {
+  guestCountCache.delete(eventId);
+  pendingRequests.delete(eventId);
+};
+
+// ✅ NOVO: Limpeza automática do cache (a cada 10 minutos)
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [eventId, cached] of guestCountCache.entries()) {
+      if (now - cached.timestamp > CACHE_TTL * 2) { // Limpar itens com mais de 10 minutos
+        guestCountCache.delete(eventId);
+      }
+    }
+  }, 10 * 60 * 1000);
+}
+
+// ✅ NOVO: Função para obter guest count com cache
+const getCachedGuestCount = async (eventId: string): Promise<number> => {
+  // Verificar cache primeiro
+  const cached = guestCountCache.get(eventId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.count;
+  }
+
+  // Se já existe request pendente, aguardar ela
+  if (pendingRequests.has(eventId)) {
+    return pendingRequests.get(eventId)!;
+  }
+
+  // Criar nova request
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(`/api/guest-count?eventId=${eventId}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'max-age=300',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API retornou erro: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const count = data.count || 0;
+
+      // Armazenar no cache
+      guestCountCache.set(eventId, { count, timestamp: Date.now() });
+      
+      return count;
+    } catch (err) {
+      // Fallback direto ao Supabase
+      try {
+        const { data, error } = await createClient()
+          .from('guests')
+          .select('id')
+          .eq('event_id', eventId);
+        
+        const count = error ? 0 : (data?.length || 0);
+        
+        // Cache do fallback também
+        guestCountCache.set(eventId, { count, timestamp: Date.now() });
+        
+        return count;
+      } catch (fbErr) {
+        return 0;
+      }
+    } finally {
+      // Remover request das pendentes
+      pendingRequests.delete(eventId);
+    }
+  })();
+
+  // Armazenar request como pendente
+  pendingRequests.set(eventId, requestPromise);
+  
+  return requestPromise;
+};
 
 // Interface para os eventos
 interface Event {
@@ -188,6 +274,24 @@ export default function EventosPage() {
           }) || [];
           
           setEventList(eventsWithStatus);
+          
+          // ✅ CORRIGIDO: Pré-carregar guest counts apenas para guest-lists próximos (visíveis)
+          const upcomingGuestListEvents = eventsWithStatus.filter(event => 
+            event.type === 'guest-list' && !isEventPast(event)
+          );
+          if (upcomingGuestListEvents.length > 0) {
+            // Fazer em background sem bloquear UI
+            setTimeout(() => {
+              upcomingGuestListEvents.forEach((event, index) => {
+                // Delay escalonado para não sobrecarregar
+                setTimeout(() => {
+                  getCachedGuestCount(event.id).catch(() => {
+                    // Falhas silenciosas no background preload
+                  });
+                }, index * 100);
+              });
+            }, 500);
+          }
         }
       } catch (err) {
         toast.error("Não foi possível carregar seus eventos");
@@ -481,58 +585,42 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
       });
   }
   
-  const refreshGuestCount = async () => {
+  const refreshGuestCount = useCallback(async () => {
     if (event.type === 'guest-list') {
       setIsLoading(true);
       
       try {
-        const response = await fetch(`/api/guest-count?eventId=${event.id}`, {
-          method: 'GET',
-          headers: {
-            'Cache-Control': 'max-age=300', // Aceitar cache de 5 minutos
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API retornou erro: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const count = data.count || 0;
-        
+        const count = await getCachedGuestCount(event.id);
         setGuestCount(count);
       } catch (err) {
-        try {
-          const { data, error } = await createClient()
-            .from('guests')
-            .select('id')
-            .eq('event_id', event.id);
-          
-          if (error) {
-            setGuestCount(0);
-          } else {
-            const count = data?.length || 0;
-            setGuestCount(count);
-          }
-        } catch (fbErr) {
           setGuestCount(0);
-        }
       } finally {
         setIsLoading(false);
       }
     }
-  };
+  }, [event.id, event.type]);
   
   const [isInitialized, setIsInitialized] = useState(false);
   
+  // ✅ NOVO: Debounce inteligente baseado na posição do card
   useEffect(() => {
     if (event.type === 'guest-list' && !isInitialized && !isLoading) {
       setIsInitialized(true);
       
-      // Debounce de 300ms para evitar chamadas simultâneas
+      // Cache hit instantâneo
+      const cached = guestCountCache.get(event.id);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        setGuestCount(cached.count);
+        return;
+      }
+      
+      // Delay escalonado para evitar chamadas simultâneas (0ms, 100ms, 200ms, etc.)
+      const eventIndex = event.id.slice(-1); // Usar último char do ID para gerar delay único
+      const delay = (parseInt(eventIndex, 16) || 0) * 50; // 0-750ms baseado no ID
+      
       const timeoutId = setTimeout(() => {
         refreshGuestCount();
-      }, 300);
+      }, delay);
       
       return () => clearTimeout(timeoutId);
     }
@@ -605,6 +693,8 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                // ✅ NOVO: Invalidar cache antes de refresh para garantir dados frescos
+                invalidateGuestCountCache(event.id);
                 refreshGuestCount();
               }}
               className="text-white hover:text-blue-200 transition-colors duration-200 hover:bg-blue-700 p-1 rounded"

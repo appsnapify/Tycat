@@ -16,33 +16,55 @@ const loginSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    console.log('Iniciando login direto de cliente');
+    // Verificar variáveis de ambiente primeiro
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Configuração do servidor incompleta' 
+      }, { status: 500 });
+    }
     
     // Extrair body da requisição
-    const body = await request.json();
-    console.log('Dados recebidos para login direto:', { 
-      userId: body.userId ? `${body.userId.substring(0, 8)}...` : 'não informado',
-      has_password: !!body.password
-    });
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Dados de requisição inválidos' 
+      }, { status: 400 });
+    }
     
     // Validar dados
     const result = loginSchema.safeParse(body);
     if (!result.success) {
-      console.error('Erro de validação:', result.error.format());
       return NextResponse.json({ 
         success: false, 
-        error: 'Dados inválidos', 
-        details: result.error.format() 
+        error: 'Dados inválidos'
       }, { status: 400 });
     }
     
     const { userId, password } = result.data;
     
-    // Inicializar cliente Supabase Admin (seguindo padrão do projeto)
-    const supabase = createAdminClient();
+    // Inicializar cliente Supabase Admin
+    let supabase;
+    try {
+      supabase = createAdminClient();
+      console.log('[DIRECT-LOGIN] Cliente Admin Supabase criado');
+    } catch (clientError) {
+      console.error('[DIRECT-LOGIN] Erro ao criar cliente Supabase:', clientError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Erro de configuração do banco de dados' 
+      }, { status: 500 });
+    }
     
-    console.log('Buscando usuário pelo ID:', userId.substring(0, 8) + '...');
+    console.log('[DIRECT-LOGIN] Buscando usuário pelo ID:', userId.substring(0, 8) + '...');
     
+    // Buscar usuário
     const { data: userData, error: userError } = await supabase
       .from('client_users')
       .select('id, first_name, last_name, phone, email, password')
@@ -50,7 +72,7 @@ export async function POST(request: Request) {
       .maybeSingle();
       
     if (userError) {
-      console.error('Erro ao buscar usuário:', userError);
+      console.error('[DIRECT-LOGIN] Erro ao buscar usuário:', userError);
       return NextResponse.json({ 
         success: false, 
         error: 'Erro ao verificar usuário: ' + userError.message 
@@ -59,15 +81,22 @@ export async function POST(request: Request) {
     
     // Verificar se o usuário foi encontrado
     if (!userData) {
-      console.log('Nenhum usuário encontrado com o ID informado');
+      console.log('[DIRECT-LOGIN] Nenhum usuário encontrado com o ID informado');
       return NextResponse.json({ 
         success: false, 
         error: 'Usuário não encontrado ou senha incorreta' 
       }, { status: 401 });
     }
     
+    console.log('[DIRECT-LOGIN] Usuário encontrado:', {
+      id: userData.id,
+      firstName: userData.first_name,
+      hasEmail: !!userData.email,
+      hasPassword: !!userData.password
+    });
+    
     // Verificar senha - SOLUÇÃO HÍBRIDA SEGURA
-    console.log('Verificando senha para usuário:', userData.id);
+    console.log('[DIRECT-LOGIN] Verificando senha para usuário:', userData.id);
     
     // MÉTODO 1: Tentar Supabase Auth primeiro (para utilizadores novos e migrados)
     let authSuccess = false;
@@ -76,6 +105,8 @@ export async function POST(request: Request) {
       userEmail = `client_${userData.id}@temp.snap.com`;
     }
     
+    console.log('[DIRECT-LOGIN] Tentando login via Supabase Auth com email:', userEmail);
+    
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: userEmail,
@@ -83,19 +114,21 @@ export async function POST(request: Request) {
       });
       
       if (!authError && authData.user) {
-        console.log('Login bem-sucedido via Supabase Auth');
+        console.log('[DIRECT-LOGIN] Login bem-sucedido via Supabase Auth');
         authSuccess = true;
+      } else {
+        console.log('[DIRECT-LOGIN] Falha no Auth:', authError?.message || 'Erro desconhecido');
       }
     } catch (authAttemptError) {
-      console.log('Falha no login via Auth, tentando método tabela...');
+      console.log('[DIRECT-LOGIN] Exceção no Auth:', authAttemptError);
     }
     
     // MÉTODO 2: Se Auth falhou, tentar password da tabela (utilizadores antigos)
     if (!authSuccess && userData.password) {
-      console.log('Tentando login via password da tabela (utilizador antigo)');
+      console.log('[DIRECT-LOGIN] Tentando login via password da tabela (utilizador antigo)');
       
       if (userData.password === password) {
-        console.log('Password da tabela correcta, migrando para Auth...');
+        console.log('[DIRECT-LOGIN] Password da tabela correcta, migrando para Auth...');
         
         // MIGRAÇÃO AUTOMÁTICA: Criar/actualizar no Supabase Auth
         try {
@@ -113,7 +146,7 @@ export async function POST(request: Request) {
           });
           
           if (!migrationError) {
-            console.log('Utilizador migrado com sucesso para Auth');
+            console.log('[DIRECT-LOGIN] Utilizador migrado com sucesso para Auth');
             
             // Limpar password da tabela após migração bem-sucedida
             await supabase
@@ -130,7 +163,7 @@ export async function POST(request: Request) {
             });
             
             if (!existingAuthError) {
-              console.log('Login com Auth existente bem-sucedido');
+              console.log('[DIRECT-LOGIN] Login com Auth existente bem-sucedido');
               
               // Limpar password da tabela
               await supabase
@@ -139,50 +172,32 @@ export async function POST(request: Request) {
                 .eq('id', userData.id);
                 
               authSuccess = true;
+            } else {
+              console.log('[DIRECT-LOGIN] Falha no login com Auth existente:', existingAuthError);
             }
+          } else {
+            console.error('[DIRECT-LOGIN] Erro na migração:', migrationError);
           }
         } catch (migrationError) {
-          console.error('Erro na migração automática:', migrationError);
+          console.error('[DIRECT-LOGIN] Exceção na migração automática:', migrationError);
           // Continuar com método tabela se migração falhou
           authSuccess = true; // Temporariamente aceitar login por tabela
         }
+      } else {
+        console.log('[DIRECT-LOGIN] Password da tabela incorrecta');
       }
     }
     
     // VERIFICAÇÃO FINAL
     if (!authSuccess) {
-      console.log('Falha na autenticação - password incorrecta');
+      console.log('[DIRECT-LOGIN] Falha na autenticação - password incorrecta');
       return NextResponse.json({ 
         success: false, 
         error: 'Telefone ou senha incorretos' 
       }, { status: 401 });
     }
     
-    // Criar token JWT - LÓGICA COMENTADA
-    /*
-    const token = sign(
-      { 
-        id: userData.id,
-        phone: userData.phone,
-        email: userData.email 
-      }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRY }
-    );
-    */
-    
-    // console.log('Token gerado para o cliente:', token); // Comentado
-
-    // Definir o cookie de autenticação - JÁ COMENTADO ANTERIORMENTE
-    // cookies().set('client_auth_token', token, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV !== 'development',
-    //   maxAge: 60 * 60 * 24 * 7, // 1 semana
-    //   path: '/',
-    //   sameSite: 'lax'
-    // });
-    
-    console.log('Login direto realizado com sucesso:', { id: userData.id });
+    console.log('[DIRECT-LOGIN] Login direto realizado com sucesso:', { id: userData.id });
     
     // Retornar dados do usuário (sem senha)
     return NextResponse.json({ 
@@ -197,7 +212,8 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
-    console.error('Erro ao processar requisição:', error);
+    console.error('[DIRECT-LOGIN] Erro ao processar requisição:', error);
+    
     let errorMessage = 'Erro interno do servidor';
     
     if (error instanceof Error) {

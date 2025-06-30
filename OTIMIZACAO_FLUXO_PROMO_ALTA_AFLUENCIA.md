@@ -12,17 +12,17 @@ Este documento apresenta uma estratégia completa para otimizar o fluxo da pági
 
 ## Análise do Fluxo Atual
 
-### Mapeamento do Fluxo
+### Mapeamento do Fluxo (ATUALIZADO com Email)
 ```
 1. CLICK → [Dialog PhoneVerificationForm]
 2. TELEFONE → API /client-auth-v2/check-phone (verifica se existe)
 3. BRANCH:
    ├─ SE EXISTE → API /client-auth/login (autenticação)
-   └─ SE NÃO EXISTE → API /client-auth/register (criação + auth Supabase)
+   └─ SE NÃO EXISTE → API /client-auth/register (criação + auth Supabase + Welcome Email)
 4. AUTENTICADO → requestAccess() 
-5. API → /client-auth/guests/create (validation + duplicate check)
+5. API → /client-auth/guests/create (validation + duplicate check + email)
 6. SQL → create_guest_safely() (inserção + QR generation)
-7. RESULTADO → QR Code exibido
+7. RESULTADO → QR Code exibido + Email com QR enviado (background)
 ```
 
 ### Gargalos Identificados
@@ -194,9 +194,9 @@ export const checkDuplicateGuest = async (eventId: string, clientUserId: string)
 
 ---
 
-### FASE 2: Background Processing (1-2 Dias) - Ganho 10x
+### FASE 2: Background Processing + Email System (1-2 Dias) - Ganho 10x
 
-#### 1. Fila Assíncrona para Guests
+#### 1. Fila Assíncrona para Guests + Emails
 
 ```typescript
 // lib/queues/guest-queue.ts
@@ -209,7 +209,18 @@ interface GuestCreationJob {
   teamId: string;
   name: string;
   phone: string;
+  email: string; // ← NOVO: Para envio de QR por email
   websocketId: string;
+}
+
+interface EmailJob {
+  type: 'welcome' | 'qr-code';
+  data: {
+    email: string;
+    firstName: string;
+    qr_code_url?: string;
+    event_title?: string;
+  };
 }
 
 export const guestCreationQueue = new Queue<GuestCreationJob>('guest-creation', {
@@ -224,13 +235,28 @@ export const guestCreationQueue = new Queue<GuestCreationJob>('guest-creation', 
     }
   }
 });
+
+// ✅ NOVA: Fila dedicada para emails
+export const emailQueue = new Queue<EmailJob>('email-sending', {
+  connection: { host: 'localhost', port: 6379 },
+  defaultJobOptions: {
+    removeOnComplete: 200,
+    removeOnFail: 100,
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000,
+    }
+  }
+});
 ```
 
-#### 2. Worker Background
+#### 2. Workers Background (Guest + Email)
 
 ```typescript
+// ✅ WORKER PARA CRIAÇÃO DE GUESTS (Atualizado)
 const guestWorker = new Worker<GuestCreationJob>('guest-creation', async (job) => {
-  const { eventId, clientUserId, promoterId, teamId, name, phone, websocketId } = job.data;
+  const { eventId, clientUserId, promoterId, teamId, name, phone, email, websocketId } = job.data;
   
   try {
     // ✅ CRIAÇÃO OTIMIZADA EM BACKGROUND
@@ -260,6 +286,19 @@ const guestWorker = new Worker<GuestCreationJob>('guest-creation', async (job) =
       }
     });
     
+    // ✅ NOVA: ENVIAR QR CODE POR EMAIL (Background)
+    if (email) {
+      await emailQueue.add('qr-code', {
+        type: 'qr-code',
+        data: {
+          email,
+          firstName: name.split(' ')[0],
+          qr_code_url: guestData.qr_code_url,
+          event_title: eventData.title // Buscar título do evento
+        }
+      });
+    }
+    
     // ✅ INVALIDAR CACHE
     duplicateCache.set(`${eventId}:${clientUserId}`, true);
     
@@ -275,6 +314,31 @@ const guestWorker = new Worker<GuestCreationJob>('guest-creation', async (job) =
 }, {
   connection: { host: 'localhost', port: 6379 },
   concurrency: 10
+});
+
+// ✅ NOVO: WORKER PARA EMAILS
+const emailWorker = new Worker<EmailJob>('email-sending', async (job) => {
+  const { type, data } = job.data;
+  
+  try {
+    switch(type) {
+      case 'welcome':
+        await sendWelcomeEmail(data);
+        break;
+      case 'qr-code':
+        await sendQRCodeEmail(data);
+        break;
+    }
+    
+    console.log(`[EMAIL] ${type} sent to ${data.email}`);
+    
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send ${type} to ${data.email}:`, error);
+    throw error;
+  }
+}, {
+  connection: { host: 'localhost', port: 6379 },
+  concurrency: 5 // Limite de emails simultâneos
 });
 ```
 
@@ -332,7 +396,109 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-#### 4. WebSocket para Notificações
+#### 4. Sistema de Email Integrado
+
+```typescript
+// lib/email/email-service.ts
+import { Resend } from 'resend'; // Ou outro provedor (SendGrid, Mailgun, etc.)
+
+// ✅ CONFIGURAÇÃO DO PROVEDOR EMAIL
+const emailProvider = new Resend(process.env.EMAIL_API_KEY);
+
+// ✅ TEMPLATES DE EMAIL
+const emailTemplates = {
+  welcome: {
+    subject: '🎉 Bem-vindo ao SNAP!',
+    getHtml: ({ firstName }: { firstName: string }) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #2563eb;">Olá ${firstName}! 🎉</h1>
+        <p>Obrigado por se registar no SNAP.</p>
+        <p>Está pronto para eventos incríveis!</p>
+        <div style="margin: 20px 0; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+          <p><strong>O que pode fazer agora:</strong></p>
+          <ul>
+            <li>Explorar eventos disponíveis</li>
+            <li>Entrar em guest lists</li>
+            <li>Receber QR codes por email</li>
+          </ul>
+        </div>
+        <p>Divirta-se! 🚀</p>
+      </div>
+    `
+  },
+  
+  qrCode: {
+    subject: ({ event_title }: { event_title: string }) => `🎫 Seu QR Code para ${event_title}`,
+    getHtml: ({ firstName, event_title, qr_code_url }: { 
+      firstName: string; 
+      event_title: string; 
+      qr_code_url: string; 
+    }) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #2563eb;">Está na guest list! 🎫</h1>
+        <p>Olá ${firstName},</p>
+        <p>Seu QR Code para <strong>${event_title}</strong> está pronto:</p>
+        
+        <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f9fafb; border-radius: 12px;">
+          <img src="${qr_code_url}" alt="QR Code" style="width: 200px; height: 200px; border: 2px solid #e5e7eb; border-radius: 8px;" />
+        </div>
+        
+        <div style="margin: 20px 0; padding: 15px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+          <p><strong>Instruções importantes:</strong></p>
+          <ul>
+            <li>Apresente este QR Code na entrada do evento</li>
+            <li>Chegue 15 minutos antes do evento</li>
+            <li>Tenha documento de identificação em mãos</li>
+          </ul>
+        </div>
+        
+        <p>Guarde este email para referência. Divirta-se! 🎉</p>
+      </div>
+    `
+  }
+};
+
+// ✅ FUNÇÕES DE ENVIO
+export const sendWelcomeEmail = async ({ email, firstName }: { 
+  email: string; 
+  firstName: string; 
+}) => {
+  const template = emailTemplates.welcome;
+  
+  return await emailProvider.emails.send({
+    from: 'SNAP <noreply@snap.com>',
+    to: email,
+    subject: template.subject,
+    html: template.getHtml({ firstName })
+  });
+};
+
+export const sendQRCodeEmail = async ({ email, firstName, qr_code_url, event_title }: {
+  email: string;
+  firstName: string; 
+  qr_code_url: string;
+  event_title: string;
+}) => {
+  const template = emailTemplates.qrCode;
+  
+  return await emailProvider.emails.send({
+    from: 'SNAP <qr@snap.com>',
+    to: email,
+    subject: template.subject({ event_title }),
+    html: template.getHtml({ firstName, event_title, qr_code_url })
+  });
+};
+
+// ✅ RATE LIMITING PARA EMAILS
+export const emailRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 5, // Máximo 5 emails por minuto por IP
+  message: 'Muitos emails enviados. Aguarde 1 minuto.',
+  standardHeaders: true
+});
+```
+
+#### 5. WebSocket para Notificações
 
 ```typescript
 // lib/websocket/client-notifications.ts
@@ -342,10 +508,157 @@ export const notifyClient = async (websocketId: string, message: any) => {
 };
 ```
 
+#### 6. Integração Email no Fluxo Existente
+
+```typescript
+// ✅ MODIFICAR API DE REGISTRO para incluir welcome email
+// app/api/client-auth/register/route.ts (ATUALIZADO)
+export async function POST(request: Request) {
+  try {
+    // ... validação e criação do usuário existente ...
+    
+    // Após criar o usuário com sucesso
+    if (clientData) {
+      // ✅ NOVA: Enviar welcome email (background)
+      await emailQueue.add('welcome', {
+        type: 'welcome',
+        data: {
+          email: clientData.email,
+          firstName: clientData.first_name
+        }
+      });
+      
+      // Retornar resposta imediata
+      return NextResponse.json({ 
+        success: true, 
+        user: {
+          id: clientData.id,
+          firstName: clientData.first_name,
+          lastName: clientData.last_name,
+          phone: clientData.phone,
+          email: clientData.email
+        },
+        message: 'Registo realizado! Verifique seu email de boas-vindas.'
+      });
+    }
+  } catch (error) {
+    // ... tratamento de erro existente ...
+  }
+}
+
+// ✅ MODIFICAR COMPONENTE GuestRequestClient para capturar email
+// components/promoter/GuestRequestClientButton.tsx (ATUALIZADO)
+const requestAccess = async () => {
+  if (!currentUser) {
+    toast.error('Você precisa estar autenticado para solicitar acesso');
+    return;
+  }
+  
+  setIsSubmitting(true);
+  
+  try {
+    const userData = {
+      event_id: eventId,
+      client_user_id: currentUser.id,
+      name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
+      phone: currentUser.phone || '',
+      email: currentUser.email || '', // ✅ NOVO: Incluir email
+      promoter_id: promoterId,
+      team_id: teamId
+    };
+    
+    // API call atualizada inclui email
+    const response = await fetch('/api/client-auth/guests/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+    
+    // ... resto da lógica existente ...
+    
+    if (result.success && result.data?.qr_code_url) {
+      setQrCodeUrl(result.data.qr_code_url);
+      setShowQRCode(true);
+      
+      // ✅ NOVA: Feedback sobre email
+      if (currentUser.email) {
+        toast.success('QR Code criado! Verifique também seu email.');
+      } else {
+        toast.success('QR Code criado com sucesso!');
+      }
+    }
+    
+  } catch (error) {
+    // ... tratamento de erro existente ...
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+```
+
+#### 7. Configuração de Provedores de Email
+
+```typescript
+// ✅ OPÇÕES DE PROVEDOR (Escolher 1)
+
+// OPÇÃO A: Resend (Recomendado - Simples e barato)
+const resendConfig = {
+  provider: 'resend',
+  apiKey: process.env.RESEND_API_KEY,
+  from: 'SNAP <noreply@snap.com>',
+  costs: {
+    free: '3000 emails/mês',
+    paid: '$20 para 50k emails/mês'
+  }
+};
+
+// OPÇÃO B: SendGrid (Enterprise)
+const sendGridConfig = {
+  provider: 'sendgrid',
+  apiKey: process.env.SENDGRID_API_KEY,
+  from: 'SNAP <noreply@snap.com>',
+  costs: {
+    free: '100 emails/dia',
+    paid: '$15 para 40k emails/mês'
+  }
+};
+
+// OPÇÃO C: Mailgun (Developers)
+const mailgunConfig = {
+  provider: 'mailgun',
+  domain: process.env.MAILGUN_DOMAIN,
+  apiKey: process.env.MAILGUN_API_KEY,
+  costs: {
+    free: '5000 emails/mês',
+    paid: '$35 para 50k emails/mês'
+  }
+};
+
+// ✅ IMPLEMENTAÇÃO AGNÓSTICA
+class EmailService {
+  constructor(private config: EmailConfig) {}
+  
+  async send(emailData: EmailData): Promise<void> {
+    switch(this.config.provider) {
+      case 'resend':
+        return this.sendWithResend(emailData);
+      case 'sendgrid':
+        return this.sendWithSendGrid(emailData);
+      case 'mailgun':
+        return this.sendWithMailgun(emailData);
+      default:
+        throw new Error(`Unsupported email provider: ${this.config.provider}`);
+    }
+  }
+}
+```
+
 **Resultados Fase 2:**
 - 📈 **Capacidade**: 75 → 300 req/min (10x)
 - ⏱️ **Response Time**: 3s → 200ms (resposta imediata)
 - 🔄 **UX**: Real-time updates via WebSocket
+- 📧 **Email System**: Welcome + QR codes por email automaticamente
+- 🎯 **Conversão**: Duplica retenção (email backup do QR)
 
 ---
 
@@ -470,10 +783,12 @@ ON team_members (user_id, team_id);
 - Dias 3-4: Configurar rate limiting
 - Dia 5: Testes e ajustes
 
-**Semana 2 - Fase 2 (Background)**
-- Dias 1-3: Setup Redis + BullMQ
-- Dias 4-5: Implementar filas e workers
-- Fins de semana: Testes de carga
+**Semana 2 - Fase 2 (Background + Email)**
+- Dias 1-2: Setup Redis + BullMQ
+- Dia 3: Implementar filas e workers
+- Dia 4: Setup email provider (Resend/SendGrid)
+- Dia 5: Integrar email no fluxo de registro e QR
+- Fins de semana: Testes de carga + emails
 
 **Semana 3 - Fase 3 (Escalabilidade)**
 - Dias 1-3: Microservices setup
@@ -956,8 +1271,27 @@ setInterval(loadMonitor.checkLoad, 10000); // Check a cada 10s
 
 Esta solução oferece **100% uptime** mesmo que o Supabase falhe temporariamente.
 
+### **🎯 VANTAGENS DO SISTEMA DE EMAIL INTEGRADO:**
+
+**Experiência do Utilizador:**
+- ✅ **Dupla Segurança**: QR na tela + email como backup
+- ✅ **Conveniência**: QR sempre acessível no email
+- ✅ **Profissionalismo**: Comunicação branded com templates
+- ✅ **Zero Ansiedade**: "Tenho meu QR guardado no email"
+
+**Vantagem Competitiva:**
+- 🚀 **Diferenciador**: Maioria dos sistemas não envia QR por email  
+- 📱 **Backup**: Se utilizador perde telefone, tem QR no email
+- 📊 **Analytics**: Tracking de entrega e abertura de emails
+- 💼 **Branding**: Cada email reforça marca SNAP
+
+**Performance:**
+- ⚡ **Zero Impacto**: Emails enviados em background
+- 🔄 **Reutiliza Queue**: Mesmo sistema de workers
+- 💰 **Custo Baixo**: 3000 emails grátis/mês com Resend
+
 ---
 
 *Documento atualizado: 2024*  
-*Versão: 2.0*  
-*Autor: Análise Técnica SNAP - Refinado com Melhorias Avançadas* 
+*Versão: 3.0*  
+*Autor: Análise Técnica SNAP - Refinado com Email System* 

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from '@/app/app/_providers/auth-provider';
 import dynamic from 'next/dynamic';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar, Cell } from "recharts";
@@ -38,6 +38,7 @@ interface GeoDistribution {
 export function RegistrationTrendCard({ eventId }: { eventId: string }) {
     const [trendData, setTrendData] = useState<RegistrationTrend[]>([]);
     const [loading, setLoading] = useState(true);
+    const { supabase } = useAuth(); // ✅ Usar cliente unificado
 
     // Dados para Recharts (formato simples)
     const [chartData, setChartData] = useState<{date: string, daily: number, cumulative: number}[]>([]);
@@ -46,7 +47,6 @@ export function RegistrationTrendCard({ eventId }: { eventId: string }) {
         const fetchTrendData = async () => {
             setLoading(true);
             try {
-                const supabase = createClientComponentClient();
                 const { data, error } = await supabase.rpc('get_registration_trend', {
                     event_id_param: eventId
                 });
@@ -158,6 +158,7 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
     const [ageData, setAgeData] = useState<AgeGroup[]>([]);
     const [avgAge, setAvgAge] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const { supabase } = useAuth(); // ✅ Usar cliente unificado
 
     // Dados para Recharts
     const [chartData, setChartData] = useState<{ageGroup: string, count: number, fill: string}[]>([]);
@@ -166,7 +167,6 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
         const fetchAgeData = async () => {
             setLoading(true);
             try {
-                const supabase = createClientComponentClient();
                 const { data, error } = await supabase.rpc('get_age_distribution', {
                     event_id_param: eventId
                 });
@@ -274,12 +274,12 @@ export function AgeDistributionCard({ eventId }: { eventId: string }) {
 export function GeographicDistributionCard({ eventId }: { eventId: string }) {
     const [geoData, setGeoData] = useState<GeoDistribution[]>([]);
     const [loading, setLoading] = useState(true);
+    const { supabase } = useAuth(); // ✅ Usar cliente unificado
 
     useEffect(() => {
         const fetchGeoData = async () => {
             setLoading(true);
             try {
-                const supabase = createClientComponentClient();
                 const { data, error } = await supabase.rpc('get_geographic_distribution', {
                     event_id_param: eventId
                 });

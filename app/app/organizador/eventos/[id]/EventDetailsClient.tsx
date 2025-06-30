@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton'; // Manter para estado de saving (se houver outras ações)
 import { toast } from "@/components/ui/use-toast"; // Corrigido import do toast
 import { CalendarIcon, MapPinIcon, QrCode, ExternalLink, PencilIcon, Clock, MapPin } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useAuth } from '@/app/app/_providers/auth-provider';
 
 // Import Tabs components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -107,6 +107,35 @@ interface EventDetailsClientProps {
     genderStats: GenderStats; // Nova prop atualizada
 }
 
+// ✅ NOVA: Função helper para chamadas RPC resilientes
+const callRPCWithRetry = async (supabase: any, funcName: string, params: any, retries = 2) => {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const { data, error } = await supabase.rpc(funcName, params);
+            
+            if (error) {
+                // Se for erro de permissão e ainda temos tentativas, tentar refresh
+                if (error.code === '42501' && i < retries) {
+                    console.log(`[${funcName}] Permission denied, refreshing session (attempt ${i + 1})`);
+                    await supabase.auth.refreshSession();
+                    await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+                    continue;
+                }
+                throw error;
+            }
+            
+            return { data, error: null };
+        } catch (err) {
+            if (i === retries) {
+                console.error(`[${funcName}] Failed after ${retries + 1} attempts:`, err);
+                throw err;
+            }
+            console.log(`[${funcName}] Attempt ${i + 1} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 300 * (i + 1))); // Progressive delay
+        }
+    }
+};
+
 export default function EventDetailsClient({ 
     event, 
     totalGuests, 
@@ -115,6 +144,7 @@ export default function EventDetailsClient({
     topPromotersStats,
     genderStats
 }: EventDetailsClientProps) {
+    const { supabase } = useAuth(); // ✅ Usar cliente unificado do AuthProvider
     // Estados
     const [peakHour, setPeakHour] = useState<{
         hour: string;
@@ -156,8 +186,8 @@ export default function EventDetailsClient({
         const fetchPeakHour = async () => {
             setLoading(true);
             try {
-                const supabase = createClientComponentClient();
-                const { data, error } = await supabase.rpc('get_peak_registration_hour', {
+                // ✅ Usar função resiliente
+                const { data, error } = await callRPCWithRetry(supabase, 'get_peak_registration_hour', {
                     event_id_param: eventId
                 });
                 
@@ -224,15 +254,15 @@ export default function EventDetailsClient({
         if (eventId) {
             fetchPeakHour();
         }
-    }, [eventId, totalGuests]);
+    }, [eventId, totalGuests, supabase]);
 
     // Novo efeito para buscar localidades principais
     useEffect(() => {
         const fetchTopLocations = async () => {
             setLoadingLocations(true);
             try {
-                const supabase = createClientComponentClient();
-                const { data, error } = await supabase.rpc('get_top_locations_for_event', {
+                // ✅ Usar função resiliente
+                const { data, error } = await callRPCWithRetry(supabase, 'get_top_locations_for_event', {
                     event_id_param: eventId
                 });
                 
@@ -283,7 +313,7 @@ export default function EventDetailsClient({
         if (eventId) {
             fetchTopLocations();
         }
-    }, [eventId]);
+    }, [eventId, supabase]);
 
     // Função de formatação movida para cá ou para utils
     const formatDate = (dateString: string | null | undefined) => {
