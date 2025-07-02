@@ -13,15 +13,22 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar } from '@/components/ui/calendar';
+import { PostalCodeInput } from '@/components/ui/postal-code-input';
 
-// Schema de validação
+// Schema de validação ATUALIZADO para códigos postais portugueses
 const registerSchema = z.object({
   phone: z.string().min(8, "Telefone deve ter pelo menos 8 caracteres"),
   email: z.string().email("Email inválido").optional().nullable(),
   first_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   last_name: z.string().optional().nullable(),
   birth_date: z.date().optional().nullable(),
-  postal_code: z.string().optional().nullable(),
+  postal_code: z.string()
+    .optional()
+    .nullable()
+    .refine((code) => {
+      if (!code) return true; // Campo opcional
+      return /^\d{4}-\d{3}$/.test(code);
+    }, "Formato inválido. Use: 1234-567"),
   gender: z.string().optional().nullable(),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   confirm_password: z.string().min(6, "Confirmação de senha é obrigatória")
@@ -44,6 +51,7 @@ export default function ClientRegistrationForm({
   onBack
 }: ClientRegistrationFormProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Inicializar formulário com react-hook-form e zod
@@ -92,7 +100,7 @@ export default function ClientRegistrationForm({
       
       toast({
         title: 'Registro realizado com sucesso',
-        description: 'Sua conta foi criada!'
+        description: detectedCity ? `Conta criada para ${detectedCity}!` : 'Sua conta foi criada!'
       });
       
       onSuccess();
@@ -107,6 +115,12 @@ export default function ClientRegistrationForm({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ✅ FUNÇÃO PARA LIDAR COM MUDANÇAS NO CÓDIGO POSTAL
+  const handlePostalCodeChange = (value: string, city: string | null) => {
+    form.setValue('postal_code', value || null);
+    setDetectedCity(city);
   };
   
   return (
@@ -262,18 +276,19 @@ export default function ClientRegistrationForm({
             />
           </div>
           
+          {/* ✅ NOVO: CAMPO CÓDIGO POSTAL COM VALIDAÇÃO INTELIGENTE */}
           <FormField
             control={form.control}
             name="postal_code"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Código Postal</FormLabel>
                 <FormControl>
-                  <Input 
-                    placeholder="0000-000" 
-                    {...field} 
+                  <PostalCodeInput
                     value={field.value || ''}
+                    onChange={handlePostalCodeChange}
                     disabled={submitting}
+                    placeholder="4750-123"
+                    label="Código Postal (Portugal)"
                   />
                 </FormControl>
                 <FormMessage />

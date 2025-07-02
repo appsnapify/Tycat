@@ -4,7 +4,7 @@ import NextImage from 'next/image';
 import { CalendarIcon, Clock, MapPin, AlertTriangle, XCircle, ClockIcon, FileText } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { GuestRequestClientV2 } from '@/components/promoter/GuestRequestClientV2';
+import { GuestRequestClient } from '@/components/promoter/GuestRequestClientButton';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useState } from 'react';
@@ -12,7 +12,7 @@ import { useState } from 'react';
 interface PromoterGuestListContentProps {
   event: {
     title: string;
-    description?: string | null;
+    description?: string;
     date: string;
     time: string | null;
     location: string | null;
@@ -31,7 +31,7 @@ interface PromoterGuestListContentProps {
   };
 }
 
-export default function PromoterGuestListContentV2({ event, params, hasAssociation = false, guestListStatus }: PromoterGuestListContentProps) {
+export default function PromoterGuestListContent({ event, params, hasAssociation = false, guestListStatus }: PromoterGuestListContentProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const eventDate = event.date ? format(new Date(event.date), 'PPP', { locale: pt }) : 'Data não definida';
@@ -70,7 +70,7 @@ export default function PromoterGuestListContentV2({ event, params, hasAssociati
     <div className="min-h-screen" style={generateBackgroundStyle()}>
       <div className="backdrop-blur-sm">
         <div className="px-6 py-6">
-          <h1 className="text-2xl font-black text-white">TYCAT <span className="text-blue-400 text-sm">v2</span></h1>
+          <h1 className="text-2xl font-black text-white">TYCAT</h1>
         </div>
       </div>
       
@@ -174,7 +174,7 @@ export default function PromoterGuestListContentV2({ event, params, hasAssociati
         <div className="px-4 py-4">
           <div className="flex justify-center">
             {guestListStatus.isOpen ? (
-              <GuestRequestClientV2
+              <GuestRequestClient
                 eventId={params[0]}
                 promoterId={params[1]}
                 teamId={params[2]}
@@ -199,52 +199,13 @@ export default function PromoterGuestListContentV2({ event, params, hasAssociati
                 }}
               />
             ) : (
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-4">
-                  {guestListStatus.status === 'CLOSED' && <XCircle className="h-6 w-6 text-red-500" />}
-                  {guestListStatus.status === 'BEFORE_OPENING' && <ClockIcon className="h-6 w-6 text-orange-500" />}
-                  {guestListStatus.status === 'NO_SCHEDULE' && <AlertTriangle className="h-6 w-6 text-yellow-500" />}
-                  <h3 className="text-lg font-semibold text-white">
-                    {guestListStatus.status === 'CLOSED' && 'Guest List Fechada'}
-                    {guestListStatus.status === 'BEFORE_OPENING' && 'Guest List em Breve'}
-                    {guestListStatus.status === 'NO_SCHEDULE' && 'Guest List Indisponível'}
-                  </h3>
-                </div>
-              
-                <div className="p-3 rounded-lg mb-4 bg-gray-800/50 backdrop-blur-sm border border-gray-700">
-                  <p className={`text-sm ${
-                      guestListStatus.status === 'CLOSED' ? 'text-red-400' :
-                      guestListStatus.status === 'BEFORE_OPENING' ? 'text-orange-400' :
-                      'text-yellow-400'
-                    }`}>
-                      {guestListStatus.message}
-                    </p>
-                  </div>
-              
-                  {guestListStatus.status === 'BEFORE_OPENING' && (
-                    <div className="text-xs text-gray-300">
-                      <p className="mb-2">Volte quando a guest list abrir para garantir o seu lugar!</p>
-                      <Button 
-                        disabled 
-                        className="px-3 py-1.5 bg-gray-700 text-gray-400 rounded-full text-xs font-medium cursor-not-allowed"
-                      >
-                        🕐 Aguardando Abertura
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {guestListStatus.status === 'CLOSED' && (
-                    <div className="text-xs text-gray-300">
-                      <p className="mb-2">O período de inscrição para este evento já terminou.</p>
-                      <Button 
-                        disabled 
-                        className="px-3 py-1.5 bg-gray-700 text-gray-400 rounded-full text-xs font-medium cursor-not-allowed"
-                      >
-                        ❌ Guest List Encerrada
-                      </Button>
-                    </div>
-                  )}
-              </div>
+              <Alert className="bg-gray-800/50 border-gray-700 text-gray-300 max-w-md">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center gap-2">
+                  <ClockIcon className="h-4 w-4" />
+                  {guestListStatus.message}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </div>

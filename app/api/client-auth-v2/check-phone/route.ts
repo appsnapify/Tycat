@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/adminClient';
+import { phoneCacheV2 } from '@/lib/cache/phone-cache-v2';
 
 export async function POST(request: Request) {
   try {
@@ -20,28 +21,65 @@ export async function POST(request: Request) {
       normalizedPhone = '+351' + normalizedPhone.replace(/^\+?351/, '');
     }
     
-    // Query Supabase
+    // ✅ VERIFICAR CACHE PRIMEIRO
+    const cached = phoneCacheV2.get(normalizedPhone);
+    if (cached) {
+      console.log(`[CHECK-PHONE-V2] Cache HIT: ${normalizedPhone}`);
+      return NextResponse.json({ 
+        success: true, 
+        exists: cached.exists,
+        userId: cached.userId,
+        cached: true
+      });
+    }
+    
+    // Query Supabase com timeout
     const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 5000)
+    );
+    
+    const queryPromise = supabase
       .from('client_users')
       .select('id')
       .eq('phone', normalizedPhone)
       .maybeSingle();
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
     
     if (error) {
+      console.error('[CHECK-PHONE-V2] Erro Supabase:', error);
       return NextResponse.json({ 
         success: false, 
         error: 'Erro ao verificar telefone'
       }, { status: 500 });
     }
     
-    return NextResponse.json({ 
-      success: true, 
+    const result = {
       exists: !!data,
       userId: data?.id || null
+    };
+    
+    // ✅ SALVAR NO CACHE
+    phoneCacheV2.set(normalizedPhone, result);
+    console.log(`[CHECK-PHONE-V2] Cache SET: ${normalizedPhone} = ${result.exists}`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      ...result,
+      cached: false
     });
     
   } catch (error) {
+    console.error('[CHECK-PHONE-V2] Erro:', error);
+    
+    if (error.message === 'Timeout') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Sistema temporariamente ocupado' 
+      }, { status: 503 });
+    }
+    
     return NextResponse.json({ 
       success: false, 
       error: 'Erro no servidor'

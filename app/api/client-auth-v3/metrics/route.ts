@@ -3,9 +3,9 @@
 // ✅ Informações sobre cache, rate limiting e performance
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getPhoneCacheStats } from '@/lib/cache/phone-cache-v2';
-import { getGuestCacheStats } from '@/lib/cache/guest-cache-v2';
-import { getRateLimitStats } from '@/lib/security/rate-limit-v2';
+import { getMetricsForAPI } from '@/lib/monitoring/cache-metrics';
+import { phoneCacheV2 } from '@/lib/cache/phone-cache-v2';
+import { guestCacheV2 } from '@/lib/cache/guest-cache-v2';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,92 +21,38 @@ export async function GET(request: NextRequest) {
       }, { status: 401 });
     }
 
-    // ✅ COLETAR MÉTRICAS DOS CACHES
-    const phoneCacheStats = getPhoneCacheStats();
-    const guestCacheStats = getGuestCacheStats();
-    const rateLimitStats = getRateLimitStats();
-
-    // ✅ MÉTRICAS DO SISTEMA
-    const memoryUsage = process.memoryUsage();
-    const uptime = process.uptime();
+    const baseMetrics = getMetricsForAPI();
+    const phoneCacheStats = phoneCacheV2.getStats();
+    const guestCacheStats = guestCacheV2.getStats();
     
-    // ✅ CALCULAR EFICIÊNCIA DOS CACHES
-    const phoneCacheEfficiency = phoneCacheStats.size > 0 ? 
-      Math.round((phoneCacheStats.size / phoneCacheStats.maxSize) * 100) : 0;
-    
-    const guestCacheEfficiency = guestCacheStats.size > 0 ? 
-      Math.round((guestCacheStats.size / guestCacheStats.maxSize) * 100) : 0;
-    
-    const rateLimitUsage = rateLimitStats.size > 0 ? 
-      Math.round((rateLimitStats.size / rateLimitStats.maxSize) * 100) : 0;
-
-    // ✅ MÉTRICAS CONSOLIDADAS
-    const metrics = {
-      timestamp: new Date().toISOString(),
-      system: {
-        uptime: Math.round(uptime),
-        uptimeFormatted: formatUptime(uptime),
-        memory: {
-          used: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
-          total: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
-          external: Math.round(memoryUsage.external / 1024 / 1024), // MB
+    const response = {
+      ...baseMetrics,
+      cacheDetails: {
+        phoneCache: {
+          size: phoneCacheStats.size,
+          maxSize: phoneCacheStats.maxSize,
+          hitRate: phoneCacheStats.hitRate
         },
-        nodeVersion: process.version,
-        platform: process.platform
-      },
-      
-      cache: {
-        phone: {
-          ...phoneCacheStats,
-          efficiency: phoneCacheEfficiency,
-          status: phoneCacheEfficiency > 80 ? 'HIGH' : phoneCacheEfficiency > 50 ? 'MEDIUM' : 'LOW'
-        },
-        guest: {
-          ...guestCacheStats,
-          efficiency: guestCacheEfficiency,
-          status: guestCacheEfficiency > 80 ? 'HIGH' : guestCacheEfficiency > 50 ? 'MEDIUM' : 'LOW'
+        guestCache: {
+          size: guestCacheStats.size,
+          maxSize: guestCacheStats.maxSize,
+          hitRate: guestCacheStats.hitRate
         }
       },
-      
-      rateLimiting: {
-        ...rateLimitStats,
-        usage: rateLimitUsage,
-        status: rateLimitUsage > 90 ? 'CRITICAL' : rateLimitUsage > 70 ? 'WARNING' : 'OK'
-      },
-      
       performance: {
-        averageResponseTime: 'N/A', // Seria calculado com histórico
-        requestsPerMinute: 'N/A',   // Seria calculado com contadores
-        errorRate: 'N/A',          // Seria calculado com contadores
-        cacheHitRate: 'N/A'        // Seria calculado com contadores
-      },
-      
-      health: {
-        overall: getOverallHealth(phoneCacheEfficiency, guestCacheEfficiency, rateLimitUsage),
-        components: {
-          cache: phoneCacheEfficiency > 0 && guestCacheEfficiency >= 0 ? 'HEALTHY' : 'DEGRADED',
-          rateLimiting: rateLimitUsage < 90 ? 'HEALTHY' : 'CRITICAL',
-          memory: memoryUsage.heapUsed < 512 * 1024 * 1024 ? 'HEALTHY' : 'WARNING' // 512MB
-        }
+        estimatedSpeedup: baseMetrics.metrics.phoneCache.hitRate !== '0.0%' 
+          ? `~${(1 / (1 - parseFloat(baseMetrics.metrics.phoneCache.hitRate) / 100) - 1) * 100}% faster`
+          : 'No data yet'
       }
     };
-
-    return NextResponse.json({
-      success: true,
-      data: metrics
-    }, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Content-Type': 'application/json'
-      }
-    });
-
-  } catch (error) {
-    console.error('[METRICS-V3] Erro:', error);
     
+    return NextResponse.json(response);
+    
+  } catch (error) {
+    console.error('[METRICS-API] Erro ao obter métricas:', error);
     return NextResponse.json({
-      success: false,
-      error: 'Erro interno ao coletar métricas'
+      status: 'error',
+      error: 'Failed to retrieve metrics'
     }, { status: 500 });
   }
 }

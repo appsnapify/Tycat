@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { ClientUser } from '@/types/client';
+import { createClient } from '../lib/supabase/client';
+import { ClientUser } from '../types/client';
 
 // Interface para o contexto de autenticação do cliente
 interface ClientAuthContextType {
@@ -101,13 +101,25 @@ export const ClientAuthProvider = ({
           return;
         }
         
-        // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
+        // Se existe sessão, buscar dados na tabela client_users usando metadados
         if (session && session.user) {
-          // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+          // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
+          const clientUserId = session.user.user_metadata?.client_user_id;
+          
+          if (!clientUserId) {
+            console.error('client_user_id não encontrado nos metadados do usuário');
+            setAuthState({
+              user: null,
+              isLoading: false,
+              error: 'Dados de sessão incompletos'
+            });
+            return;
+          }
+          
           const { data, error: clientError } = await supabaseClient
             .from('client_users')
             .select('*')
-            .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+            .eq('id', clientUserId) // Usar o ID dos metadados que é o ID real da tabela
             .single();
             
           if (clientError) {
@@ -171,11 +183,22 @@ export const ClientAuthProvider = ({
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session && session.user) {
-            // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+            // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
+            const clientUserId = session.user.user_metadata?.client_user_id;
+            
+            if (!clientUserId) {
+              console.error('client_user_id não encontrado nos metadados após auth change');
+              setAuthState(prev => ({
+                ...prev,
+                error: 'Dados de sessão incompletos'
+              }));
+              return;
+            }
+            
             const { data, error: clientError } = await supabaseClient
               .from('client_users')
               .select('*')
-              .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+              .eq('id', clientUserId) // Usar o ID dos metadados que é o ID real da tabela
               .single();
               
             if (clientError) {
@@ -257,15 +280,22 @@ export const ClientAuthProvider = ({
         return null;
       }
       
-      // Se existe sessão, buscar dados na tabela client_users usando o ID do Auth
+      // Se existe sessão, buscar dados na tabela client_users usando metadados
       if (session && session.user) {
-        // CORRIGIDO: Usar diretamente o ID do usuário Auth para buscar na tabela client_users
+        // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
+        const clientUserId = session.user.user_metadata?.client_user_id;
+        
+        if (!clientUserId) {
+          console.error('client_user_id não encontrado nos metadados em checkAuth');
+          return null;
+        }
+        
         const { data, error: clientError } = await supabaseClient
           .from('client_users')
           .select('*')
-          .eq('id', session.user.id) // ID do Auth é o mesmo da tabela client_users
+          .eq('id', clientUserId) // Usar o ID dos metadados que é o ID real da tabela
           .single();
-      
+          
         if (clientError) {
           console.error('Erro ao buscar dados do usuário:', clientError);
           return null;

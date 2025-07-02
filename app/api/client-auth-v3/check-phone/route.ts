@@ -1,133 +1,98 @@
 // app/api/client-auth-v3/check-phone/route.ts
-// API otimizada de verificação de telefone
-// ✅ Cache em memória + Rate limiting + Validação aprimorada
+// API otimizada de verificação de telefone PARA PROMO2
+// ✅ Cache em memória + Rate limiting + Timeout protection
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/adminClient';
-import { getCachedPhoneVerification, setCachedPhoneVerification } from '@/lib/cache/phone-cache-v2';
-import { checkRateLimit, RATE_LIMIT_CONFIGS, createRateLimitKey } from '@/lib/security/rate-limit-v2';
+import { phoneCacheV2 } from '@/lib/cache/phone-cache-v2';
+import { checkRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/security/advanced-rate-limit';
 
-// ✅ HELPER PARA OBTER IP
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  
-  if (realIP) {
-    return realIP;
-  }
-  
-  return 'unknown';
-}
-
-// ✅ VALIDAÇÃO DE TELEFONE
-function validatePhone(phone: string): { valid: boolean; error?: string } {
+// ✅ VALIDAÇÃO DE TELEFONE ROBUSTA
+function validatePhone(phone: any): { valid: boolean; error?: string } {
   if (!phone || typeof phone !== 'string') {
     return { valid: false, error: 'Telefone é obrigatório' };
   }
   
   const cleanPhone = phone.trim();
-  
-  if (cleanPhone.length < 9 || cleanPhone.length > 15) {
-    return { valid: false, error: 'Formato de telefone inválido' };
+  if (cleanPhone.length < 9) {
+    return { valid: false, error: 'Telefone deve ter pelo menos 9 dígitos' };
   }
   
-  // Verificar se contém apenas números e símbolos permitidos
-  if (!/^[\d\s\+\-\(\)]+$/.test(cleanPhone)) {
-    return { valid: false, error: 'Telefone contém caracteres inválidos' };
+  if (cleanPhone.length > 20) {
+    return { valid: false, error: 'Telefone inválido' };
   }
   
   return { valid: true };
 }
 
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  
   try {
-    // ✅ RATE LIMITING
-    const clientIP = getClientIP(request);
-    const rateLimitKey = createRateLimitKey(clientIP);
-    const rateCheck = checkRateLimit(rateLimitKey, RATE_LIMIT_CONFIGS.PHONE_CHECK);
-    
-    if (!rateCheck.allowed) {
+    // ✅ RATE LIMITING CONFORME PLANO
+    const rateLimitResult = await checkRateLimit(request, RATE_LIMIT_CONFIGS.CHECK_PHONE);
+    if (!rateLimitResult.success) {
       return NextResponse.json({
         success: false,
         error: 'Muitas tentativas. Tente novamente em alguns minutos.',
-        retryAfter: Math.ceil((rateCheck.resetTime - Date.now()) / 1000)
+        retryAfter: rateLimitResult.retryAfter
       }, { 
         status: 429,
         headers: {
-          'X-RateLimit-Remaining': rateCheck.remaining.toString(),
-          'X-RateLimit-Reset': rateCheck.resetTime.toString()
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString()
         }
       });
     }
 
-    // ✅ VALIDAÇÃO DO BODY
-    let body;
-    try {
-      body = await request.json();
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        error: 'Dados inválidos'
-      }, { status: 400 });
-    }
-
+    const body = await request.json();
     const { phone } = body;
 
-    // ✅ VALIDAÇÃO DO TELEFONE
-    const phoneValidation = validatePhone(phone);
-    if (!phoneValidation.valid) {
+    // ✅ VALIDAÇÃO ROBUSTA
+    const validation = validatePhone(phone);
+    if (!validation.valid) {
       return NextResponse.json({
         success: false,
-        error: phoneValidation.error
+        error: validation.error 
       }, { status: 400 });
     }
 
-    const cleanPhone = phone.trim();
-
-    // ✅ CACHE HIT - RESPOSTA INSTANTÂNEA
-    const cached = getCachedPhoneVerification(cleanPhone);
+    // ✅ NORMALIZAÇÃO TELEFONE
+    let normalizedPhone = phone.trim();
+    if (!normalizedPhone.startsWith('+351')) {
+      normalizedPhone = '+351' + normalizedPhone.replace(/^\\+?351/, '');
+    }
+    
+    // ✅ CACHE HIT CHECK
+    const cached = phoneCacheV2.get(normalizedPhone);
     if (cached) {
-      console.log(`[PHONE-CHECK-V3] Cache hit para ${cleanPhone}`);
-      
-      const responseTime = Date.now() - startTime;
-      
+      console.log(`[CHECK-PHONE-V3] Cache HIT: ${normalizedPhone} = ${cached.exists}`);
       return NextResponse.json({
         success: true,
         exists: cached.exists,
         userId: cached.userId,
-        source: 'cache',
-        responseTime
-      }, {
-        headers: {
-          'X-Cache-Status': 'HIT',
-          'X-Response-Time': responseTime.toString()
-        }
+        cached: true
       });
     }
-
-    // ✅ CACHE MISS - CONSULTAR DATABASE
-    console.log(`[PHONE-CHECK-V3] Cache miss para ${cleanPhone}, consultando BD`);
     
+    // ✅ TIMEOUT PROTECTION
     const supabase = createAdminClient();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 5000)
+    );
     
-    const { data, error } = await supabase
+    const queryPromise = supabase
       .from('client_users')
-      .select('id, phone')
-      .eq('phone', cleanPhone)
-      .limit(1)
+      .select('id')
+      .eq('phone', normalizedPhone)
       .maybeSingle();
 
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+    
     if (error) {
-      console.error('[PHONE-CHECK-V3] Erro na consulta:', error);
+      console.error('[CHECK-PHONE-V3] Erro Supabase:', error);
       return NextResponse.json({
         success: false,
-        error: 'Erro interno na verificação'
+        error: 'Erro ao verificar telefone' 
       }, { status: 500 });
     }
 
@@ -135,41 +100,30 @@ export async function POST(request: NextRequest) {
       exists: !!data,
       userId: data?.id || null
     };
-
-    // ✅ CACHE PARA PRÓXIMAS VERIFICAÇÕES
-    setCachedPhoneVerification(cleanPhone, result.exists, result.userId);
     
-    const responseTime = Date.now() - startTime;
-    
-    console.log(`[PHONE-CHECK-V3] Verificação completa para ${cleanPhone}: ${result.exists ? 'EXISTE' : 'NÃO EXISTE'} (${responseTime}ms)`);
+    // ✅ CACHE SET
+    phoneCacheV2.set(normalizedPhone, result);
+    console.log(`[CHECK-PHONE-V3] Cache SET: ${normalizedPhone} = ${result.exists}`);
 
     return NextResponse.json({
       success: true,
       ...result,
-      source: 'database',
-      responseTime
-    }, {
-      headers: {
-        'X-Cache-Status': 'MISS',
-        'X-Response-Time': responseTime.toString(),
-        'X-RateLimit-Remaining': rateCheck.remaining.toString()
-      }
+      cached: false
     });
 
   } catch (error) {
-    console.error('[PHONE-CHECK-V3] Erro não tratado:', error);
+    console.error('[CHECK-PHONE-V3] Erro:', error);
     
-    const responseTime = Date.now() - startTime;
+    if (error.message === 'Timeout') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Sistema temporariamente ocupado. Tente novamente.' 
+      }, { status: 503 });
+    }
     
     return NextResponse.json({
       success: false,
-      error: 'Erro interno no servidor',
-      responseTime
-    }, { 
-      status: 500,
-      headers: {
-        'X-Response-Time': responseTime.toString()
-      }
-    });
+      error: 'Erro interno' 
+    }, { status: 500 });
   }
 } 

@@ -104,7 +104,7 @@ export default function ClientLoginFormReal() {
     setStatusMessage(translations['Verificando número...'])
     
     try {
-      const response = await fetch('/api/client-auth-v2/check-phone', {
+      const response = await fetch('/api/client-auth-v3/check-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

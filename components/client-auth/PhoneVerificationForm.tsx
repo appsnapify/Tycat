@@ -73,7 +73,7 @@ export function PhoneVerificationForm({ onVerified, defaultPhone = '' }: PhoneVe
       // Usar o telefone diretamente (já vem formatado do react-phone-number-input)
       const phoneToVerify = phone;
       
-      const response = await fetch('/api/client-auth-v2/check-phone', {
+      const response = await fetch('/api/client-auth-v3/check-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

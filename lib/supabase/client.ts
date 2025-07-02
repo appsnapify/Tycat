@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { Database } from '../../types/supabase'
 
 // Variáveis de ambiente
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,27 +14,41 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Cliente singleton para evitar múltiplas instâncias
 let clientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
 
-// Função para limpeza cirúrgica de cookies corrompidos
+// Função inteligente para limpeza de cookies corrompidos
 function cleanupCorruptedCookies() {
   try {
     if (typeof window === 'undefined') return // Proteção SSR
     
+    // Sempre limpar cookies corrompidos - sem verificação de sessão ativa
+    
+    let cookiesRemoved = 0
     document.cookie.split(';').forEach(cookie => {
       const [name, value] = cookie.trim().split('=')
       
-      // Verificar apenas cookies Supabase que começam com base64-
+      // Verificar apenas cookies Supabase específicos que causam problemas
       if (name?.includes('supabase') && value?.startsWith('base64-')) {
         try {
-          // Tentar parsing do conteúdo base64 - se falhar, é corrupto
-          JSON.parse(value.substring(7))
+          // Verificação mais rigorosa - tentar decodificar base64 e parsear JSON
+          const decoded = atob(value.substring(7))
+          const parsed = JSON.parse(decoded)
+          
+          // Verificar se é um token válido
+          if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
+            throw new Error('Token inválido')
+          }
         } catch {
-          // Cookie corrupto detectado - remover apenas este específico
+          // Cookie realmente corrupto - remover apenas este específico
           console.log(`[Auth] Removendo cookie corrupto: ${name}`)
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
+          cookiesRemoved++
         }
       }
     })
+    
+    if (cookiesRemoved > 0) {
+      console.log(`[Auth] Limpeza concluída: ${cookiesRemoved} cookies corrompidos removidos`)
+    }
   } catch (error) {
     // Falha silenciosa para manter compatibilidade total
     console.warn('[Auth] Aviso: Não foi possível verificar cookies:', error)

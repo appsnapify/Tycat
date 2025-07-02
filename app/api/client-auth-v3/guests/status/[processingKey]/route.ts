@@ -3,26 +3,14 @@
 // ✅ Resposta rápida sobre estado do processamento background
 
 import { NextRequest, NextResponse } from 'next/server';
-
-// ✅ REFERÊNCIA AO MAPA DE PROCESSAMENTO
-// (Idealmente seria compartilhado, mas para simplicidade, recriaremos)
-// Em produção, usaria Redis ou similar para estado compartilhado
-
-// Simulação do mapa para demonstração
-// (Em implementação real, seria importado do arquivo principal)
-const mockProcessingMap = new Map<string, {
-  status: 'processing' | 'completed' | 'failed';
-  result?: any;
-  error?: string;
-  timestamp: number;
-}>();
+import { processingManager } from '@/lib/processing/processing-manager';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { processingKey: string } }
+  { params }: { params: Promise<{ processingKey: string }> }
 ) {
   try {
-    const { processingKey } = params;
+    const { processingKey } = await params;
 
     if (!processingKey || typeof processingKey !== 'string') {
       return NextResponse.json({
@@ -31,8 +19,8 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // ✅ VERIFICAR STATUS NO MAPA
-    const processStatus = mockProcessingMap.get(processingKey);
+    // ✅ VERIFICAR STATUS NO MAPA REAL
+    const processStatus = processingManager.get(processingKey);
 
     if (!processStatus) {
       return NextResponse.json({
@@ -45,7 +33,7 @@ export async function GET(
     // ✅ VERIFICAR SE EXPIROU (5 minutos)
     const now = Date.now();
     if (now - processStatus.timestamp > 5 * 60 * 1000) {
-      mockProcessingMap.delete(processingKey);
+      processingManager.delete(processingKey);
       return NextResponse.json({
         success: false,
         error: 'Processamento expirou',
@@ -65,8 +53,7 @@ export async function GET(
         });
 
       case 'completed':
-        // ✅ SUCESSO - REMOVER DO MAPA
-        mockProcessingMap.delete(processingKey);
+        // ✅ SUCESSO - MANTER NO MAPA (será removido pelo cleanup automático)
         return NextResponse.json({
           success: true,
           processing: false,
@@ -76,8 +63,7 @@ export async function GET(
         });
 
       case 'failed':
-        // ✅ ERRO - REMOVER DO MAPA
-        mockProcessingMap.delete(processingKey);
+        // ✅ ERRO - MANTER NO MAPA (será removido pelo cleanup automático)
         return NextResponse.json({
           success: false,
           processing: false,

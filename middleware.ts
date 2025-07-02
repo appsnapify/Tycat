@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-// import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs' // REMOVIDO
-import { createServerClient, type CookieOptions } from '@supabase/ssr' // ADICIONADO
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { getRoleRedirectUrl, normalizeRole, hasRoutePermission } from '@/lib/utils/role-redirect'
-// import { rateLimit } from './lib/security/rate-limit' // TEMPORARIAMENTE DESABILITADO
 
 // Definir função de normalização para consistência entre banco e frontend
 const roleMappings: Record<string, string> = {
@@ -43,24 +41,9 @@ const getDashboardUrlByRole = (role: string, userMetadata?: any): string => {
   }
 };
 
-// 🔒 RATE LIMITING TEMPORARIAMENTE DESABILITADO - estava causando timeouts
-// const limiter = rateLimit({
-//   interval: 60 * 1000, // 1 minuto
-//   uniqueTokenPerInterval: 500
-// });
-
 // Middleware de autenticação para controlar acesso a rotas protegidas
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
-  
-  // 🔒 RATE LIMITING TEMPORARIAMENTE DESABILITADO - estava causando timeouts
-  // if (pathname.startsWith('/promo') || pathname.startsWith('/api')) {
-  //   try {
-  //     await limiter.check(req, 10, req.ip || 'anonymous'); // 10 requests per minute
-  //   } catch (error) {
-  //     return new NextResponse('Rate limit exceeded', { status: 429 });
-  //   }
-  // }
 
   // Permitir acesso direto a rotas públicas específicas dentro de /app
   const publicAppRoutes = ['/app/dashboard1'];
@@ -178,13 +161,10 @@ export async function middleware(req: NextRequest) {
 // Configurar quais caminhos este middleware deve ser executado
 export const config = {
   matcher: [
-    // Matcher original que estava a funcionar
     '/app/:path*',
     '/login',
     '/register',
-    '/api/client-auth/:path*',
     '/api/guests/:path*',
     '/api/scanners/:path*',
-    // '/promo/:path*', // TEMPORARIAMENTE REMOVIDO - estava causando problemas
   ],
 } 

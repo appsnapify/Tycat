@@ -48,75 +48,140 @@ export function GuestRequestClientV2({
   const [loadingMessage, setLoadingMessage] = useState('');
   const [loadingSubmessage, setLoadingSubmessage] = useState('');
 
-  // ✅ POLLING AUTOMÁTICO PARA VERIFICAR STATUS
+  // ✅ POLLING AUTOMÁTICO COM FALLBACK ROBUSTO
   useEffect(() => {
     if (!processingKey || !isPolling) return;
 
     let pollCount = 0;
-    const maxPolls = 20; // Máximo 20 tentativas (40 segundos)
+    let consecutiveErrors = 0;
+    const maxPolls = 15; // Reduzido para 30 segundos
+    const maxErrors = 3; // Máximo de erros consecutivos
     
-    const pollInterval = setInterval(async () => {
-      pollCount++;
-      
-      try {
-        const response = await fetch(`/api/client-auth-v3/guests/status/${processingKey}`);
-        const result = await response.json();
+    // ✅ DELAY INICIAL para dar tempo ao processamento
+    const initialDelay = setTimeout(() => {
+      const pollInterval = setInterval(async () => {
+        pollCount++;
         
-        if (result.success && !result.processing) {
-          // ✅ PROCESSAMENTO COMPLETO
-          clearInterval(pollInterval);
-          setIsPolling(false);
-          setProcessingKey(null);
+        try {
+          const response = await fetch(`/api/client-auth-v3/guests/status/${processingKey}`);
           
-          if (result.data?.qr_code_url) {
-            setQrCodeUrl(result.data.qr_code_url);
-            setShowQRCode(true);
-            setCompletedSteps(prev => [...prev, 'qr']);
-            toast.success('QR Code criado com sucesso!');
+          // ✅ RESET CONTADOR DE ERROS EM SUCESSO
+          if (response.ok) {
+            consecutiveErrors = 0;
           }
           
-          setIsSubmitting(false);
-          return;
-        }
-        
-        if (!result.success || result.expired) {
+          const result = await response.json();
+          
+          // ✅ PROCESSAMENTO COMPLETO
+          if (result.success && !result.processing) {
+            clearInterval(pollInterval);
+            setIsPolling(false);
+            setProcessingKey(null);
+            setIsSubmitting(false);
+            
+            if (result.data?.qr_code_url) {
+              setQrCodeUrl(result.data.qr_code_url);
+              setShowQRCode(true);
+              setCompletedSteps(prev => [...prev, 'qr']);
+              toast.success('QR Code criado com sucesso!');
+            }
+            return;
+          }
+          
           // ✅ ERRO OU EXPIRADO
-          clearInterval(pollInterval);
+          if (!result.success || result.expired) {
+            consecutiveErrors++;
+            
+            // ✅ FALLBACK: SE MUITOS 404s, TENTAR BUSCAR GUEST DIRETAMENTE
+            if (response.status === 404 && consecutiveErrors >= 2) {
+              console.log('[POLLING] Muitos 404s, tentando fallback direto...');
+              
+              try {
+                // ✅ TENTAR BUSCAR GUEST EXISTENTE
+                const fallbackResponse = await fetch('/api/client-auth/guests/check-existing', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    event_id: eventId,
+                    client_user_id: currentUser?.id
+                  }),
+                });
+                
+                if (fallbackResponse.ok) {
+                  const fallbackResult = await fallbackResponse.json();
+                  if (fallbackResult.success && fallbackResult.data?.qr_code_url) {
+                    clearInterval(pollInterval);
+                    setIsPolling(false);
+                    setProcessingKey(null);
+                    setIsSubmitting(false);
+                    
+                    setQrCodeUrl(fallbackResult.data.qr_code_url);
+                    setShowQRCode(true);
+                    setCompletedSteps(prev => [...prev, 'qr']);
+                    toast.success('QR Code encontrado!');
+                    return;
+                  }
+                }
+              } catch (fallbackError) {
+                console.error('Erro no fallback:', fallbackError);
+              }
+            }
+            
+            // ✅ TIMEOUT FINAL
+            if (pollCount >= maxPolls || consecutiveErrors >= maxErrors) {
+              clearInterval(pollInterval);
+              setIsPolling(false);
+              setProcessingKey(null);
+              setIsSubmitting(false);
+              
+              toast.error('Processamento demorou mais que o esperado. Tente novamente.');
+              return;
+            }
+            
+            return; // Continuar polling
+          }
+          
+          // ✅ AINDA PROCESSANDO - ATUALIZAR PROGRESSO
+          if (result.processing) {
+            const progress = Math.min(90, (pollCount / maxPolls) * 100);
+            setProcessingProgress(progress);
+            setLoadingSubmessage(`Verificando status... ${pollCount}/${maxPolls}`);
+          }
+          
+        } catch (error) {
+          console.error('Erro no polling:', error);
+          consecutiveErrors++;
+          
+          // ✅ MUITOS ERROS - PARAR POLLING
+          if (consecutiveErrors >= maxErrors || pollCount >= maxPolls) {
+            clearInterval(pollInterval);
+            setIsPolling(false);
+            setProcessingKey(null);
+            setIsSubmitting(false);
+            
+            toast.error('Erro na comunicação. Tente novamente.');
+            return;
+          }
+        }
+      }, 2000); // Poll a cada 2 segundos
+      
+      // ✅ TIMEOUT ABSOLUTO - GARANTIA DE QUE POLLING NUNCA FICA INFINITO
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isPolling) {
           setIsPolling(false);
           setProcessingKey(null);
           setIsSubmitting(false);
-          
-          toast.error(result.error || 'Processamento falhou');
-          return;
+          toast.error('Timeout: Processamento demorou mais que 60 segundos.');
         }
-        
-        // ✅ AINDA PROCESSANDO - ATUALIZAR PROGRESSO
-        if (result.processing) {
-          const progress = Math.min(95, (pollCount / maxPolls) * 100);
-          setProcessingProgress(progress);
-          
-          setLoadingSubmessage(`Tentativa ${pollCount}/${maxPolls} - ${Math.round(progress)}%`);
-        }
-        
-      } catch (error) {
-        console.error('Erro no polling:', error);
-        
-        // ✅ ERRO NO POLLING - TENTAR MAIS ALGUMAS VEZES
-        if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
-          setIsPolling(false);
-          setProcessingKey(null);
-          setIsSubmitting(false);
-          
-          toast.error('Tempo esgotado. Tente novamente.');
-        }
-      }
-    }, 2000); // Poll a cada 2 segundos
+      }, 60000); // 60 segundos máximo
+      
+    }, 1500); // Delay inicial de 1.5 segundos
 
     return () => {
-      clearInterval(pollInterval);
+      clearTimeout(initialDelay);
     };
-  }, [processingKey, isPolling]);
+  }, [processingKey, isPolling, eventId, currentUser?.id]);
 
   // ✅ FUNÇÃO OTIMIZADA DE VERIFICAÇÃO DE TELEFONE
   const checkPhoneOptimized = async (phone: string): Promise<{ exists: boolean; userId: string | null }> => {
@@ -219,6 +284,7 @@ export function GuestRequestClientV2({
       if (result.processing && result.processingKey) {
         setProcessingKey(result.processingKey);
         setIsPolling(true);
+        setIsSubmitting(false); // ✅ REMOVER LOADING OVERLAY
         setLoadingMessage('QR Code sendo criado...');
         setLoadingSubmessage('Processando em background - aguarde');
         
@@ -336,7 +402,7 @@ export function GuestRequestClientV2({
   
   return (
     <LoadingOverlay 
-      isLoading={isSubmitting && !isPolling} 
+      isLoading={isSubmitting && !isPolling && !processingKey} 
       message={loadingMessage} 
       submessage={loadingSubmessage}
     >
@@ -390,14 +456,19 @@ export function GuestRequestClientV2({
               
               <Button 
                 onClick={requestAccessOptimized} 
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPolling}
                 className="w-full"
                 style={buttonStyle}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isPolling ? 'Processando...' : 'Enviando...'}
+                    Enviando...
+                  </>
+                ) : isPolling ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Criando QR Code...
                   </>
                 ) : (
                   <>
@@ -439,9 +510,8 @@ export function GuestRequestClientV2({
             
             {authStep === 'phone' && (
               <div className="p-2 sm:p-0">
-                <PhoneVerificationForm 
+                                <PhoneVerificationForm
                   onVerified={handlePhoneVerified}
-                  optimizedCheck={checkPhoneOptimized}
                 />
               </div>
             )}

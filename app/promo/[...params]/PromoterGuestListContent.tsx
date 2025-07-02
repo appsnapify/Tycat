@@ -4,7 +4,7 @@ import NextImage from 'next/image';
 import { CalendarIcon, Clock, MapPin, AlertTriangle, XCircle, ClockIcon, FileText } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { GuestRequestClient } from '@/components/promoter/GuestRequestClientButton';
+import { GuestRequestClientV2 } from '@/components/promoter/GuestRequestClientV2';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useState } from 'react';
@@ -12,7 +12,7 @@ import { useState } from 'react';
 interface PromoterGuestListContentProps {
   event: {
     title: string;
-    description?: string;
+    description?: string | null;
     date: string;
     time: string | null;
     location: string | null;
@@ -174,7 +174,7 @@ export default function PromoterGuestListContent({ event, params, hasAssociation
         <div className="px-4 py-4">
           <div className="flex justify-center">
             {guestListStatus.isOpen ? (
-              <GuestRequestClient
+              <GuestRequestClientV2
                 eventId={params[0]}
                 promoterId={params[1]}
                 teamId={params[2]}

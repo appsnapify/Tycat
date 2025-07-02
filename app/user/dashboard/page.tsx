@@ -2,11 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useClientAuth } from '@/hooks/useClientAuth';
+import { useClientAuth } from '../../../hooks/useClientAuth';
 import { Heart, QrCode, Calendar, MapPin, Settings, Users, Ticket } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '../../../components/ui/button';
+import { Card, CardContent } from '../../../components/ui/card';
+import { Dialog, DialogContent, DialogTitle } from '../../../components/ui/dialog';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 

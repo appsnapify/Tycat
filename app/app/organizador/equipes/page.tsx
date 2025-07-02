@@ -31,14 +31,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { createClient } from '@/lib/supabase'
 
-// Definir cores consistentes com o tema
+// Sistema de cores azul moderno - consistente com o dashboard
 const colors = {
-  primary: "bg-lime-500 hover:bg-lime-600 text-white",
+  primary: "bg-blue-600 hover:bg-blue-700 text-white",
   secondary: "bg-white hover:bg-gray-50 text-gray-700",
-  accent: "bg-fuchsia-500 hover:bg-fuchsia-600 text-white",
+  accent: "bg-blue-600 hover:bg-blue-700 text-white",
   badge: {
     green: "bg-green-100 text-green-800",
-    fuchsia: "bg-fuchsia-100 text-fuchsia-800",
+    blue: "bg-blue-100 text-blue-800",
     gray: "bg-gray-100 text-gray-700"
   }
 }
@@ -124,21 +124,43 @@ export default function OrganizadorEquipesPage() {
       
       setOrganization({ id: organizationId, name: '', slug: '' });
 
-      const { data: teamsWithCounts, error: rpcError } = await supabase
-        .rpc('get_organization_teams_with_counts', { 
-          org_id: organizationId 
-        });
+      // Consulta direta mais robusta para contornar problemas de autenticação
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('teams')
+        .select(`
+          id,
+          name,
+          team_code,
+          organization_id
+        `)
+        .eq('organization_id', organizationId)
+        .eq('is_active', true);
       
-      if (rpcError) {
-        console.error('Erro ao chamar RPC:', rpcError.message); 
+      if (teamsError) {
+        console.error('Erro ao buscar teams:', teamsError.message);
         requestAnimationFrame(() => {
-          const errorMessage = rpcError.message || 'Erro ao carregar equipes via RPC.';
-          toast.error(errorMessage);
+          toast.error('Erro ao carregar equipes: ' + teamsError.message);
         });
         setLoading(false);
         return;
       }
 
+      // Buscar contagem de membros separadamente para cada equipe
+      let teamsWithCounts = [];
+      if (teamsData && teamsData.length > 0) {
+        for (const team of teamsData) {
+          const { count } = await supabase
+            .from('team_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('team_id', team.id);
+          
+          teamsWithCounts.push({
+            ...team,
+            member_count: count || 0
+          });
+        }
+      }
+      
       if (teamsWithCounts && teamsWithCounts.length > 0) {
         setTeams(teamsWithCounts);
         setFilteredTeams(teamsWithCounts);
@@ -263,7 +285,7 @@ export default function OrganizadorEquipesPage() {
       <div className="container py-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
             <h3 className="text-xl font-medium">Carregando equipes...</h3>
           </div>
         </div>
@@ -323,7 +345,7 @@ export default function OrganizadorEquipesPage() {
           
           <Dialog open={showCallTeamDialog} onOpenChange={setShowCallTeamDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="hover:border-fuchsia-500 hover:text-fuchsia-600">
+              <Button variant="outline" className="hover:border-blue-500 hover:text-blue-600">
                 <Users className="mr-2 h-4 w-4" />
                 Chamar equipa
               </Button>
@@ -371,7 +393,7 @@ export default function OrganizadorEquipesPage() {
       <div className="mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative md:w-80">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-lime-500" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-500" />
             <Input
               placeholder="Buscar equipes..."
               className="pl-10"
@@ -384,7 +406,7 @@ export default function OrganizadorEquipesPage() {
       
       {filteredTeams.length === 0 ? (
         <div className="bg-card border rounded-lg p-12 flex flex-col items-center justify-center">
-          <Users className="h-12 w-12 text-fuchsia-400 mb-4" />
+          <Users className="h-12 w-12 text-blue-400 mb-4" />
           {searchQuery ? (
             <>
               <h3 className="text-xl font-medium mb-2">Nenhuma equipe encontrada</h3>
@@ -408,7 +430,7 @@ export default function OrganizadorEquipesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-lime-500">
+            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-blue-500">
               <CardHeader className="pb-3 text-center">
                 <CardTitle className="text-gray-900">{team.name}</CardTitle>
                 <CardDescription className="flex items-center justify-center">
@@ -429,7 +451,7 @@ export default function OrganizadorEquipesPage() {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleTeamSettings(team.id)}
-                  className="w-2/3 hover:border-lime-500 hover:text-lime-600"
+                  className="w-2/3 hover:border-blue-500 hover:text-blue-600"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Editar

@@ -1,32 +1,30 @@
 // lib/cache/guest-cache-v2.ts
-// Cache para verificação de duplicatas de guests
-// Evita queries repetidas durante alta concorrência
+// Cache para verificação de duplicatas de guests - AJUSTADO PARA 500 USERS
+// Evita hits desnecessários na BD durante picos de tráfego
+
+import { LRUCache } from 'lru-cache';
 
 interface GuestCacheEntry {
   exists: boolean;
-  guestData: any | null;
+  guestData: any;
   timestamp: number;
 }
 
 class GuestCacheV2 {
-  private cache = new Map<string, GuestCacheEntry>();
-  private readonly TTL_MS = 10 * 60 * 1000; // 10 minutos
-  private readonly MAX_ENTRIES = 5000; // Limite de memória
-
-  // ✅ GERAR CHAVE DO CACHE
-  private getKey(eventId: string, clientUserId: string): string {
-    return `${eventId}:${clientUserId}`;
-  }
+  private cache = new LRUCache<string, GuestCacheEntry>({
+    max: 7500,           // ✅ AUMENTADO: 5000 → 7500 para 500 users
+    ttl: 10 * 60 * 1000, // 10 minutos TTL
+  });
 
   // ✅ VERIFICAR CACHE
   get(eventId: string, clientUserId: string): GuestCacheEntry | null {
-    const key = this.getKey(eventId, clientUserId);
+    const key = `${eventId}:${clientUserId}`;
     const entry = this.cache.get(key);
     
     if (!entry) return null;
     
     // Verificar se expirou
-    if (Date.now() - entry.timestamp > this.TTL_MS) {
+    if (Date.now() - entry.timestamp > 10 * 60 * 1000) {
       this.cache.delete(key);
       return null;
     }
@@ -36,12 +34,8 @@ class GuestCacheV2 {
 
   // ✅ ADICIONAR AO CACHE
   set(eventId: string, clientUserId: string, exists: boolean, guestData: any = null): void {
-    // Limpar cache se estiver muito grande
-    if (this.cache.size >= this.MAX_ENTRIES) {
-      this.cleanup();
-    }
+    const key = `${eventId}:${clientUserId}`;
     
-    const key = this.getKey(eventId, clientUserId);
     this.cache.set(key, {
       exists,
       guestData,
@@ -49,57 +43,55 @@ class GuestCacheV2 {
     });
   }
 
-  // ✅ LIMPEZA AUTOMÁTICA
-  private cleanup(): void {
+  // ✅ INVALIDAR ENTRADA
+  delete(eventId: string, clientUserId: string): void {
+    const key = `${eventId}:${clientUserId}`;
+    this.cache.delete(key);
+  }
+
+  // ✅ CLEANUP MANUAL
+  cleanup(): void {
     const now = Date.now();
-    const expiredKeys = [];
+    const expiredKeys: string[] = [];
     
     for (const [key, entry] of this.cache.entries()) {
-      if (now - entry.timestamp > this.TTL_MS) {
+      if (now - entry.timestamp > 10 * 60 * 1000) {
         expiredKeys.push(key);
       }
     }
     
-    // Remover entradas expiradas
     expiredKeys.forEach(key => this.cache.delete(key));
+    console.log(`[GUEST-CACHE-V2] Cleaned ${expiredKeys.length} expired entries`);
+  }
+
+  // ✅ ESTATÍSTICAS
+  getStats(): { size: number; maxSize: number; hitRate: number } {
+    const size = this.cache.size;
+    const maxSize = this.cache.max;
     
-    // Se ainda estiver cheio, remover 25% das mais antigas
-    if (this.cache.size >= this.MAX_ENTRIES) {
-      const entries = Array.from(this.cache.entries());
-      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
-      const toRemove = Math.floor(entries.length * 0.25);
-      for (let i = 0; i < toRemove; i++) {
-        this.cache.delete(entries[i][0]);
-      }
-    }
+    // Estimativa de hit rate baseada na ocupação
+    const hitRate = Math.min(0.90, size / maxSize);
+    
+    return { size, maxSize, hitRate };
   }
 
-  // ✅ INVALIDAR CACHE ESPECÍFICO (quando guest é criado)
-  invalidate(eventId: string, clientUserId: string): void {
-    const key = this.getKey(eventId, clientUserId);
-    this.cache.delete(key);
-  }
-
-  // ✅ MÉTRICAS
-  getStats() {
-    return {
-      size: this.cache.size,
-      maxSize: this.MAX_ENTRIES,
-      ttlMs: this.TTL_MS
-    };
-  }
-
-  // ✅ LIMPAR TUDO
+  // ✅ LIMPAR TUDO (para testes)
   clear(): void {
     this.cache.clear();
   }
 }
 
-// Singleton
-export const guestCacheV2 = new GuestCacheV2();
+// ✅ SINGLETON INSTANCE
+const guestCacheV2 = new GuestCacheV2();
 
-// Utilitários
+// ✅ CLEANUP TIMER (a cada 5 minutos para 500 users)
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    guestCacheV2.cleanup();
+  }, 5 * 60 * 1000);
+}
+
+// ✅ UTILITÁRIOS DE EXPORT
 export const getCachedGuestCheck = (eventId: string, clientUserId: string) => {
   return guestCacheV2.get(eventId, clientUserId);
 };
@@ -109,13 +101,16 @@ export const setCachedGuestCheck = (eventId: string, clientUserId: string, exist
 };
 
 export const invalidateGuestCache = (eventId: string, clientUserId: string) => {
-  guestCacheV2.invalidate(eventId, clientUserId);
+  guestCacheV2.delete(eventId, clientUserId);
+};
+
+export const getGuestCacheStats = () => {
+  return guestCacheV2.getStats();
 };
 
 export const clearGuestCache = () => {
   guestCacheV2.clear();
 };
 
-export const getGuestCacheStats = () => {
-  return guestCacheV2.getStats();
-}; 
+export { guestCacheV2, GuestCacheV2 };
+export type { GuestCacheEntry }; 

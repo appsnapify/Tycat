@@ -9,205 +9,131 @@
  * Para proteger APIs críticas contra DDoS e alta afluência
  */
 
-interface RateLimitConfig {
-  windowMs: number;     // Janela de tempo em ms
-  maxRequests: number;  // Máximo de requests por janela
-  skipSuccessfulHits?: boolean; // Se deve contar apenas requests falhados
-}
+import { LRUCache } from 'lru-cache';
 
 interface RateLimitEntry {
   count: number;
   resetTime: number;
-  firstRequest: number;
+  blocked: boolean;
 }
 
-// Storage em memória para rate limiting
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Configs predefinidas para diferentes cenários
-export const RATE_LIMIT_CONFIGS = {
-  // Para APIs de guest creation (alto tráfego esperado)
-  GUEST_CREATION: {
-    windowMs: 60 * 1000,    // 1 minuto
-    maxRequests: 20,        // 20 requests por minuto por IP
-  },
-  
-  // Para verificação de telefone (muito alta frequência)
-  PHONE_CHECK: {
-    windowMs: 60 * 1000,    // 1 minuto  
-    maxRequests: 30,        // 30 verificações por minuto por IP
-  },
-  
-  // Para APIs críticas de admin
-  ADMIN_OPERATIONS: {
-    windowMs: 60 * 1000,    // 1 minuto
-    maxRequests: 10,        // 10 operações por minuto por IP
-  },
-  
-  // Proteção DDoS básica (muito agressiva)
-  DDOS_PROTECTION: {
-    windowMs: 10 * 1000,    // 10 segundos
-    maxRequests: 5,         // 5 requests por 10s por IP
-  }
-} as const;
-
-/**
- * Extrai IP do request de forma robusta
- */
-function getClientIP(request: Request): string {
-  // Tentar headers de proxy primeiro
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  
-  const realIP = request.headers.get('x-real-ip');
-  if (realIP) {
-    return realIP;
-  }
-  
-  // Fallback para localhost em desenvolvimento
-  return '127.0.0.1';
-}
-
-/**
- * Limpa entradas expiradas do storage
- */
-function cleanupExpiredEntries(): void {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      rateLimitStore.delete(key);
-    }
-  }
-}
-
-/**
- * Verifica se request deve ser rate limited
- */
-export function checkRateLimit(
-  request: Request, 
-  config: RateLimitConfig,
-  customKey?: string
-): {
-  allowed: boolean;
+interface RateLimitResult {
+  success: boolean;
+  limit: number;
   remaining: number;
   resetTime: number;
   retryAfter?: number;
-} {
-  const ip = getClientIP(request);
-  const key = customKey || `${ip}:${new URL(request.url).pathname}`;
-  const now = Date.now();
+}
+
+class AdvancedRateLimit {
+  private cache = new LRUCache<string, RateLimitEntry>({
+    max: 5000,           // ✅ Suporte para 5000 IPs únicos
+    ttl: 15 * 60 * 1000, // 15 minutos TTL
+  });
+
+  private readonly WINDOW_MS = 60 * 1000; // 1 minuto
   
-  // Cleanup periódico (a cada 100 requests)
-  if (Math.random() < 0.01) {
-    cleanupExpiredEntries();
-  }
-  
-  let entry = rateLimitStore.get(key);
-  
-  // Se não existe entrada ou expirou, criar nova
-  if (!entry || now > entry.resetTime) {
-    entry = {
-      count: 1,
-      resetTime: now + config.windowMs,
-      firstRequest: now
-    };
-    rateLimitStore.set(key, entry);
+  // ✅ RATE LIMITING INTELIGENTE conforme plano
+  async check(request: Request, maxRequests: number = 10): Promise<RateLimitResult> {
+    const key = this.generateKey(request);
+    const now = Date.now();
+    
+    // Buscar entrada existente
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      // ✅ PRIMEIRA REQUEST - permitir
+      this.cache.set(key, {
+        count: 1,
+        resetTime: now + this.WINDOW_MS,
+        blocked: false
+      });
+      
+      return {
+        success: true,
+        limit: maxRequests,
+        remaining: maxRequests - 1,
+        resetTime: now + this.WINDOW_MS
+      };
+    }
+    
+    // ✅ RESET WINDOW se expirou
+    if (now > entry.resetTime) {
+      this.cache.set(key, {
+        count: 1,
+        resetTime: now + this.WINDOW_MS,
+        blocked: false
+      });
+      
+      return {
+        success: true,
+        limit: maxRequests,
+        remaining: maxRequests - 1,
+        resetTime: now + this.WINDOW_MS
+      };
+    }
+    
+    // ✅ CHECK LIMIT
+    if (entry.count >= maxRequests) {
+      return {
+        success: false,
+        limit: maxRequests,
+        remaining: 0,
+        resetTime: entry.resetTime,
+        retryAfter: Math.ceil((entry.resetTime - now) / 1000)
+      };
+    }
+    
+    // ✅ INCREMENT COUNT
+    entry.count++;
+    this.cache.set(key, entry);
     
     return {
-      allowed: true,
-      remaining: config.maxRequests - 1,
+      success: true,
+      limit: maxRequests,
+      remaining: maxRequests - entry.count,
       resetTime: entry.resetTime
     };
   }
   
-  // Incrementar contador
-  entry.count++;
-  
-  // Verificar se excedeu limite
-  if (entry.count > config.maxRequests) {
-    const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+  // ✅ KEY GENERATION baseado em IP + Phone (conforme plano)
+  private generateKey(request: Request): string {
+    // Extrair IP do request
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0] : 
+               request.headers.get('x-real-ip') || 
+               'unknown';
     
-    return {
-      allowed: false,
-      remaining: 0,
-      resetTime: entry.resetTime,
-      retryAfter
-    };
+    return `rate_limit:${ip}`;
   }
   
-  return {
-    allowed: true,
-    remaining: config.maxRequests - entry.count,
-    resetTime: entry.resetTime
-  };
+  // ✅ STATS para monitoring
+  getStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.cache.max,
+      hitRate: this.cache.calculatedSize / (this.cache.size || 1)
+    };
+  }
 }
 
-/**
- * Middleware para aplicar rate limiting facilmente
- */
-export function withRateLimit(
-  config: RateLimitConfig,
-  customKey?: (request: Request) => string
-) {
-  return function(request: Request) {
-    const key = customKey ? customKey(request) : undefined;
-    const result = checkRateLimit(request, config, key);
-    
-    if (!result.allowed) {
-      // Log de tentativa de rate limit
-      console.warn(`[RATE_LIMIT] IP ${getClientIP(request)} excedeu limite:`, {
-        path: new URL(request.url).pathname,
-        retryAfter: result.retryAfter
-      });
-    }
-    
-    return result;
-  };
-}
+export const advancedRateLimit = new AdvancedRateLimit();
 
-/**
- * Headers para resposta HTTP
- */
-export function getRateLimitHeaders(result: ReturnType<typeof checkRateLimit>) {
-  return {
-    'X-RateLimit-Limit': '20',
-    'X-RateLimit-Remaining': result.remaining.toString(),
-    'X-RateLimit-Reset': new Date(result.resetTime).toISOString(),
-    ...(result.retryAfter ? { 'Retry-After': result.retryAfter.toString() } : {})
-  };
-}
+// ✅ HELPER FUNCTION para usar nas APIs
+export const checkRateLimit = async (
+  request: Request, 
+  maxRequests: number = 10
+): Promise<RateLimitResult> => {
+  return advancedRateLimit.check(request, maxRequests);
+};
 
-/**
- * Response de rate limit excedido
- */
-export function createRateLimitResponse(result: ReturnType<typeof checkRateLimit>) {
-  return new Response(
-    JSON.stringify({
-      error: 'Rate limit exceeded',
-      message: `Too many requests. Try again in ${result.retryAfter} seconds.`,
-      retryAfter: result.retryAfter
-    }),
-    {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        ...getRateLimitHeaders(result)
-      }
-    }
-  );
-}
-
-
-
-
-
-
-
-
-
-
+// ✅ RATE LIMIT CONFIGS conforme diferentes endpoints
+export const RATE_LIMIT_CONFIGS = {
+  CHECK_PHONE: 15,     // 15 req/min para verificação telefone
+  REGISTER: 5,         // 5 req/min para registros (mais restritivo)
+  GUEST_CREATE: 10,    // 10 req/min para criação de guests
+  LOGIN: 20           // 20 req/min para login
+};
 
 /**
  * 🔌 CIRCUIT BREAKER SIMPLES

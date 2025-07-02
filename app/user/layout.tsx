@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ClientAuthProvider } from '@/hooks/useClientAuth';
+import { ClientAuthProvider } from '../../hooks/useClientAuth';
 
 export default function UserLayout({
   children,

@@ -1,11 +1,14 @@
 // app/api/client-auth-v3/guests/create-instant/route.ts
-// API otimizada de criação de guests com resposta imediata
-// ✅ Cache + Rate limiting + Background processing + Polling
+// API otimizada para criação instantânea de guests COM RATE LIMITING
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/adminClient';
 import { getCachedGuestCheck, setCachedGuestCheck, invalidateGuestCache } from '@/lib/cache/guest-cache-v2';
-import { checkRateLimit, RATE_LIMIT_CONFIGS, createRateLimitKey } from '@/lib/security/rate-limit-v2';
+import { processingManager } from '@/lib/processing/processing-manager';
+import { checkRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/security/advanced-rate-limit';
+
+// ✅ USANDO PROCESSING MANAGER COMPARTILHADO
 
 // ✅ HELPER PARA OBTER IP
 function getClientIP(request: NextRequest): string {
@@ -48,78 +51,88 @@ function validateGuestData(data: any): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
-// ✅ PROCESSO BACKGROUND SIMULADO (mantém tudo no Supabase)
-async function processGuestCreationInBackground(guestData: any): Promise<string> {
-  const supabase = createAdminClient();
-  
-  // Simular pequeno delay para background processing
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  const { data: result, error } = await supabase.rpc('create_guest_safely', {
-    p_event_id: guestData.event_id,
-    p_client_user_id: guestData.client_user_id,
-    p_promoter_id: guestData.promoter_id,
-    p_team_id: guestData.team_id,
-    p_name: guestData.name,
-    p_phone: guestData.phone,
-    p_source: 'PROMOTER'
-  });
+// ✅ PROCESSO BACKGROUND REAL
+async function processGuestCreationInBackground(guestData: any, processingKey: string): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    
+    // ✅ ATUALIZAR STATUS PARA PROCESSANDO
+    processingManager.set(processingKey, {
+      status: 'processing',
+      timestamp: Date.now()
+    });
+    
+    // ✅ USAR GRACEFUL SYSTEM EM VEZ DE CHAMADA DIRETA
+    const { gracefulGuestCreation } = await import('@/lib/resilience/graceful-degradation');
+    
+    const gracefulResult = await gracefulGuestCreation({
+      event_id: guestData.event_id,
+      client_user_id: guestData.client_user_id,
+      promoter_id: guestData.promoter_id,
+      team_id: guestData.team_id,
+      name: guestData.name,
+      phone: guestData.phone
+    });
 
-  if (error) {
-    throw new Error(`Erro na criação: ${error.message}`);
-  }
-
-  if (!result || result.length === 0) {
-    throw new Error('Nenhum resultado retornado');
-  }
-
-  const guest = result[0];
-  
-  // ✅ INVALIDAR CACHE (agora existe)
-  invalidateGuestCache(guestData.event_id, guestData.client_user_id);
-  setCachedGuestCheck(guestData.event_id, guestData.client_user_id, true, guest);
-
-  return guest.qr_code_url;
-}
-
-// ✅ MAPA DE PROCESSAMENTO EM MEMÓRIA
-const processingMap = new Map<string, {
-  status: 'processing' | 'completed' | 'failed';
-  result?: any;
-  error?: string;
-  timestamp: number;
-}>();
-
-// ✅ LIMPEZA AUTOMÁTICA DO MAPA
-setInterval(() => {
-  const now = Date.now();
-  const expiredKeys = [];
-  
-  for (const [key, entry] of processingMap.entries()) {
-    // Remover entradas antigas (5 minutos)
-    if (now - entry.timestamp > 5 * 60 * 1000) {
-      expiredKeys.push(key);
+    if (!gracefulResult.success) {
+      throw new Error(`Graceful system falhou: ${gracefulResult.message}`);
     }
+
+    // ✅ GRACEFUL SEMPRE RETORNA ALGO (nunca falha)
+    const guest = gracefulResult.data || { id: 'processing', qr_code_url: null };
+    
+    // ✅ SUCESSO - ATUALIZAR STATUS
+    processingManager.set(processingKey, {
+      status: 'completed',
+      result: gracefulResult.fallbackUsed ? {
+        id: gracefulResult.emergencyTicket || 'emergency',
+        qr_code_url: null,
+        message: gracefulResult.message,
+        emergency_ticket: gracefulResult.emergencyTicket
+      } : {
+        id: guest.id,
+        qr_code_url: guest.qr_code_url
+      },
+      timestamp: Date.now()
+    });
+    
+    // ✅ INVALIDAR CACHE
+    invalidateGuestCache(guestData.event_id, guestData.client_user_id);
+    setCachedGuestCheck(guestData.event_id, guestData.client_user_id, true, guest);
+
+    console.log(`[GUEST-CREATE-V3] Processamento completo: ${processingKey}`);
+
+  } catch (error) {
+    console.error(`[GUEST-CREATE-V3] Erro no processamento ${processingKey}:`, error);
+    
+    // ✅ ERRO - ATUALIZAR STATUS
+    processingManager.set(processingKey, {
+      status: 'failed',
+      error: error.message || 'Erro desconhecido',
+      timestamp: Date.now()
+    });
   }
-  
-  expiredKeys.forEach(key => processingMap.delete(key));
-}, 60 * 1000); // Limpeza a cada minuto
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
-    // ✅ RATE LIMITING
-    const clientIP = getClientIP(request);
-    const rateLimitKey = createRateLimitKey(clientIP);
-    const rateCheck = checkRateLimit(rateLimitKey, RATE_LIMIT_CONFIGS.GUEST_CREATE);
-    
-    if (!rateCheck.allowed) {
+    // ✅ RATE LIMITING CONFORME PLANO DE OTIMIZAÇÃO
+    const rateLimitResult = await checkRateLimit(request, RATE_LIMIT_CONFIGS.GUEST_CREATE);
+    if (!rateLimitResult.success) {
       return NextResponse.json({
         success: false,
-        error: 'Limite de criações atingido. Aguarde um momento.',
-        retryAfter: Math.ceil((rateCheck.resetTime - Date.now()) / 1000)
-      }, { status: 429 });
+        error: 'Muitas tentativas. Tente novamente em alguns minutos.',
+        retryAfter: rateLimitResult.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString()
+        }
+      });
     }
 
     // ✅ VALIDAÇÃO DO BODY
@@ -158,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ VERIFICAR SE JÁ ESTÁ PROCESSANDO
     const processingKey = `${event_id}:${client_user_id}`;
-    const existingProcess = processingMap.get(processingKey);
+    const existingProcess = processingManager.get(processingKey);
     
     if (existingProcess) {
       if (existingProcess.status === 'completed') {
@@ -171,7 +184,7 @@ export async function POST(request: NextRequest) {
         });
       } else if (existingProcess.status === 'failed') {
         // Falhou, tentar novamente
-        processingMap.delete(processingKey);
+        processingManager.delete(processingKey);
       } else {
         // Ainda processando
         return NextResponse.json({
@@ -184,53 +197,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ INICIAR PROCESSAMENTO BACKGROUND
-    processingMap.set(processingKey, {
-      status: 'processing',
-      timestamp: Date.now()
-    });
-
     // ✅ RESPOSTA IMEDIATA
     const responseTime = Date.now() - startTime;
     
     // ✅ PROCESSO BACKGROUND (não bloqueia resposta)
-    processGuestCreationInBackground(body)
-      .then((qrCodeUrl) => {
-        processingMap.set(processingKey, {
-          status: 'completed',
-          result: {
-            qr_code_url: qrCodeUrl,
-            created_at: new Date().toISOString()
-          },
-          timestamp: Date.now()
-        });
-        console.log(`[GUEST-CREATE-V3] ✅ Sucesso para ${processingKey}: QR criado`);
-      })
-      .catch((error) => {
-        processingMap.set(processingKey, {
-          status: 'failed',
-          error: error.message,
-          timestamp: Date.now()
-        });
-        console.error(`[GUEST-CREATE-V3] ❌ Erro para ${processingKey}:`, error);
-      });
+    setImmediate(() => {
+      processGuestCreationInBackground(body, processingKey);
+    });
 
     return NextResponse.json({
       success: true,
       processing: true,
       processingKey,
-      message: 'Processando seu pedido... Você receberá o QR Code em instantes.',
+      message: 'Processando sua solicitação... Você receberá o QR Code em instantes.',
       estimatedTime: '3-5 segundos',
-      pollUrl: `/api/client-auth-v3/guests/status/${processingKey}`,
       responseTime
+    }, {
+      headers: {
+        'X-Response-Time': responseTime.toString(),
+        'X-Processing-Key': processingKey
+      }
     });
 
   } catch (error) {
     console.error('[GUEST-CREATE-V3] Erro não tratado:', error);
     
+    const responseTime = Date.now() - startTime;
+    
     return NextResponse.json({
       success: false,
-      error: 'Erro interno no servidor'
-    }, { status: 500 });
+      error: 'Erro interno no servidor',
+      responseTime
+    }, { 
+      status: 500,
+      headers: {
+        'X-Response-Time': responseTime.toString()
+      }
+    });
   }
 } 

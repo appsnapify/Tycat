@@ -1,8 +1,6 @@
 'use server'
 
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { Database } from '@/types/supabase' // Assume que você tem tipos gerados
+import { createClient } from '@/lib/supabase/server'
 
 // Interface para os dados retornados de cada convidado
 // Adaptar conforme necessário
@@ -34,10 +32,10 @@ export async function getGuestsForEvent(
     searchTerm?: string,
     filterCheckedIn?: boolean | null
 ): Promise<GetGuestsResult> {
-    const supabase = createServerActionClient<Database>({ cookies });
+    const supabase = await createClient();
 
     try {
-        // Consulta para buscar convidados com informações básicas
+        // Construir consulta com filtros
         let query = supabase
             .from('guests')
             .select(`
@@ -48,8 +46,8 @@ export async function getGuestsForEvent(
                 check_in_time,
                 created_at,
                 team_id,
-                promoter:profiles ( first_name, last_name )
-            `, { count: 'exact' })
+                promoter_id
+            `)
             .eq('event_id', eventId);
         
         // Aplicar filtros de pesquisa
@@ -62,16 +60,49 @@ export async function getGuestsForEvent(
         
         // Aplicar ordenação e paginação
         query = query.order('created_at', { ascending: false });
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize - 1;
-        query = query.range(startIndex, endIndex);
+        query = query.range((page - 1) * pageSize, page * pageSize - 1);
         
-        // Executar consulta principal
-        const { data: guestsData, error: guestsError, count } = await query;
+        const { data: guestsData, error: guestsError } = await query;
+        
+        // Buscar contagem total respeitando os filtros
+        let countQuery = supabase
+            .from('guests')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId);
+        
+        // Aplicar os mesmos filtros na contagem
+        if (searchTerm) {
+            countQuery = countQuery.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+        }
+        if (filterCheckedIn !== null && filterCheckedIn !== undefined) {
+            countQuery = countQuery.eq('checked_in', filterCheckedIn);
+        }
+        
+        const { count } = await countQuery;
         
         if (guestsError) {
             console.error("Erro ao buscar convidados:", guestsError);
             throw new Error(`Erro ao buscar convidados: ${guestsError.message}`);
+        }
+
+        // Buscar dados dos promotores se existirem
+        const promoterIds = guestsData
+            ?.filter(guest => guest.promoter_id)
+            .map(guest => guest.promoter_id) || [];
+        
+        const promoterNames: Record<string, string> = {};
+        
+        if (promoterIds.length > 0) {
+            const { data: promotersData } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name')
+                .in('id', promoterIds);
+                
+            if (promotersData) {
+                promotersData.forEach(promoter => {
+                    promoterNames[promoter.id] = `${promoter.first_name || ''} ${promoter.last_name || ''}`.trim();
+                });
+            }
         }
         
         // Extrair IDs de equipes para busca posterior
@@ -82,25 +113,16 @@ export async function getGuestsForEvent(
         // Mapa para armazenar nomes de equipes por ID
         const teamNames: Record<string, string> = {};
         
-        // Se temos IDs de equipes, buscar nomes usando a função RPC personalizada
+        // Se temos IDs de equipes, buscar nomes diretamente da tabela teams
         if (teamIds.length > 0) {
-            const { data: teamsData, error: teamsError } = await supabase
-                .rpc('get_team_names_for_guests', { 
-                    guest_team_ids: teamIds 
-                });
+            const { data: teamsData } = await supabase
+                .from('teams')
+                .select('id, name')
+                .in('id', teamIds);
                 
-            if (!teamsError && teamsData) {
-                // Preencher o mapa de IDs para nomes
-                teamsData.forEach((team: { id: string, name: string }) => {
+            if (teamsData) {
+                teamsData.forEach(team => {
                     teamNames[team.id] = team.name;
-                });
-            } else if (teamsError) {
-                console.warn("Aviso: Não foi possível buscar nomes de equipes:", teamsError);
-                // Mostrar detalhes do erro para debug
-                console.debug("Detalhes do erro de equipes:", {
-                    message: teamsError.message,
-                    details: teamsError.details,
-                    hint: teamsError.hint
                 });
             }
         }
@@ -113,7 +135,7 @@ export async function getGuestsForEvent(
             checked_in: guest.checked_in,
             check_in_time: guest.check_in_time,
             created_at: guest.created_at,
-            promoter_name: guest.promoter ? `${guest.promoter.first_name || ''} ${guest.promoter.last_name || ''}`.trim() : null,
+            promoter_name: guest.promoter_id ? promoterNames[guest.promoter_id] || null : null,
             team_name: guest.team_id ? teamNames[guest.team_id] || '-' : null,
         })) || [];
         
