@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/adminClient';
+import { createAdminClient } from '@/lib/supabase/adminClient'; // ✅ ADMIN CLIENT para bypasser RLS
 
 export async function GET(request: Request) {
   try {
@@ -13,8 +13,9 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
 
-    console.log('Buscando eventos para utilizador:', userId);
+    console.log('🔥 [CLIENT-AUTH-API] Buscando eventos para utilizador:', userId);
 
+    // ✅ ADMIN CLIENT bypassa RLS - acesso direto aos dados
     const supabase = createAdminClient();
 
     // Buscar eventos onde o utilizador está na guest list
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
         id,
         event_id,
         qr_code_url,
+        checked_in,
+        check_in_time,
         created_at,
         events (
           id,
@@ -42,7 +45,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao buscar eventos:', error);
+      console.error('❌ [CLIENT-AUTH-API] Erro ao buscar eventos:', error);
       return NextResponse.json({ 
         success: false, 
         error: 'Erro ao buscar eventos' 
@@ -56,6 +59,8 @@ export async function GET(request: Request) {
         id: guest.id,
         event_id: guest.event_id,
         qr_code_url: guest.qr_code_url || '',
+        checked_in: guest.checked_in || false,
+        check_in_time: guest.check_in_time || null,
         title: guest.events.title,
         date: guest.events.date,
         location: guest.events.location || 'Local não definido',
@@ -65,7 +70,7 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
-    console.log(`Encontrados ${formattedEvents.length} eventos para o utilizador`);
+    console.log(`✅ [CLIENT-AUTH-API] Encontrados ${formattedEvents.length} eventos para o utilizador`);
 
     return NextResponse.json({ 
       success: true, 
@@ -73,7 +78,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error('Erro ao processar requisição:', error);
+    console.error('❌ [CLIENT-AUTH-API] Erro ao processar requisição:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Erro interno do servidor' 

@@ -484,8 +484,8 @@ export function GuestRequestClientButton({
           </div>
           
           <div className="flex gap-2 justify-between mt-6">
-            <Button variant="outline" onClick={() => router.push('/client/dashboard')}>
-              Ver Meus Ingressos
+            <Button variant="outline" onClick={() => router.push('/user/dashboard')}>
+              Ver Dashboard
             </Button>
             <Button onClick={() => setShowQRCode(false)}>
               Fechar

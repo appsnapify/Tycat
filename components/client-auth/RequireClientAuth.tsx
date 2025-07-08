@@ -14,9 +14,9 @@ export function ClientProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // Se não estiver carregando e o usuário não existir, redirecionar para login
+    // Se não estiver carregando e o usuário não existir, redirecionar para sistema isolado
     if (!isLoading && !user) {
-      router.push('/client/auth');
+      router.push('/login/cliente'); // ✅ SISTEMA ISOLADO: Usar /login/cliente em vez de /client/auth
     }
   }, [user, isLoading, router]);
 
@@ -41,7 +41,7 @@ export function ClientProtectedRoute({ children }: ProtectedRouteProps) {
 // Componente de wrapper com o provedor de sessão
 export function ClientProtectedRouteWrapper({ 
   children, 
-  redirectTo = '/client/auth' 
+  redirectTo = '/login/cliente' // ✅ ALTERADO: usar sistema isolado para eliminar logs PHONE-CACHE-V2
 }: { 
   children: React.ReactNode;
   redirectTo?: string;

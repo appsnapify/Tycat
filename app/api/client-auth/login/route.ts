@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
-// import { cookies } from 'next/headers'; // Comentado, pois cookies().set foi comentado
-// import { sign } from 'jsonwebtoken'; // Comentado, pois a criação do token foi comentada
+import { createAdminClient } from '@/lib/supabase/adminClient';
 
 // Schema de validação
 const loginSchema = z.object({
@@ -10,25 +8,13 @@ const loginSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória")
 });
 
-// Chave JWT secreta e expiração - Comentados pois não são mais usados aqui
-// const JWT_SECRET = process.env.JWT_SECRET || 'sua-chave-secreta-temporaria';
-// const JWT_EXPIRY = '7d'; 
-
 export async function POST(request: Request) {
   try {
-    console.log('Iniciando login de cliente');
-    
-    // Extrair body da requisição
     const body = await request.json();
-    console.log('Dados recebidos para login:', { 
-      phone: body.phone ? `${body.phone.substring(0, 3)}****` : 'não informado',
-      has_password: !!body.password
-    });
     
     // Validar dados
     const result = loginSchema.safeParse(body);
     if (!result.success) {
-      console.error('Erro de validação:', result.error.format());
       return NextResponse.json({ 
         success: false, 
         error: 'Dados inválidos', 
@@ -38,10 +24,8 @@ export async function POST(request: Request) {
     
     const { phone, password } = result.data;
     
-    // Criar cliente Supabase
-    const supabase = await createClient();
-    
-    console.log('Buscando usuário pelo telefone:', phone.substring(0, 3) + '****');
+    // Criar cliente Supabase Admin
+    const supabase = createAdminClient();
     
     // Buscar usuário na tabela client_users
     const { data: userData, error: userError } = await supabase
@@ -51,7 +35,6 @@ export async function POST(request: Request) {
       .maybeSingle();
       
     if (userError) {
-      console.error('Erro ao buscar usuário:', userError);
       return NextResponse.json({ 
         success: false, 
         error: 'Erro ao verificar telefone: ' + userError.message 
@@ -60,7 +43,6 @@ export async function POST(request: Request) {
     
     // Verificar se o usuário foi encontrado
     if (!userData) {
-      console.log('Nenhum usuário encontrado com o telefone informado');
       return NextResponse.json({ 
         success: false, 
         error: 'Telefone ou senha incorretos' 
@@ -68,10 +50,8 @@ export async function POST(request: Request) {
     }
     
     // Verificar senha - SOLUÇÃO HÍBRIDA SEGURA
-    console.log('Verificando senha para usuário:', userData.id);
-    
-    // MÉTODO 1: Tentar Supabase Auth primeiro (para utilizadores novos e migrados)
     let authSuccess = false;
+    let authUser = null;
     let userEmail = userData.email;
     if (!userEmail) {
       userEmail = `client_${userData.id}@temp.snap.com`;
@@ -84,20 +64,35 @@ export async function POST(request: Request) {
       });
       
       if (!authError && authData.user) {
-        console.log('Login bem-sucedido via Supabase Auth');
+        authUser = authData.user;
         authSuccess = true;
+        
+        // ✅ SEMPRE GARANTIR METADADOS CORRETOS
+        if (!authData.user.user_metadata?.client_user_id || authData.user.user_metadata.client_user_id !== userData.id) {
+          try {
+            await supabase.auth.admin.updateUserById(
+              authData.user.id,
+              {
+                user_metadata: {
+                  client_user_id: userData.id,
+                  first_name: userData.first_name,
+                  last_name: userData.last_name,
+                  phone: userData.phone
+                }
+              }
+            );
+          } catch (metaUpdateError) {
+            // Silencioso
+          }
+        }
       }
     } catch (authAttemptError) {
-      console.log('Falha no login via Auth, tentando método tabela...');
+      // Tentar método tabela
     }
     
     // MÉTODO 2: Se Auth falhou, tentar password da tabela (utilizadores antigos)
     if (!authSuccess && userData.password) {
-      console.log('Tentando login via password da tabela (utilizador antigo)');
-      
       if (userData.password === password) {
-        console.log('Password da tabela correcta, migrando para Auth...');
-        
         // MIGRAÇÃO AUTOMÁTICA: Criar/actualizar no Supabase Auth
         try {
           // Tentar criar no Auth se não existir
@@ -113,8 +108,8 @@ export async function POST(request: Request) {
             }
           });
           
-          if (!migrationError) {
-            console.log('Utilizador migrado com sucesso para Auth');
+          if (!migrationError && migrationData.user) {
+            authUser = migrationData.user;
             
             // Limpar password da tabela após migração bem-sucedida
             await supabase
@@ -123,15 +118,30 @@ export async function POST(request: Request) {
               .eq('id', userData.id);
               
             authSuccess = true;
-          } else if (migrationError.message.includes('already been registered')) {
+          } else if (migrationError && migrationError.message.includes('already been registered')) {
             // Se já existe no Auth, apenas fazer login
             const { data: existingAuthData, error: existingAuthError } = await supabase.auth.signInWithPassword({
               email: userEmail,
               password: password
             });
             
-            if (!existingAuthError) {
-              console.log('Login com Auth existente bem-sucedido');
+            if (!existingAuthError && existingAuthData.user) {
+              authUser = existingAuthData.user;
+              
+              // ✅ SEMPRE GARANTIR METADADOS
+              if (!existingAuthData.user.user_metadata?.client_user_id) {
+                await supabase.auth.admin.updateUserById(
+                  existingAuthData.user.id,
+                  {
+                    user_metadata: {
+                      client_user_id: userData.id,
+                      first_name: userData.first_name,
+                      last_name: userData.last_name,
+                      phone: userData.phone
+                    }
+                  }
+                );
+              }
               
               // Limpar password da tabela
               await supabase
@@ -143,7 +153,6 @@ export async function POST(request: Request) {
             }
           }
         } catch (migrationError) {
-          console.error('Erro na migração automática:', migrationError);
           // Continuar com método tabela se migração falhou
           authSuccess = true; // Temporariamente aceitar login por tabela
         }
@@ -152,14 +161,11 @@ export async function POST(request: Request) {
     
     // VERIFICAÇÃO FINAL
     if (!authSuccess) {
-      console.log('Falha na autenticação - password incorrecta');
       return NextResponse.json({ 
         success: false, 
         error: 'Telefone ou senha incorretos' 
       }, { status: 401 });
     }
-    
-    console.log('Login realizado com sucesso:', { id: userData.id });
     
     // Retornar dados do usuário (sem senha)
     return NextResponse.json({
@@ -174,7 +180,6 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
-    console.error('Erro ao processar requisição:', error);
     let errorMessage = 'Erro interno do servidor';
     
     if (error instanceof Error) {

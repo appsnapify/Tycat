@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ClientAuthProvider } from '../../hooks/useClientAuth';
+import { ClienteAuthProvider } from '@/hooks/useClienteIsolado';
 
 export default function UserLayout({
   children,
@@ -9,8 +9,8 @@ export default function UserLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClientAuthProvider persistSession={true}>
+    <ClienteAuthProvider>
       {children}
-    </ClientAuthProvider>
+    </ClienteAuthProvider>
   );
 } 

@@ -115,6 +115,34 @@ export async function POST(request: Request) {
       
       if (!authError && authData.user) {
         console.log('[DIRECT-LOGIN] Login bem-sucedido via Supabase Auth');
+        
+        // ✅ VERIFICAR E GARANTIR METADADOS
+        if (!authData.user.user_metadata?.client_user_id) {
+          console.log('[DIRECT-LOGIN] Metadados ausentes, atualizando...');
+          
+          try {
+            const { error: updateError } = await supabase.auth.admin.updateUserById(
+              authData.user.id,
+              {
+                user_metadata: {
+                  client_user_id: userData.id,
+                  first_name: userData.first_name,
+                  last_name: userData.last_name,
+                  phone: userData.phone
+                }
+              }
+            );
+            
+            if (updateError) {
+              console.error('[DIRECT-LOGIN] Erro ao atualizar metadados:', updateError);
+            } else {
+              console.log('[DIRECT-LOGIN] Metadados atualizados com sucesso');
+            }
+          } catch (metaUpdateError) {
+            console.error('[DIRECT-LOGIN] Exceção ao atualizar metadados:', metaUpdateError);
+          }
+        }
+        
         authSuccess = true;
       } else {
         console.log('[DIRECT-LOGIN] Falha no Auth:', authError?.message || 'Erro desconhecido');
@@ -164,6 +192,33 @@ export async function POST(request: Request) {
             
             if (!existingAuthError) {
               console.log('[DIRECT-LOGIN] Login com Auth existente bem-sucedido');
+              
+              // ✅ VERIFICAR E GARANTIR METADADOS TAMBÉM AQUI
+              if (existingAuthData.user && !existingAuthData.user.user_metadata?.client_user_id) {
+                console.log('[DIRECT-LOGIN] Metadados ausentes no Auth existente, atualizando...');
+                
+                try {
+                  const { error: updateError } = await supabase.auth.admin.updateUserById(
+                    existingAuthData.user.id,
+                    {
+                      user_metadata: {
+                        client_user_id: userData.id,
+                        first_name: userData.first_name,
+                        last_name: userData.last_name,
+                        phone: userData.phone
+                      }
+                    }
+                  );
+                  
+                  if (updateError) {
+                    console.error('[DIRECT-LOGIN] Erro ao atualizar metadados existente:', updateError);
+                  } else {
+                    console.log('[DIRECT-LOGIN] Metadados existente atualizados com sucesso');
+                  }
+                } catch (metaUpdateError) {
+                  console.error('[DIRECT-LOGIN] Exceção ao atualizar metadados existente:', metaUpdateError);
+                }
+              }
               
               // Limpar password da tabela
               await supabase

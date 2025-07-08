@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { createClient } from '../lib/supabase/client';
+import { getLoginClienteSupabase } from '../lib/login-cliente/auth-client';
 import { ClientUser } from '../types/client';
 
 // Interface para o contexto de autenticação do cliente
@@ -51,8 +51,19 @@ export const ClientAuthProvider = ({
     error: null
   });
 
-  // Referência ao cliente Supabase com proteção SSR
-  const supabaseClientRef = useRef<ReturnType<typeof createClient> | null>(null)
+  // Referência ao cliente Supabase com proteção SSR - USANDO MESMO CLIENTE DO LOGIN
+  const supabaseClientRef = useRef<ReturnType<typeof getLoginClienteSupabase> | null>(null)
+  
+  // Referência para o timeout de segurança
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Função helper para limpar timeout quando loading finaliza
+  const clearLoadingTimeout = () => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+  };
   
   // Função para obter cliente de forma lazy e segura para SSR
   const getSupabaseClient = () => {
@@ -61,13 +72,14 @@ export const ClientAuthProvider = ({
     
     // Lazy loading: só cria o cliente quando necessário
     if (!supabaseClientRef.current) {
-      supabaseClientRef.current = createClient();
+      supabaseClientRef.current = getLoginClienteSupabase();
     }
     return supabaseClientRef.current;
   }
   
   // Log apenas uma vez por carregamento da aplicação
   if (process.env.NODE_ENV === 'development' && !providerMounted && typeof window !== 'undefined') {
+    console.log('🔥 [CLIENT-AUTH] Provider montado - USANDO CLIENTE DO LOGIN');
     providerMounted = true;
   }
   
@@ -76,6 +88,7 @@ export const ClientAuthProvider = ({
     // Função para carregar o usuário da sessão
     const loadUser = async () => {
       try {
+        console.log('🔄 [CLIENT-AUTH] Carregando sessão...');
         const supabaseClient = getSupabaseClient();
         
         // Se não há cliente (SSR), pular carregamento
@@ -88,11 +101,11 @@ export const ClientAuthProvider = ({
           return;
         }
 
-        // Carregar usuário da sessão Supabase
+        // ✅ SIMPLIFICAÇÃO: Carregar sessão uma vez, sem retry complexo
         const { data: { session }, error } = await supabaseClient.auth.getSession();
         
         if (error) {
-          console.error('Erro ao carregar sessão:', error);
+          console.error('❌ [CLIENT-AUTH] Erro ao carregar sessão:', error);
           setAuthState({
             user: null,
             isLoading: false,
@@ -101,38 +114,194 @@ export const ClientAuthProvider = ({
           return;
         }
         
-        // Se existe sessão, buscar dados na tabela client_users usando metadados
+        // Se existe sessão, buscar dados na tabela client_users
         if (session && session.user) {
-          // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
-          const clientUserId = session.user.user_metadata?.client_user_id;
+          // ✅ TENTAR AMBOS OS CAMPOS de metadados
+          const clientUserId = session.user.user_metadata?.client_user_id || 
+                              session.user.raw_user_meta_data?.client_user_id;
           
           if (!clientUserId) {
-            console.error('client_user_id não encontrado nos metadados do usuário');
-            setAuthState({
-              user: null,
-              isLoading: false,
-              error: 'Dados de sessão incompletos'
-            });
-            return;
-          }
-          
-          const { data, error: clientError } = await supabaseClient
-            .from('client_users')
-            .select('*')
-            .eq('id', clientUserId) // Usar o ID dos metadados que é o ID real da tabela
-            .single();
+            // ✅ SIMPLIFICAÇÃO: Tentar apenas um refresh simples
+            try {
+              await supabaseClient.auth.refreshSession();
+              const { data: { session: refreshedSession } } = await supabaseClient.auth.getSession();
+              const refreshedUserId = refreshedSession?.user?.user_metadata?.client_user_id || 
+                                    refreshedSession?.user?.raw_user_meta_data?.client_user_id;
+              
+              if (refreshedUserId) {
+                // Buscar dados com userId refreshed
+                await fetchUserData(supabaseClient, refreshedUserId);
+                return;
+              }
+            } catch (refreshError) {
+              console.error('❌ [CLIENT-AUTH] Erro no refresh:', refreshError);
+            }
             
-          if (clientError) {
-            console.error('Erro ao buscar dados do usuário:', clientError);
+            // Se ainda não conseguiu, marcar como não autenticado
             setAuthState({
               user: null,
               isLoading: false,
-              error: clientError.message
+              error: null
             });
             return;
           }
           
-          if (data) {
+          // ✅ SIMPLIFICAÇÃO: Buscar dados uma vez
+          await fetchUserData(supabaseClient, clientUserId);
+          return;
+        }
+        
+        // Nenhum usuário encontrado na sessão
+        setAuthState({
+          user: null,
+          isLoading: false,
+          error: null
+        });
+        
+      } catch (error) {
+        console.error('❌ [CLIENT-AUTH] Erro ao carregar sessão:', error);
+        setAuthState({
+          user: null,
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Erro desconhecido'
+        });
+      }
+    };
+    
+    // ✅ FUNÇÃO AUXILIAR: Buscar dados do utilizador de forma simples
+    const fetchUserData = async (supabaseClient: any, clientUserId: string) => {
+      try {
+        // ✅ Log simplificado - só quando necessário
+        
+        const { data: userData, error: clientError } = await supabaseClient
+          .from('client_users')
+          .select('*')
+          .eq('id', clientUserId)
+          .single();
+          
+        if (clientError) {
+          console.error('❌ [CLIENT-AUTH] Erro ao buscar dados do utilizador:', clientError);
+          setAuthState({
+            user: null,
+            isLoading: false,
+            error: 'Erro ao carregar dados do utilizador'
+          });
+          return;
+        }
+        
+        if (!userData) {
+          console.warn('⚠️ [CLIENT-AUTH] Utilizador não encontrado na tabela');
+          setAuthState({
+            user: null,
+            isLoading: false,
+            error: null
+          });
+          return;
+        }
+        
+        // ✅ SUCESSO: Normalizar o objeto de usuário
+        const clientUser: ClientUser = {
+          id: userData.id,
+          firstName: userData.first_name,
+          lastName: userData.last_name,
+          email: userData.email || '',
+          phone: userData.phone || ''
+        };
+        
+        console.log('✅ [CLIENT-AUTH] Utilizador carregado com sucesso:', clientUser.firstName);
+        
+        setAuthState({
+          user: clientUser,
+          isLoading: false,
+          error: null
+        });
+        
+      } catch (fetchError) {
+        console.error('❌ [CLIENT-AUTH] Erro ao buscar dados:', fetchError);
+        setAuthState({
+          user: null,
+          isLoading: false,
+          error: 'Erro ao carregar dados'
+        });
+      }
+    };
+    
+    // Executar a função de carregar usuário
+    loadUser();
+
+    // ✅ TIMEOUT DE SEGURANÇA: Garantir que loading nunca fica permanente
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.warn('⚠️ [CLIENT-AUTH] Timeout de carregamento - forçando isLoading: false');
+      setAuthState(prevState => ({
+        ...prevState,
+        isLoading: false,
+        error: prevState.error || 'Timeout ao carregar autenticação'
+      }));
+    }, 10000); // 10 segundos de timeout
+
+    // Configurar listener para mudanças na autenticação
+    const supabaseClient = getSupabaseClient();
+    if (!supabaseClient) {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      return; // SSR safety
+    }
+
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
+      async (event, session) => {
+        // Log apenas para eventos importantes
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          // ✅ Log simplificado - só quando necessário
+        }
+        
+        if (event === 'SIGNED_IN' && session && session.user) {
+          // ✅ DEBUG: Ver estrutura completa dos metadados
+          // ✅ Log simplificado - só quando necessário
+          
+          // ✅ TENTAR AMBOS OS CAMPOS
+          const clientUserId = session.user.user_metadata?.client_user_id || 
+                              session.user.raw_user_meta_data?.client_user_id;
+          
+          if (!clientUserId) {
+            // ✅ Log simplificado - só quando necessário
+            
+            // ✅ FORÇAR LOGOUT se sessão inválida
+            try {
+              await supabaseClient.auth.signOut();
+            } catch (signOutError) {
+              // ✅ Log simplificado - só quando necessário
+            }
+            
+            // ✅ SEMPRE LIMPAR LOADING
+            setAuthState({
+              user: null,
+              isLoading: false,
+              error: null
+            });
+            return;
+          }
+          
+          // Buscar dados do utilizador de forma simples
+          try {
+            const { data, error: clientError } = await supabaseClient
+              .from('client_users')
+              .select('*')
+              .eq('id', clientUserId)
+              .single();
+              
+            if (clientError || !data) {
+              console.error('❌ [CLIENT-AUTH] Erro ao buscar dados em authChange:', clientError);
+              // ✅ SEMPRE LIMPAR LOADING mesmo em caso de erro
+              setAuthState({
+                user: null,
+                isLoading: false,
+                error: 'Erro ao carregar dados do utilizador'
+              });
+              return;
+            }
+            
             // Normalizar o objeto de usuário
             const clientUser: ClientUser = {
               id: data.id,
@@ -142,93 +311,23 @@ export const ClientAuthProvider = ({
               phone: data.phone || ''
             };
             
+            // ✅ Sucesso: Utilizador carregado
             setAuthState({
               user: clientUser,
               isLoading: false,
               error: null
             });
-            return;
-          }
-        }
-        
-        // Nenhum usuário encontrado na sessão
-        setAuthState({
-          user: null,
-          isLoading: false,
-          error: null
-        });
-      } catch (error) {
-        console.error('Erro não tratado ao carregar sessão:', error);
-        setAuthState({
-          user: null,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Erro desconhecido'
-        });
-      }
-    };
-    
-    // Executar a função de carregar usuário
-    loadUser();
-
-    // Configurar listener para mudanças na autenticação
-    const supabaseClient = getSupabaseClient();
-    if (!supabaseClient) return; // SSR safety
-
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-      async (event, session) => {
-        // Log apenas para eventos importantes
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-          console.log('Evento de autenticação:', event);
-        }
-        
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          if (session && session.user) {
-            // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
-            const clientUserId = session.user.user_metadata?.client_user_id;
-            
-            if (!clientUserId) {
-              console.error('client_user_id não encontrado nos metadados após auth change');
-              setAuthState(prev => ({
-                ...prev,
-                error: 'Dados de sessão incompletos'
-              }));
-              return;
-            }
-            
-            const { data, error: clientError } = await supabaseClient
-              .from('client_users')
-              .select('*')
-              .eq('id', clientUserId) // Usar o ID dos metadados que é o ID real da tabela
-              .single();
-              
-            if (clientError) {
-              console.error('Erro ao buscar dados do usuário após auth change:', clientError);
-              setAuthState(prev => ({
-                ...prev,
-                error: clientError.message
-              }));
-              return;
-            }
-            
-            if (data) {
-              // Normalizar o objeto de usuário
-              const clientUser: ClientUser = {
-                id: data.id,
-                firstName: data.first_name,
-                lastName: data.last_name,
-                email: data.email || '',
-                phone: data.phone || ''
-              };
-              
-              setAuthState({
-                user: clientUser,
-                isLoading: false,
-                error: null
-              });
-              return;
-            }
+          } catch (error) {
+            console.error('❌ [CLIENT-AUTH] Erro não tratado em authChange:', error);
+            // ✅ SEMPRE LIMPAR LOADING mesmo em caso de exceção
+            setAuthState({
+              user: null,
+              isLoading: false,
+              error: 'Erro inesperado ao carregar utilizador'
+            });
           }
         } else if (event === 'SIGNED_OUT') {
+          // ✅ Log simplificado - só quando necessário
           setAuthState({
             user: null,
             isLoading: false,
@@ -238,9 +337,13 @@ export const ClientAuthProvider = ({
       }
     );
 
-    // Cleanup: remover listener ao desmontar
+    // Cleanup: remover listener e timeout ao desmontar
     return () => {
       authListener.subscription.unsubscribe();
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -283,10 +386,26 @@ export const ClientAuthProvider = ({
       // Se existe sessão, buscar dados na tabela client_users usando metadados
       if (session && session.user) {
         // USAR METADADOS: Buscar pelo client_user_id salvo nos metadados do Auth
-        const clientUserId = session.user.user_metadata?.client_user_id;
+        let clientUserId = session.user.user_metadata?.client_user_id || 
+                          session.user.raw_user_meta_data?.client_user_id;
+        
+        // ✅ RETRY se metadados não existirem (pode ser timing issue após login)
+        if (!clientUserId) {
+          // ✅ Log simplificado - só quando necessário
+          
+          try {
+            await supabaseClient.auth.refreshSession()
+            const { data: { session: refreshedSession } } = await supabaseClient.auth.getSession()
+            clientUserId = refreshedSession?.user?.user_metadata?.client_user_id || 
+                          refreshedSession?.user?.raw_user_meta_data?.client_user_id
+            // ✅ Log simplificado - só quando necessário
+          } catch (refreshError) {
+            console.error('Erro ao refresh da sessão em checkAuth:', refreshError)
+          }
+        }
         
         if (!clientUserId) {
-          console.error('client_user_id não encontrado nos metadados em checkAuth');
+          console.error('client_user_id não encontrado nos metadados em checkAuth após retry')
           return null;
         }
         
@@ -331,12 +450,12 @@ export const ClientAuthProvider = ({
   
   // Função para fazer logout
   const logout = async (): Promise<void> => {
-    console.log('🔄 Iniciando processo de logout...');
+    // ✅ Log simplificado - só quando necessário
     
     try {
       // Tentar limpar cookies problemáticos antes do logout
       if (typeof window !== 'undefined') {
-        console.log('🔄 Limpando cookies problemáticos...');
+        // ✅ Log simplificado - só quando necessário
         
         // Limpar cookies Supabase malformados
         document.cookie.split(";").forEach(cookie => {
@@ -344,7 +463,7 @@ export const ClientAuthProvider = ({
           const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
           if (name.includes('supabase') && document.cookie.includes('base64-')) {
             document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-            console.log(`🧹 Cookie problemático removido: ${name}`);
+            // ✅ Log simplificado - só quando necessário
           }
         });
       }
@@ -352,44 +471,44 @@ export const ClientAuthProvider = ({
       const supabaseClient = getSupabaseClient();
       
       if (supabaseClient) {
-        console.log('🔄 Tentando signOut no Supabase com timeout curto...');
+        // ✅ Log simplificado - só quando necessário
         
-        // Timeout mais curto para signOut específico
+        // Timeout mais realista para signOut
         const signOutPromise = supabaseClient.auth.signOut();
-        const quickTimeout = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('SignOut timeout')), 2000)
+        const reasonableTimeout = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('SignOut timeout')), 8000) // ✅ 8s em vez de 2s
         );
         
         try {
-          await Promise.race([signOutPromise, quickTimeout]);
-          console.log('✅ SignOut do Supabase concluído');
+          await Promise.race([signOutPromise, reasonableTimeout]);
+          // ✅ Log simplificado - só quando necessário
         } catch (signOutError) {
-          console.log('⚠️ SignOut do Supabase falhou, prosseguindo com limpeza local:', signOutError);
+          // ✅ Log simplificado - só quando necessário
         }
       } else {
-        console.log('⚠️ Cliente Supabase não disponível, prosseguindo com limpeza local');
+        // ✅ Log simplificado - só quando necessário
       }
       
       // SEMPRE limpar estado local
-      console.log('🔄 Limpando estado local...');
+      // ✅ Log simplificado - só quando necessário
       setAuthState({
         user: null,
         isLoading: false,
         error: null
       });
-      console.log('✅ Estado local limpo com sucesso');
+      // ✅ Log simplificado - só quando necessário
       
     } catch (error) {
       console.error('❌ Erro durante logout:', error);
       
       // FORÇAR limpeza local mesmo com erro
-      console.log('🔄 Forçando limpeza local após erro...');
+      // ✅ Log simplificado - só quando necessário
       setAuthState({
         user: null,
         isLoading: false,
         error: null
       });
-      console.log('✅ Limpeza local forçada concluída');
+      // ✅ Log simplificado - só quando necessário
     }
   };
 

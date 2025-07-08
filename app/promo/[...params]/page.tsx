@@ -1,9 +1,9 @@
-// Este ficheiro representa a página pública de registo para uma guest list de evento com rastreamento de promotor.
-// [...params] captura /promo/[eventId]/[promoterId]/[teamId]
+// Este ficheiro representa a página pública OFICIAL de registo para uma guest list de evento.
+// /promo/[eventId]/[promoterId]/[teamId] - VERSÃO OTIMIZADA OFICIAL
 
 import { notFound } from 'next/navigation';
 import { processPromoParams } from '../actions';
-import PromoterGuestListContent from './PromoterGuestListContent';
+import PromoterGuestListContentV2 from './PromoterGuestListContentV2';
 
 // Interface para props da página
 interface PageProps {
@@ -13,8 +13,8 @@ interface PageProps {
 }
 
 // Server Component que captura parâmetros da URL
-export default async function PromoterGuestListPage({ params }: PageProps) {
-  // 🚀 OTIMIZAÇÃO FASE 3: Simplificação para evitar recarregamentos desnecessários
+export default async function PromoterGuestListPageV2({ params }: PageProps) {
+  // 🚀 OTIMIZAÇÃO: Simplificação para evitar recarregamentos desnecessários
   const resolvedParams = await params;
   const urlParams = resolvedParams?.params;
   
@@ -24,16 +24,16 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
   }
 
   try {
-    // Processar parâmetros e buscar dados
+    // Processar parâmetros e buscar dados (reutiliza a action do promo original)
     const data = await processPromoParams(urlParams);
     
     if (!data || !data.event) {
-      console.error('[ERROR] Dados do evento não encontrados');
+      console.error('[PROMO] Dados do evento não encontrados');
       notFound();
     }
 
     return (
-      <PromoterGuestListContent 
+      <PromoterGuestListContentV2 
         event={data.event}
         params={urlParams}
         hasAssociation={data.hasAssociation}
@@ -41,7 +41,7 @@ export default async function PromoterGuestListPage({ params }: PageProps) {
       />
     );
   } catch (error) {
-    console.error('[ERROR] Erro ao processar página do promotor:', error);
+    console.error('[PROMO] Erro ao processar página do promotor:', error);
     notFound();
   }
 } 

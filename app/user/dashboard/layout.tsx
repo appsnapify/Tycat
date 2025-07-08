@@ -3,23 +3,19 @@
 import React from 'react';
 import BottomNav from '@/components/user/BottomNav';
 import Header from '@/components/user/Header';
-import { useClientAuth } from '@/hooks/useClientAuth';
+import { useUserAuth } from '@/hooks/useUserAuth';
+import { Loader2 } from 'lucide-react';
 
-export default function UserDashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useClientAuth();
-  
-  // O redirecionamento agora é tratado pelo ClientProtectedRoute
+  const { user, isLoading } = useUserAuth();
   
   return (
     <div className="flex flex-col min-h-screen">
-      <Header 
-        userFirstName={user?.firstName} 
-        avatarUrl={user?.avatarUrl} 
-      />
+      <Header />
       <main className="flex-grow">
         {children}
       </main>

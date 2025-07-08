@@ -1,64 +1,32 @@
-'use client';
+'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { ClientAuthFlow } from '@/components/client-auth/ClientAuthFlow';
-import { useClientAuth } from '@/hooks/useClientAuth';
-import { ClientSessionProvider } from '@/components/client-auth/ClientSessionProvider';
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 
-export default function ClientAuthPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, isLoading } = useClientAuth();
-  const [initialPhone, setInitialPhone] = useState('');
+/**
+ * Redirecionamento automático para sistema isolado /login/cliente
+ * Remove dependência de PhoneVerificationForm (client-auth-v3) que causa logs PHONE-CACHE-V2
+ * Preserva todos os parâmetros de query (redirect, phone, etc.)
+ */
+export default function ClientAuthRedirect() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   
-  // Pegar parâmetros de query como redirect e phone
   useEffect(() => {
-    const phone = searchParams.get('phone');
-    if (phone) {
-      setInitialPhone(phone);
-    }
-  }, [searchParams]);
-  
-  // Redirecionar se usuário já estiver autenticado
-  useEffect(() => {
-    if (user && !isLoading) {
-      // Verificar se veio de uma página de promotor
-      const redirectUrl = searchParams.get('redirect');
-      
-      // Se for da página do promotor, retornar para lá após login
-      if (redirectUrl && redirectUrl.includes('/promo/')) {
-        router.push(redirectUrl);
-      } else {
-        // Caso contrário, ir para o dashboard
-        router.push('/user/dashboard');
-      }
-    }
-  }, [user, isLoading, router, searchParams]);
-  
-  const handleAuthComplete = (userData: any) => {
-    // Verificar se veio de uma página de promotor
-    const redirectUrl = searchParams.get('redirect');
+    // Preservar TODOS os parâmetros de query e redirecionar para sistema isolado
+    const params = new URLSearchParams(searchParams.toString())
+    const redirectUrl = `/login/cliente?${params.toString()}`
     
-    // Se for da página do promotor, retornar para lá após login
-    if (redirectUrl && redirectUrl.includes('/promo/')) {
-      router.push(redirectUrl);
-    } else {
-      // Caso contrário, ir para o dashboard
-      router.push('/user/dashboard');
-    }
-  };
+    console.log('🔄 [CLIENT-AUTH-REDIRECT] Redirecionando para sistema isolado:', redirectUrl)
+    router.replace(redirectUrl)
+  }, [router, searchParams])
   
   return (
-    <ClientSessionProvider>
-      <div className="min-h-screen w-full flex flex-col justify-center items-center p-4 bg-slate-50">
-        <div className="w-full max-w-md rounded-lg border bg-white p-6 shadow-sm">
-          <ClientAuthFlow 
-            onComplete={handleAuthComplete} 
-            initialPhone={initialPhone}
-          />
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-gray-600">A redirecionar para sistema seguro...</p>
       </div>
-    </ClientSessionProvider>
-  );
+    </div>
+  )
 } 

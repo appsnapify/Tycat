@@ -136,7 +136,7 @@ export default function GuestRequestClient({
           title="Solicitação confirmada!"
           description="Seu QR code está disponível no seu dashboard."
           actionText="Acessar meu QR code"
-          actionHref="/cliente/dashboard"
+          actionHref="/user/dashboard"
         />
       )}
     </div>

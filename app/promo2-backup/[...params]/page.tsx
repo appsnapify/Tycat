@@ -2,7 +2,7 @@
 // /promo2/[eventId]/[promoterId]/[teamId] - VERSÃO OTIMIZADA
 
 import { notFound } from 'next/navigation';
-import { processPromoParams } from '../../promo/actions';
+import { processPromoParams } from '../actions';
 import PromoterGuestListContentV2 from './PromoterGuestListContentV2';
 
 // Interface para props da página

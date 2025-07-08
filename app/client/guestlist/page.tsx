@@ -90,7 +90,7 @@ export default function GuestListPage() {
       
       if (existingRequest) {
         // Já existe um pedido, redirecionar para o dashboard
-        router.push('/client/dashboard');
+        router.push('/user/dashboard');
         return;
       }
       
@@ -108,7 +108,7 @@ export default function GuestListPage() {
       if (createError) throw createError;
       
       // Redirecionar para o dashboard após o sucesso
-      router.push('/client/dashboard');
+      router.push('/user/dashboard');
       
     } catch (error) {
       console.error('Erro ao solicitar acesso:', error);
@@ -124,7 +124,7 @@ export default function GuestListPage() {
           <header className="mb-8">
             <div className="flex justify-between items-center">
               <h1 className="text-3xl font-bold">Solicitar Ingresso</h1>
-              <Link href="/client/dashboard">
+              <Link href="/user/dashboard">
                 <Button variant="outline">Voltar ao Painel</Button>
               </Link>
             </div>

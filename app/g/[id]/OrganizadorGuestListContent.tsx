@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { CalendarIcon, Clock, MapPin } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { OrganizadorGuestRequest } from '@/components/organizador/OrganizadorGuestRequest';
+import { OrganizadorGuestRequestIsolated } from '@/components/organizador/OrganizadorGuestRequestIsolated';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -72,7 +72,7 @@ export default function OrganizadorGuestListContent({ event, eventId }: Organiza
       </Card>
       
       {/* Componente com autenticação completa para organização */}
-      <OrganizadorGuestRequest eventId={eventId} />
+      <OrganizadorGuestRequestIsolated eventId={eventId} />
     </div>
   );
 } 
