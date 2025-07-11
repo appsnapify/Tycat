@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 
 // Schema de validação
@@ -36,7 +36,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 interface ClientRegistrationFormProps {
   onSuccess: (userData: any) => void;
-  onBack: () => void;
+  onBack?: () => void;
   phone?: string;
 }
 
@@ -52,9 +52,7 @@ export default function ClientRegistrationForm({
     register,
     handleSubmit,
     formState: { errors },
-    control,
     setValue,
-    watch
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -155,7 +153,6 @@ export default function ClientRegistrationForm({
           if (retryError) {
             console.error('Falha na segunda tentativa de login:', retryError);
           }
-          
         }
         
       } catch (loginErr) {
@@ -177,166 +174,170 @@ export default function ClientRegistrationForm({
   };
   
   return (
-    <div className="space-y-2 w-full max-w-md auth-dialog px-3 sm:px-6 pb-4 sm:pb-6">
-      <div className="text-center mb-2">
-        <h2 className="text-lg sm:text-xl font-bold">Criar Conta</h2>
-        <p className="text-xs text-muted-foreground">
+    <div className="w-full max-w-md mx-auto p-6">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Criar Conta</h2>
+        <p className="text-sm text-gray-500 mt-2">
           Preenche os campos obrigatórios (*)
         </p>
       </div>
       
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {error && (
-          <Alert variant="destructive" className="py-2">
-            <AlertDescription className="text-xs">{error}</AlertDescription>
+          <Alert variant="destructive">
+            <AlertDescription className="text-sm">{error}</AlertDescription>
           </Alert>
         )}
         
         {/* Telefone - Readonly */}
-        <div className="space-y-1">
-          <Label htmlFor="phone" className="text-xs">Telefone *</Label>
+        <div className="space-y-2">
+          <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Telefone *</Label>
           <Input
             id="phone"
             type="tel"
             {...register('phone')}
             disabled={true}
-            className="bg-muted text-xs sm:text-sm"
+            className="bg-gray-50 text-sm"
           />
           {errors.phone && (
-            <p className="text-xs text-destructive">{errors.phone.message}</p>
+            <p className="text-xs text-red-500">{errors.phone.message}</p>
           )}
         </div>
         
         {/* Email */}
-        <div className="space-y-1">
-          <Label htmlFor="email" className="text-xs">Email *</Label>
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email *</Label>
           <Input
             id="email"
             type="email"
             placeholder="o.teu.email@exemplo.com"
             {...register('email')}
             disabled={isLoading}
-            className="text-xs sm:text-sm"
+            className="text-sm"
           />
           {errors.email && (
-            <p className="text-xs text-destructive">{errors.email.message}</p>
+            <p className="text-xs text-red-500">{errors.email.message}</p>
           )}
         </div>
         
         {/* Nome e Apelido */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="firstName" className="text-xs">Nome *</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">Nome *</Label>
             <Input
               id="firstName"
               placeholder="Nome"
               {...register('firstName')}
               disabled={isLoading}
-              className="text-xs sm:text-sm"
+              className="text-sm"
             />
             {errors.firstName && (
-              <p className="text-xs text-destructive">{errors.firstName.message}</p>
+              <p className="text-xs text-red-500">{errors.firstName.message}</p>
             )}
           </div>
           
-          <div className="space-y-1">
-            <Label htmlFor="lastName" className="text-xs">Apelido *</Label>
+          <div className="space-y-2">
+            <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">Apelido *</Label>
             <Input
               id="lastName"
               placeholder="Apelido"
               {...register('lastName')}
               disabled={isLoading}
-              className="text-xs sm:text-sm"
+              className="text-sm"
             />
             {errors.lastName && (
-              <p className="text-xs text-destructive">{errors.lastName.message}</p>
+              <p className="text-xs text-red-500">{errors.lastName.message}</p>
             )}
           </div>
         </div>
         
         {/* Data de Nascimento e Género */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="birthDate" className="text-xs">Data Nasc.</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="birthDate" className="text-sm font-medium text-gray-700">Data Nasc.</Label>
             <Input
               id="birthDate"
               type="date"
               {...register('birthDate')}
               disabled={isLoading}
-              className="text-xs"
+              className="text-sm"
             />
             {errors.birthDate && (
-              <p className="text-xs text-destructive">{errors.birthDate.message}</p>
+              <p className="text-xs text-red-500">{errors.birthDate.message}</p>
             )}
           </div>
           
-          <div className="space-y-1">
-            <Label htmlFor="gender" className="text-xs">Género</Label>
+          <div className="space-y-2">
+            <Label htmlFor="gender" className="text-sm font-medium text-gray-700">Género</Label>
             <Select onValueChange={handleGenderChange} disabled={isLoading}>
-              <SelectTrigger className="text-xs">
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Escolher" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="M" className="text-xs">Masculino</SelectItem>
-                <SelectItem value="F" className="text-xs">Feminino</SelectItem>
-                <SelectItem value="O" className="text-xs">Outro</SelectItem>
+                <SelectItem value="M" className="text-sm">Masculino</SelectItem>
+                <SelectItem value="F" className="text-sm">Feminino</SelectItem>
+                <SelectItem value="O" className="text-sm">Outro</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         
         {/* Código Postal */}
-        <div className="space-y-1">
-          <Label htmlFor="postalCode" className="text-xs">Código Postal *</Label>
+        <div className="space-y-2">
+          <Label htmlFor="postalCode" className="text-sm font-medium text-gray-700">Código Postal *</Label>
           <Input
             id="postalCode"
             placeholder="4750-850"
             {...register('postalCode')}
             disabled={isLoading}
-            className="text-xs sm:text-sm"
+            className="text-sm"
           />
           {errors.postalCode && (
-            <p className="text-xs text-destructive">{errors.postalCode.message}</p>
+            <p className="text-xs text-red-500">{errors.postalCode.message}</p>
           )}
         </div>
         
         {/* Palavras-passe */}
-        <div className="space-y-1">
-          <Label htmlFor="password" className="text-xs">Palavra-passe *</Label>
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-medium text-gray-700">Palavra-passe *</Label>
           <Input
             id="password"
             type="password"
             placeholder="Mínimo 8 caracteres"
             {...register('password')}
             disabled={isLoading}
-            className="text-xs sm:text-sm"
+            className="text-sm"
           />
           {errors.password && (
-            <p className="text-xs text-destructive">{errors.password.message}</p>
+            <p className="text-xs text-red-500">{errors.password.message}</p>
           )}
         </div>
         
-        <div className="space-y-1">
-          <Label htmlFor="confirmPassword" className="text-xs">Confirmar Palavra-passe *</Label>
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">Confirmar Palavra-passe *</Label>
           <Input
             id="confirmPassword"
             type="password"
             placeholder="Repetir palavra-passe"
             {...register('confirmPassword')}
             disabled={isLoading}
-            className="text-xs sm:text-sm"
+            className="text-sm"
           />
           {errors.confirmPassword && (
-            <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+            <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>
           )}
         </div>
         
         {/* Botões */}
-        <div className="flex flex-col gap-2 pt-3">
-          <Button type="submit" disabled={isLoading} className="w-full text-xs sm:text-sm">
+        <div className="flex flex-col gap-2 pt-4">
+          <Button 
+            type="submit" 
+            disabled={isLoading} 
+            className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white"
+          >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 A criar conta...
               </>
             ) : (
@@ -344,15 +345,18 @@ export default function ClientRegistrationForm({
             )}
           </Button>
           
+          {onBack && (
           <Button
             type="button"
             variant="outline"
             onClick={onBack}
             disabled={isLoading}
-            className="text-xs"
+              className="text-sm"
           >
+              <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Button>
+          )}
         </div>
       </form>
     </div>

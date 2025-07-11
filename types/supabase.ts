@@ -145,6 +145,76 @@ export interface Database {
           role?: string
         }
       }
+      events: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          date: string
+          time: string | null
+          location: string | null
+          flyer_url: string | null
+          is_published: boolean
+          guest_list_open_datetime: string | null
+          guest_list_close_datetime: string | null
+          organization_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          date: string
+          time?: string | null
+          location?: string | null
+          flyer_url?: string | null
+          is_published?: boolean
+          guest_list_open_datetime?: string | null
+          guest_list_close_datetime?: string | null
+          organization_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          date?: string
+          time?: string | null
+          location?: string | null
+          flyer_url?: string | null
+          is_published?: boolean
+          guest_list_open_datetime?: string | null
+          guest_list_close_datetime?: string | null
+          organization_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      event_promoters: {
+        Row: {
+          id: string
+          event_id: string
+          promoter_id: string
+          team_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          promoter_id: string
+          team_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          promoter_id?: string
+          team_id?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

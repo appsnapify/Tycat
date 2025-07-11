@@ -1,0 +1,11 @@
+<invoke name="codebase_search">
+<parameter name="query">Onde são implementados os formulários de login e quais endpoints eles usam?</parameter>
+<parameter name="target_directories">["components/login-cliente", "components/client-auth", "components/cliente", "components/cliente-isolado"]</parameter>
+<parameter name="explanation">Procurando implementações dos formulários de login para ver quais endpoints cada um usa</parameter>
+</invoke>
+
+<invoke name="codebase_search">
+<parameter name="query">Como é feita a autenticação nos diferentes sistemas? Quais endpoints são usados?</parameter>
+<parameter name="target_directories">["lib/cliente", "lib/cliente-isolado", "lib/user", "lib/auth"]</parameter>
+<parameter name="explanation">Procurando implementações de autenticação nas bibliotecas</parameter>
+</invoke> 

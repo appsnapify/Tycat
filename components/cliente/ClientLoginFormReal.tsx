@@ -200,7 +200,7 @@ export default function ClientLoginFormReal() {
         localStorage.setItem('client_user', JSON.stringify(result.user));
       }
       
-      router.push('/user/dashboard');
+      router.push('/cliente/dashboard');
       
     } catch (error) {
       console.error('Erro no login:', error)

@@ -1,7 +1,7 @@
 // 🚀 OTIMIZAÇÃO PROMO2: Layout otimizado com Toaster para o sistema v2
 import { Toaster } from 'sonner';
 
-export default function Promo2Layout({
+export default function PromoLayout({
   children,
 }: {
   children: React.ReactNode;

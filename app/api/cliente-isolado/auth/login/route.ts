@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClienteIsoladoAdminClient } from '@/lib/cliente-isolado/supabase'
+import { createClienteIsoladoAdminClient, createClienteIsoladoClient } from '@/lib/cliente-isolado/supabase'
 import { 
   checkPhoneExists, 
   createClientUser, 

@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import { checkDuplicateGuest, setGuestExists, invalidateGuestCache } from '@/lib/cache/guest-cache';
 import { recordGuestCacheHit, recordGuestCacheMiss } from '@/lib/monitoring/cache-metrics';
-import { checkRateLimit, createRateLimitResponse, RATE_LIMIT_CONFIGS, checkCircuitBreaker, createCircuitBreakerResponse, recordCircuitBreakerSuccess, recordCircuitBreakerFailure } from '@/lib/security/advanced-rate-limit';
+import { createRateLimitResponse } from '@/lib/security/rate-limit-v2';
 
 // Função auxiliar para validar UUID
 function isValidUUID(id: string): boolean {

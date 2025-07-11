@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import AuthProvider from '@/components/cliente-isolado/AuthProvider'
+import { Toaster } from '@/components/ui/toaster'
+import Header from '@/components/cliente-isolado/Dashboard/Header'
 
 export const metadata: Metadata = {
   title: 'SNAP - Cliente',
@@ -14,7 +16,9 @@ export default function ClienteIsoladoLayout({
   return (
     <AuthProvider>
       <div className="min-h-screen bg-gray-900">
+        <Header />
         {children}
+        <Toaster />
       </div>
     </AuthProvider>
   )

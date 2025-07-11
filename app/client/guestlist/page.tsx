@@ -90,7 +90,7 @@ export default function GuestListPage() {
       
       if (existingRequest) {
         // Já existe um pedido, redirecionar para o dashboard
-        router.push('/user/dashboard');
+        router.push('/cliente/dashboard');
         return;
       }
       
@@ -108,7 +108,7 @@ export default function GuestListPage() {
       if (createError) throw createError;
       
       // Redirecionar para o dashboard após o sucesso
-      router.push('/user/dashboard');
+      router.push('/cliente/dashboard');
       
     } catch (error) {
       console.error('Erro ao solicitar acesso:', error);

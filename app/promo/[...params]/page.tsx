@@ -14,17 +14,18 @@ interface PageProps {
 
 // Server Component que captura parâmetros da URL
 export default async function PromoterGuestListPageV2({ params }: PageProps) {
-  // 🚀 OTIMIZAÇÃO: Simplificação para evitar recarregamentos desnecessários
-  const resolvedParams = await params;
-  const urlParams = resolvedParams?.params;
-  
-  // Validação inicial dos parâmetros
-  if (!urlParams || urlParams.length !== 3) {
-    notFound();
-  }
-
   try {
-    // Processar parâmetros e buscar dados (reutiliza a action do promo original)
+    // 🚀 OTIMIZAÇÃO: Aguardar resolução dos parâmetros
+    const resolvedParams = await params;
+    const urlParams = resolvedParams?.params;
+    
+    // Validação inicial dos parâmetros
+    if (!urlParams || urlParams.length !== 3) {
+      console.error('[PROMO] Parâmetros inválidos:', urlParams);
+      notFound();
+    }
+
+    // Processar parâmetros e buscar dados
     const data = await processPromoParams(urlParams);
     
     if (!data || !data.event) {

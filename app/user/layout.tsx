@@ -1,16 +1,18 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { ClienteAuthProvider } from '@/hooks/useClienteIsolado';
+import React from 'react'
+import { UserAuthProvider } from '@/hooks/useUser'
 
 export default function UserLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <ClienteAuthProvider>
+    <UserAuthProvider>
+      <div className="min-h-screen bg-gray-900">
       {children}
-    </ClienteAuthProvider>
-  );
+      </div>
+    </UserAuthProvider>
+  )
 } 

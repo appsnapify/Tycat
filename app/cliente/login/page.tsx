@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useClienteIsolado } from '@/hooks/useClienteIsolado'
@@ -39,11 +39,41 @@ export default function LoginPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   
-  const { login, register, checkPhone, isAuthenticated, isLoading, error } = useClienteIsolado()
+  const { login, register, checkPhone, logout, isAuthenticated, isLoading, error } = useClienteIsolado()
   const router = useRouter()
+  const hasLoggedOut = useRef(false)
 
   // ✅ Verificar se telefone é válido
   const isPhoneValid = phoneValue ? isValidPhoneNumber(phoneValue) : false
+
+  // 🔒 LOGOUT FORÇADO COMPLETO: Mata sessão servidor + estado interno
+  useEffect(() => {
+    const forceCompleteLogout = async () => {
+      if (!hasLoggedOut.current) {
+        hasLoggedOut.current = true
+        
+        try {
+          console.log('🔒 [FORCED-LOGOUT] Executando logout completo...')
+          
+          // ✅ LOGOUT COMPLETO: servidor + estado interno + localStorage
+          await logout()
+          
+          console.log('✅ [FORCED-LOGOUT] Logout completo executado')
+        } catch (error) {
+          console.log('⚠️ [FORCED-LOGOUT] Erro (ignorado):', error)
+          
+          // ✅ Fallback: Limpeza manual se logout falhar
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('cliente-session-token')
+            localStorage.removeItem('cliente-user-id') 
+            localStorage.removeItem('cliente-session-expires')
+          }
+        }
+      }
+    }
+    
+    forceCompleteLogout()
+  }, [logout]) // Dependência: logout function
 
   // ✅ Adicionar estilos personalizados para PhoneInput
   useEffect(() => {
@@ -89,13 +119,14 @@ export default function LoginPage() {
     }
   }, [])
 
-  // ✅ Redirect se já autenticado (removido para evitar conflitos)
-  // useEffect(() => {
-  //   if (isAuthenticated && !isLoading) {
-  //     console.log('🔄 [LOGIN] Utilizador autenticado, redirecionando...')
-  //     router.push('/cliente/dashboard')
-  //   }
-  // }, [isAuthenticated, isLoading, router])
+  // ✅ Redirect se já autenticado (após logout forçado)
+  useEffect(() => {
+    // ✅ Só redireciona APÓS o logout forçado ter sido executado
+    if (isAuthenticated && !isLoading && hasLoggedOut.current) {
+      console.log('🔄 [LOGIN] Utilizador ainda autenticado após logout forçado, redirecionando...')
+      window.location.href = '/cliente/dashboard'
+    }
+  }, [isAuthenticated, isLoading])
 
   // ✅ PASSO 1: Verificar se telefone existe
   const handleCheckPhone = async (e: React.FormEvent) => {
@@ -201,7 +232,7 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ Se já autenticado, mostrar loading
+  // ✅ Se forçando logout, mostrar loading
   if (isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">

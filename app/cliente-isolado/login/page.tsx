@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useClienteIsolado } from '@/hooks/useClienteIsolado'
 import { Phone, User, Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
+export default function ClienteLoginPage() {
   const [phone, setPhone] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -15,7 +15,7 @@ export default function LoginPage() {
   const { login, isAuthenticated, isLoading, error } = useClienteIsolado()
   const router = useRouter()
 
-  // ✅ Redirect se já autenticado
+  // ✅ Redirect se já autenticado - PARA URL CORRETA
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       router.push('/cliente-isolado/dashboard')
@@ -65,17 +65,17 @@ export default function LoginPage() {
   // ✅ Se já autenticado, mostrar loading
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>A redirecionar...</p>
+          <p>A redirecionar para dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -166,7 +166,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-xs text-gray-500">
-            Sistema cliente isolado v1.0
+            Sistema cliente otimizado
           </p>
         </div>
       </div>

@@ -12,6 +12,7 @@ interface EventCardProps {
     flyer_url: string
     checked_in: boolean
     check_in_time: string | null
+    type: 'guest' | 'ticket'
   }
   onViewQR: () => void
 }
@@ -19,7 +20,12 @@ interface EventCardProps {
 export default function EventCard({ event, onViewQR }: EventCardProps) {
   const eventDate = new Date(event.date)
   const now = new Date()
-  const isPastEvent = eventDate < now
+  const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000))
+  
+  // ✅ CATEGORIZAÇÃO IGUAL AO SISTEMA AVANÇADO
+  const isUpcoming = eventDate >= now
+  const isRecent = eventDate < now && eventDate >= twentyFourHoursAgo
+  const isPast = eventDate < twentyFourHoursAgo
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -29,8 +35,34 @@ export default function EventCard({ event, onViewQR }: EventCardProps) {
     })
   }
 
+  // ✅ CORES E ESTILOS POR CATEGORIA
+  const getEventStyles = () => {
+    if (isUpcoming) {
+      return {
+        container: 'bg-gray-800 border-blue-500/30',
+        badge: 'bg-yellow-600 text-yellow-100',
+        badgeText: 'PRÓXIMO'
+      }
+    }
+    if (isRecent) {
+      return {
+        container: 'bg-gray-800 border-orange-500/30',
+        badge: 'bg-orange-600 text-orange-100',
+        badgeText: 'RECENTE'
+      }
+    }
+    // isPast
+    return {
+      container: 'bg-gray-700 border-gray-600 opacity-75 grayscale',
+      badge: 'bg-gray-600 text-gray-200',
+      badgeText: 'PASSADO'
+    }
+  }
+
+  const styles = getEventStyles()
+
   return (
-    <div className={`bg-gray-800 border border-gray-700 rounded-xl overflow-hidden ${isPastEvent ? 'opacity-75' : ''}`}>
+    <div className={`${styles.container} border rounded-xl overflow-hidden transition-all duration-300`}>
       {/* Flyer */}
       <div className="relative h-40 bg-gray-700">
         {event.flyer_url ? (
@@ -47,16 +79,14 @@ export default function EventCard({ event, onViewQR }: EventCardProps) {
         )}
         
         {/* Status Badge */}
-        {event.checked_in && (
+        {event.checked_in ? (
           <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
             <CheckCircle className="w-3 h-3" />
             USADO
           </div>
-        )}
-        
-        {isPastEvent && !event.checked_in && (
-          <div className="absolute top-2 right-2 bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-medium">
-            PASSADO
+        ) : (
+          <div className={`absolute top-2 right-2 ${styles.badge} px-2 py-1 rounded-md text-xs font-medium`}>
+            {styles.badgeText}
           </div>
         )}
       </div>
@@ -82,15 +112,25 @@ export default function EventCard({ event, onViewQR }: EventCardProps) {
           <div className="bg-red-900/20 border border-red-700 rounded-md p-2">
             <div className="flex items-center gap-2 text-red-400 text-xs">
               <Clock className="w-3 h-3" />
-              Check-in: {new Date(event.check_in_time).toLocaleString('pt-PT')}
+              QR Code utilizado em {new Date(event.check_in_time).toLocaleString('pt-PT')}
             </div>
           </div>
         )}
 
-        {!event.checked_in && !isPastEvent && (
+        {!event.checked_in && isUpcoming && (
           <div className="bg-green-900/20 border border-green-700 rounded-md p-2">
-            <div className="text-green-400 text-xs">
-              ✅ Válido - Ainda não foi usado
+            <div className="flex items-center gap-2 text-green-400 text-xs">
+              <QrCode className="w-3 h-3" />
+              QR Code não utilizado
+            </div>
+          </div>
+        )}
+
+        {!event.checked_in && isRecent && (
+          <div className="bg-orange-900/20 border border-orange-700 rounded-md p-2">
+            <div className="flex items-center gap-2 text-orange-400 text-xs">
+              <QrCode className="w-3 h-3" />
+              QR Code não utilizado (evento recente)
             </div>
           </div>
         )}
@@ -98,10 +138,14 @@ export default function EventCard({ event, onViewQR }: EventCardProps) {
         {/* Action Button */}
         <button
           onClick={onViewQR}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium transition-colors"
+          className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-colors ${
+            isPast 
+              ? 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
         >
           <QrCode className="w-4 h-4" />
-          Ver QR Code
+          {isPast ? 'Histórico' : 'Ver QR Code'}
         </button>
       </div>
     </div>

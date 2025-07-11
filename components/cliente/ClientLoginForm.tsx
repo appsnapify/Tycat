@@ -240,7 +240,7 @@ export default function ClientLoginForm() {
         
         // SOLUÇÃO TEMPORÁRIA: Redirecionar diretamente para o dashboard
         // Isto ignora a autenticação real, mas permite o usuário avançar
-        window.location.href = '/user/dashboard'
+        window.location.href = '/cliente/dashboard'
       }, 1000)
       
     } catch (error) {

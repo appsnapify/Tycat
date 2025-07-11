@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         details: result.error.format() 
       }, { status: 400 });
     }
-    
+
     const { 
       phone, 
       email, 
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         .from('client_users')
         .delete()
         .eq('id', clientUser.id);
-        
+      
       return NextResponse.json({ 
         success: false, 
         error: 'Erro ao criar conta: ' + authError.message 
@@ -143,15 +143,15 @@ export async function POST(request: Request) {
               }
             }
           );
-        }
+      }
       }
     } catch (autoLoginError) {
       // Login automático falhou, mas registro foi bem-sucedido
     }
     
     // Retornar dados do usuário (sem senha)
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       user: {
         id: clientUser.id,
         firstName: clientUser.first_name,

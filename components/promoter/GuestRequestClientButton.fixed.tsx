@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { createClient } from '@/lib/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { PhoneVerificationForm } from '@/components/client-auth/PhoneVerificationForm';
 import ClientLoginForm from '@/components/client-auth/ClientLoginForm';
 import ClientRegistrationForm from '@/components/client-auth/ClientRegistrationForm';
@@ -409,47 +409,53 @@ export function GuestRequestClientButton({
   
   return (
     <>
-      <Button 
-        onClick={handleClick} 
+      <Button
+        onClick={handleClick}
         disabled={isSubmitting}
         className={className}
       >
         {isSubmitting ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             A processar...
           </>
         ) : (
           buttonText
         )}
       </Button>
-      
-      {/* Dialog para autenticação */}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-full max-w-md p-0 mx-auto max-h-[80vh] overflow-y-auto">
-          <DialogTitle className="sr-only">Acesso à Guest List</DialogTitle>
-          
-          {authStep === 'phone' && (
-            <PhoneVerificationForm onVerified={handlePhoneVerified} />
-          )}
-          
-          {authStep === 'login' && (
-            <ClientLoginForm 
-              phone={phone} 
-              onSuccess={handleLoginSuccess} 
-              onBack={() => setAuthStep('phone')} 
-            />
-          )}
-          
-          {authStep === 'register' && (
-            <div className="py-1 px-2">
-              <ClientRegistrationForm 
-                phone={phone} 
-                onSuccess={handleRegistrationSuccess}
-                onBack={() => setAuthStep('phone')}
-              />
+        <DialogContent className="sm:max-w-[425px] p-0">
+          <div className="relative">
+            <button
+              onClick={() => setDialogOpen(false)}
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+            
+            <div className="p-6">
+              {authStep === 'phone' && (
+                <PhoneVerificationForm
+                  onVerified={handlePhoneVerified}
+                  defaultPhone={phone}
+                />
+              )}
+              {authStep === 'login' && (
+                <ClientLoginForm
+                  phone={phone}
+                  onSuccess={handleLoginSuccess}
+                />
+              )}
+              {authStep === 'register' && (
+                <ClientRegistrationForm
+                  phone={phone}
+                  onSuccess={handleRegistrationSuccess}
+                />
+              )}
             </div>
-          )}
+          </div>
         </DialogContent>
       </Dialog>
       
@@ -484,7 +490,7 @@ export function GuestRequestClientButton({
           </div>
           
           <div className="flex gap-2 justify-between mt-6">
-            <Button variant="outline" onClick={() => router.push('/user/dashboard')}>
+            <Button variant="outline" onClick={() => router.push('/cliente/dashboard')}>
               Ver Dashboard
             </Button>
             <Button onClick={() => setShowQRCode(false)}>

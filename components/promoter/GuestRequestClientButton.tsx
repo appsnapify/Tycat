@@ -1,364 +1,272 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowRight, Phone } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import Image from 'next/image';
-import { ClientUser } from '@/types/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PhoneVerificationForm } from '@/components/client-auth/PhoneVerificationForm';
 import ClientLoginForm from '@/components/client-auth/ClientLoginForm';
 import ClientRegistrationForm from '@/components/client-auth/ClientRegistrationForm';
-import { ProgressSteps } from '@/components/ui/progress-steps';
-import { LoadingOverlay } from '@/components/ui/loading-overlay';
+import { useClientAuth } from '@/hooks/useClientAuth';
+import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface GuestRequestProps {
+interface GuestRequestClientButtonProps {
   eventId: string;
   promoterId: string;
   teamId: string;
+  buttonText?: string;
   className?: string;
-  buttonStyle?: React.CSSProperties;
 }
 
-export function GuestRequestClient({
+export function GuestRequestClientButton({
   eventId,
   promoterId,
   teamId,
-  className = '',
-  buttonStyle
-}: GuestRequestProps) {
-  const [currentUser, setCurrentUser] = useState<ClientUser | null>(null);
+  buttonText = 'Entrar com o Telemóvel',
+  className = ''
+}: GuestRequestClientButtonProps) {
+  const { user, checkAuth } = useClientAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [phone, setPhone] = useState('');
   const [authStep, setAuthStep] = useState<'phone' | 'login' | 'register'>('phone');
+  const [phone, setPhone] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  
-  // States para controle de progresso e feedback
-  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-  const [loadingMessage, setLoadingMessage] = useState('');
-  const [loadingSubmessage, setLoadingSubmessage] = useState('');
-  
-  // Monitor state changes
-  
-  // Função para solicitar acesso ao evento (gerar QR code)
-  const requestAccess = async () => {
-    if (!currentUser) {
-      toast.error('Você precisa estar autenticado para solicitar acesso');
-      return;
+  const [eventDetails, setEventDetails] = useState<{title?: string, date?: string, location?: string}>({});
+
+  const handleClick = async () => {
+    if (user) {
+      submitRequest();
+    } else {
+      setDialogOpen(true);
     }
-    
+  };
+
+  const generateQRCode = async (guestId: string): Promise<string> => {
+    try {
+      console.log(`Gerando QR code para guestId: ${guestId}`);
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=guest_${guestId}_event_${eventId}_${Date.now()}`;
+      
+      const testResponse = await fetch(qrCodeUrl, { method: 'HEAD' });
+      if (testResponse.ok) {
+        console.log('QR code gerado com sucesso via API externa');
+        return qrCodeUrl;
+      }
+      
+      console.log('Tentando fallback 1 para geração de QR code');
+      return `https://chart.googleapis.com/chart?cht=qr&chs=250x250&chl=guest_${guestId}_event_${eventId}_${Date.now()}`;
+    } catch (error) {
+      console.error('Erro ao gerar QR code, usando fallback:', error);
+      return `https://chart.googleapis.com/chart?cht=qr&chs=250x250&chl=guest_${guestId}_event_${eventId}_${Date.now()}`;
+    }
+  };
+
+  const loadEventDetails = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('events')
+        .select('title, date, location')
+        .eq('id', eventId)
+        .single();
+      
+      if (error) {
+        console.error('Erro ao carregar detalhes do evento:', error);
+        return;
+      }
+      
+      if (data) {
+        setEventDetails({
+          title: data.title,
+          date: new Date(data.date).toLocaleDateString('pt-PT'),
+          location: data.location
+        });
+        console.log('Detalhes do evento carregados com sucesso:', data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar detalhes do evento:', error);
+    }
+  };
+
+  const submitRequest = async () => {
     setIsSubmitting(true);
-    setLoadingMessage('Gerando seu QR Code...');
-    setLoadingSubmessage('Validando dados e criando acesso');
     
     try {
-      // Verificar se temos todos os IDs necessários
-      if (!eventId) throw new Error('ID do evento não fornecido');
-      if (!promoterId) throw new Error('ID do promotor não fornecido');
-      if (!teamId) throw new Error('ID da equipe não fornecido');
-      if (!currentUser.id) throw new Error('ID do usuário não fornecido');
-      
-      setLoadingSubmessage('Conectando com o servidor...');
-      
-      // Dados do usuário para enviar para a API
-      const userData = {
-        event_id: eventId,
-        client_user_id: currentUser.id,
-        name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
-        phone: currentUser.phone || '',
-        promoter_id: promoterId,
-        team_id: teamId
-      };
-      
-      setLoadingSubmessage('Processando sua solicitação...');
-      
-      // Chamada para a nova API client-auth que contorna o middleware
-      const response = await fetch('/api/client-auth/guests/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+      console.log('Iniciando submitRequest com os seguintes dados:', {
+        userId: user?.id,
+        eventId,
+        promoterId,
+        teamId
       });
       
-      setLoadingSubmessage('Finalizando...');
-      
-      // Verificar resposta
-      if (!response.ok) {
-        console.error('Erro na resposta da API:', response.status, response.statusText);
-        
-        // Tentar obter detalhes do erro
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Erro ao processar solicitação');
-        } catch (e) {
-          throw new Error(`Erro na API (${response.status}): ${response.statusText}`);
-        }
+      if (!user) {
+        throw new Error('Usuário não autenticado. Por favor, faça login novamente.');
       }
       
-      // Processar resposta com sucesso
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Erro desconhecido na API');
+      if (!eventId || !promoterId || !teamId) {
+        throw new Error('Dados incompletos para o pedido');
       }
       
-      // QR Code foi gerado pelo servidor
-      if (result.data && result.data.qr_code_url) {
-        // Marcar etapa QR como completa
-        setCompletedSteps(prev => [...prev, 'qr']);
+      if (!user.firstName || !user.lastName) {
+        throw new Error('Dados do usuário incompletos. Verifique seu perfil.');
+      }
+      
+      await loadEventDetails();
+      
+      const supabase = createClient();
+      
+      console.log(`Verificando pedido existente para usuário ${user.id} no evento ${eventId}`);
+      const { data: existingRequest, error: checkError } = await supabase
+        .from('guests')
+        .select('id, qr_code_url')
+        .eq('event_id', eventId)
+        .eq('client_user_id', user.id)
+        .maybeSingle();
+      
+      if (checkError) {
+        throw checkError;
+      }
+      
+      let guestId: string;
+      let qrCode: string;
+      
+      if (existingRequest) {
+        guestId = existingRequest.id;
+        console.log('Pedido existente encontrado com ID:', guestId);
         
-        // Atualizar a interface com o QR code
-        setQrCodeUrl(result.data.qr_code_url);
-        
-        // Mostrar o QR code
-        setShowQRCode(true);
-        
-        // Mensagem diferente para guest existente vs novo guest
-        if (result.isExisting) {
-          toast.success(result.message || 'Você já está na Guest List! Aqui está seu QR Code.');
+        if (existingRequest.qr_code_url) {
+          qrCode = existingRequest.qr_code_url;
+          console.log('Usando QR code existente');
         } else {
-          toast.success(result.message || 'Acesso confirmado! Seu QR code está pronto.');
+          console.log('Gerando novo QR code para pedido existente');
+          qrCode = await generateQRCode(guestId);
+          
+          const { error: updateError } = await supabase
+            .from('guests')
+            .update({ 
+              qr_code_url: qrCode,
+              status: 'approved'
+            })
+            .eq('id', guestId);
+          
+          if (updateError) {
+            console.error('Erro ao atualizar QR code:', updateError);
+          }
         }
       } else {
-        throw new Error('QR Code não retornado pela API');
+        console.log('Criando novo pedido de convidado...');
+        
+        const { data: newGuest, error: insertError } = await supabase
+          .from('guests')
+          .insert({
+            event_id: eventId,
+            name: `${user.firstName} ${user.lastName}`,
+            phone: user.phone,
+            client_user_id: user.id,
+            promoter_id: promoterId,
+            team_id: teamId,
+            status: 'approved'
+          })
+          .select()
+          .single();
+        
+        if (insertError || !newGuest) {
+          throw insertError || new Error('Falha ao criar pedido');
+        }
+        
+        guestId = newGuest.id;
+        qrCode = await generateQRCode(guestId);
+        
+        const { error: updateError } = await supabase
+          .from('guests')
+          .update({ qr_code_url: qrCode })
+          .eq('id', guestId);
+        
+        if (updateError) {
+          console.error('Erro ao salvar QR code:', updateError);
+        }
       }
+      
+      setQrCodeUrl(qrCode);
+      setShowQRCode(true);
+      toast.success('Pedido processado com sucesso!');
       
     } catch (error) {
-      console.error('Erro ao solicitar acesso via API:', error);
-      
-      // Tratamento de erro melhorado
-      let errorMessage = 'Erro ao solicitar acesso';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message || errorMessage;
-      } else if (typeof error === 'object' && error !== null) {
-        const errorObj = error as any;
-        errorMessage = errorObj.message || errorObj.error || errorObj.statusText || JSON.stringify(error);
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      toast.error(errorMessage);
+      console.error('Erro ao processar pedido:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao processar pedido');
     } finally {
       setIsSubmitting(false);
-      setLoadingMessage('');
-      setLoadingSubmessage('');
-    }
-  };
-  
-  // Handler para quando o telefone é verificado
-  const handlePhoneVerified = (phone: string, exists: boolean, userId: string | null = null) => {
-    // Marcar step de telefone como completo
-    setCompletedSteps(['phone']);
-    
-    // Armazenar o telefone e userId para uso posterior
-    setPhone(phone);
-    if (userId) setUserId(userId);
-    
-    // Navegar para o próximo passo com base no resultado da verificação
-    if (exists === true) {
-      setAuthStep('login');
-    } else {
-      setAuthStep('register');
-    }
-  };
-  
-  // Handler para sucesso no login
-  const handleLoginSuccess = async (userData: any) => {
-    try {
-      // Marcar step de auth como completo
-      setCompletedSteps(['phone', 'auth']);
-      
-      // Normalizar dados do usuário
-      const normalizedUser = {
-        id: userData.id || userData.user_id || '',
-        firstName: userData.firstName || userData.first_name || '',
-        lastName: userData.lastName || userData.last_name || '',
-        email: userData.email || '',
-        phone: userData.phone || phone
-      };
-      
-      // Atualizar state local (sem useClientAuth)
-      setCurrentUser(normalizedUser);
-      
-      // Fechar o diálogo de autenticação
-      setDialogOpen(false);
-      
-      toast.success('Login realizado com sucesso');
-    } catch (error) {
-      console.error('Erro ao processar login:', error);
-      toast.error('Ocorreu um erro ao processar o login. Tente novamente.');
     }
   };
 
-  // Handler para sucesso no registro
-  const handleRegisterSuccess = async (userData: any) => {
-    try {
-      // Marcar step de auth como completo
-      setCompletedSteps(['phone', 'auth']);
-      
-      // Extrair dados do user que vem dentro de userData
-      const user = userData.user || userData;
-      
-      // Normalizar dados do usuário
-      const normalizedUser = {
-        id: user.id || user.user_id || '',
-        firstName: user.firstName || user.first_name || '',
-        lastName: user.lastName || user.last_name || '',
-        email: user.email || '',
-        phone: user.phone || phone
-      };
-      
-      // Atualizar state local
-      setCurrentUser(normalizedUser);
-      
-      // Fechar o diálogo de autenticação
+  const handlePhoneVerified = async (phoneNumber: string, exists: boolean) => {
+    setPhone(phoneNumber);
+    setAuthStep(exists ? 'login' : 'register');
+  };
+
+  const handleLoginSuccess = async () => {
+    const authCheck = await checkAuth();
+    if (authCheck) {
       setDialogOpen(false);
-      
-      // Resetar authStep para evitar problemas
-      setAuthStep('phone');
-      
-      toast.success('Registro realizado com sucesso');
-    } catch (error) {
-      console.error('Erro ao processar registro:', error);
-      toast.error('Ocorreu um erro ao processar o registro. Tente novamente.');
+      submitRequest();
     }
   };
 
-  // Função para iniciar verificação de telefone
-  const startPhoneVerification = () => {
-    setAuthStep('phone');
-    setDialogOpen(true);
+  const handleRegistrationSuccess = async () => {
+    const authCheck = await checkAuth();
+    if (authCheck) {
+      setDialogOpen(false);
+      submitRequest();
+    }
   };
   
   return (
-    <LoadingOverlay 
-      isLoading={isSubmitting} 
-      message={loadingMessage} 
-      submessage={loadingSubmessage}
-    >
-      <Card className={`w-full bg-transparent border-0 shadow-none ${className}`}>
-        {currentUser && (
-        <CardHeader>
-          <CardTitle className="text-xl text-center text-white">
-              Olá, {currentUser.firstName || 'Convidado'}!
-          </CardTitle>
-        </CardHeader>
-        )}
-        
-        <CardContent>
-        {showQRCode && qrCodeUrl ? (
-          <div className="flex flex-col items-center gap-4">
-            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-lg">
-              <Image 
-                src={qrCodeUrl} 
-                alt="QR Code de acesso" 
-                width={200} 
-                height={200} 
-                priority
-                className="rounded-md w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]"
-              />
-            </div>
-            <div className="text-center px-4">
-              <p className="text-green-600 font-medium text-sm sm:text-base">Acesso aprovado!</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Apresente este QR code na entrada do evento
-              </p>
-            </div>
+    <>
             <Button 
-              variant="outline" 
-              onClick={() => setShowQRCode(false)}
-              className="text-xs sm:text-sm px-3 sm:px-4"
-            >
-              Esconder QR
-            </Button>
-          </div>
-          ) : currentUser ? (
-            <div className="flex flex-col items-center gap-4">
-        <Button 
-                onClick={requestAccess} 
+        onClick={handleClick}
           disabled={isSubmitting}
-                className="w-full"
-                style={buttonStyle}
+        className={`bg-[#6366f1] hover:bg-[#4f46e5] text-white ${className}`}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processando...
+            A processar...
               </>
             ) : (
-                  <>
-                    Solicitar QR Code
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
+          buttonText
             )}
           </Button>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <Button
-                onClick={startPhoneVerification}
-                className="w-full"
-                style={buttonStyle}
-              >
-                <Phone className="mr-2 h-4 w-4" />
-                Entrar com o Telemóvel
-              </Button>
-            </div>
-          )}
-        </CardContent>
-        
-        {/* Dialog para autenticação */}
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="w-[95vw] max-w-md p-0 mx-auto max-h-[90vh] overflow-y-auto">
-            <DialogTitle className="sr-only">Acesso à Guest List</DialogTitle>
-            <DialogDescription className="sr-only">
-              Processo de autenticação para acesso à lista de convidados. Siga as etapas para verificar seu telefone e obter seu QR code de entrada.
-            </DialogDescription>
-            
-            {/* Progress Steps */}
-            <div className="p-4 sm:p-6 pb-0">
-              <ProgressSteps 
-                currentStep={authStep === 'phone' ? 'phone' : authStep === 'login' || authStep === 'register' ? 'auth' : 'qr'} 
-                completedSteps={completedSteps}
-              />
-            </div>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle className="text-center">
+            {authStep === 'phone' && 'Verificar Telemóvel'}
+            {authStep === 'login' && 'Entrar'}
+            {authStep === 'register' && 'Criar Conta'}
+          </DialogTitle>
             
             {authStep === 'phone' && (
-              <div className="p-2 sm:p-0">
                 <PhoneVerificationForm onVerified={handlePhoneVerified} />
-              </div>
             )}
             
             {authStep === 'login' && (
-              <div className="p-2 sm:p-0">
                 <ClientLoginForm 
                   phone={phone} 
-                  userId={userId}
                   onSuccess={handleLoginSuccess} 
                   onBack={() => setAuthStep('phone')} 
                 />
-              </div>
             )}
             
             {authStep === 'register' && (
-              <div className="p-2 sm:p-0">
                 <ClientRegistrationForm 
                   phone={phone} 
-                  onSuccess={handleRegisterSuccess}
+              onSuccess={handleRegistrationSuccess}
                   onBack={() => setAuthStep('phone')}
                 />
-              </div>
             )}
           </DialogContent>
         </Dialog>
-      </Card>
-    </LoadingOverlay>
+    </>
   );
 } 

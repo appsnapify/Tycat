@@ -297,10 +297,12 @@ export function ClienteAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // ✅ Logout rápido
+  // ✅ Logout completo
   const logout = async (): Promise<void> => {
     try {
-      // ✅ Logout local primeiro (UX)
+      console.log('🔒 [CLIENTE-ISOLADO] Iniciando logout completo...')
+      
+      // ✅ 1. Limpar estado interno PRIMEIRO
       safeSetState({
         user: null,
         isAuthenticated: false,
@@ -308,27 +310,46 @@ export function ClienteAuthProvider({ children }: { children: ReactNode }) {
         error: null
       })
 
-      // ✅ Limpar tokens de sessão
+      // ✅ 2. Limpar cache de sessão
+      sessionCache.clear()
+
+      // ✅ 3. Limpar localStorage
       if (typeof window !== 'undefined') {
         localStorage.removeItem('cliente-session-token')
         localStorage.removeItem('cliente-user-id')
         localStorage.removeItem('cliente-session-expires')
         
-        console.log('🧹 [CLIENTE-ISOLADO] Tokens limpos')
+        console.log('🧹 [CLIENTE-ISOLADO] Tokens e cache limpos')
       }
 
-      // ✅ Logout no servidor (async)
-      fetch('/api/cliente-isolado/auth/logout', {
+      // ✅ 4. Logout no servidor (silent)
+      try {
+        await fetch('/api/cliente-isolado/auth/logout', {
         method: 'POST'
-      }).catch(err => console.warn('Logout API warning:', err))
+        })
+        console.log('✅ [CLIENTE-ISOLADO] Logout servidor concluído')
+      } catch (err) {
+        console.warn('⚠️ [CLIENTE-ISOLADO] Logout servidor falhou (ignorado):', err)
+      }
 
-      // ✅ Redirecionar para login isolado
-      if (typeof window !== 'undefined') {
+      // ✅ 5. Redirecionar apenas se NÃO estiver na página de login
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/cliente/login')) {
+        console.log('🔄 [CLIENTE-ISOLADO] Redirecionando para login...')
         window.location.href = '/cliente/login'
+      } else {
+        console.log('✅ [CLIENTE-ISOLADO] Logout completo na página de login')
       }
 
     } catch (error) {
-      console.warn('Logout warning:', error)
+      console.error('❌ [CLIENTE-ISOLADO] Erro logout:', error)
+      
+      // ✅ Fallback: garantir que o estado fica limpo mesmo com erro
+      safeSetState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null
+      })
     }
   }
 
@@ -354,13 +375,13 @@ export function ClienteAuthProvider({ children }: { children: ReactNode }) {
     timeoutRef.current = setTimeout(() => {
       // ✅ Só forçar timeout se ainda estiver loading
       if (state.isLoading) {
-        console.warn('⚠️ [CLIENTE-ISOLADO] Timeout - forçando não autenticado')
-        safeSetState({
-          isLoading: false,
-          isAuthenticated: false,
-          user: null,
-          error: null
-        })
+      console.warn('⚠️ [CLIENTE-ISOLADO] Timeout - forçando não autenticado')
+      safeSetState({
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+        error: null
+      })
       }
     }, 3000) // 3s mais rápido
 

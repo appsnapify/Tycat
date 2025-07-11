@@ -93,3 +93,50 @@ export function normalizePhoneNumber(phone: string, defaultCountryCode: string =
     return '+' + cleanedPhone;
   }
 }
+
+/**
+ * Valida se uma string é um UUID válido
+ */
+export function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
+
+// 🔒 FUNÇÕES DE SEGURANÇA PARA LOGS
+export function maskUserId(userId: string): string {
+  if (!userId || userId.length < 8) return '***'
+  return userId.substring(0, 8) + '...'
+}
+
+export function maskPhone(phone: string): string {
+  if (!phone) return '***'
+  if (phone.length <= 4) return '***'
+  
+  // +351919999998 → +351***998
+  if (phone.startsWith('+351')) {
+    return '+351***' + phone.slice(-3)
+  }
+  
+  // 919999998 → 919***998  
+  if (phone.length >= 7) {
+    return phone.substring(0, 3) + '***' + phone.slice(-3)
+  }
+  
+  return phone.substring(0, 3) + '***'
+}
+
+export function safeLog(message: string, data?: any): void {
+  if (data && typeof data === 'object') {
+    const safeData = { ...data }
+    
+    // Mascarar campos sensíveis automaticamente
+    if (safeData.userId) safeData.userId = maskUserId(safeData.userId)
+    if (safeData.phone) safeData.phone = maskPhone(safeData.phone)
+    if (safeData.telemóvel) safeData.telemóvel = maskPhone(safeData.telemóvel)
+    if (safeData.telefone) safeData.telefone = maskPhone(safeData.telefone)
+    
+    console.log(message, safeData)
+  } else {
+    console.log(message, data)
+  }
+}

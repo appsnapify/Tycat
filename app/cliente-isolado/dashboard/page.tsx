@@ -7,7 +7,7 @@ import Header from '@/components/cliente-isolado/Dashboard/Header'
 import BottomNav from '@/components/cliente-isolado/Dashboard/BottomNav'
 import EventCard from '@/components/cliente-isolado/Dashboard/EventCard'
 import QRModal from '@/components/cliente-isolado/Dashboard/QRModal'
-import { Loader2, Calendar, RefreshCw } from 'lucide-react'
+import { Loader2, Calendar, RefreshCw, Users, Ticket } from 'lucide-react'
 
 interface EventGuest {
   id: string
@@ -21,6 +21,7 @@ interface EventGuest {
   flyer_url: string
   description?: string
   time?: string
+  type: 'guest' | 'ticket'
 }
 
 export default function DashboardPage() {
@@ -31,6 +32,8 @@ export default function DashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState<EventGuest | null>(null)
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showAllPastEvents, setShowAllPastEvents] = useState(false)
+  const [activeWallet, setActiveWallet] = useState<'guest' | 'ticket'>('guest')
 
   // ✅ Fetch eventos ultrarrápido
   const fetchEvents = async (force = false) => {
@@ -78,23 +81,30 @@ export default function DashboardPage() {
     const now = new Date()
     const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000))
 
-    const upcomingEvents = events
+    // Filtrar por tipo de wallet primeiro
+    const filteredEvents = events.filter(event => event.type === activeWallet)
+
+    const upcomingEvents = filteredEvents
       .filter(event => new Date(event.date) >= now)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-    const recentEvents = events
+    const recentEvents = filteredEvents
       .filter(event => {
         const eventDate = new Date(event.date)
         return eventDate < now && eventDate >= twentyFourHoursAgo
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-    const pastEvents = events
+    const pastEvents = filteredEvents
       .filter(event => new Date(event.date) < twentyFourHoursAgo)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 4) // Limite de 4 eventos passados
 
-    return { upcomingEvents, recentEvents, pastEvents }
+    // Se showAllPastEvents for false, limita a 4 eventos
+    return { 
+      upcomingEvents, 
+      recentEvents, 
+      pastEvents: showAllPastEvents ? pastEvents : pastEvents.slice(0, 4)
+    }
   }
 
   const { upcomingEvents, recentEvents, pastEvents } = categorizeEvents(events)
@@ -106,10 +116,35 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-900 pb-20"> {/* pb-20 para o bottom nav */}
-        <Header />
-        
+      <div className="min-h-screen bg-gray-900 pb-20">
         <main className="p-4 space-y-6">
+          {/* Wallet Selector */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveWallet('guest')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
+                activeWallet === 'guest'
+                  ? 'bg-yellow-500 text-yellow-950'
+                  : 'bg-gray-800 text-gray-400'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Guest List
+            </button>
+            
+            <button
+              onClick={() => setActiveWallet('ticket')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
+                activeWallet === 'ticket'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-400'
+              }`}
+            >
+              <Ticket className="w-4 h-4" />
+              Bilhetes
+            </button>
+          </div>
+
           {/* Loading State */}
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -131,31 +166,14 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* Header Stats */}
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-white">Os meus eventos</h2>
-                    <p className="text-sm text-gray-400">
-                      {events.length} {events.length === 1 ? 'evento' : 'eventos'} no total
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
               {/* Empty State */}
-              {events.length === 0 ? (
+              {events.filter(e => e.type === activeWallet).length === 0 ? (
                 <div className="text-center py-20">
                   <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                   <h3 className="text-xl font-bold text-white mb-2">Nenhum evento encontrado</h3>
-                  <p className="text-gray-400 mb-4">Ainda não tens eventos registados.</p>
+                  <p className="text-gray-400 mb-4">
+                    Não tens {activeWallet === 'guest' ? 'guest lists' : 'bilhetes'} registados.
+                  </p>
                   <button
                     onClick={handleRefresh}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors"
@@ -166,11 +184,11 @@ export default function DashboardPage() {
               ) : (
                 <>
                   {/* Próximos Eventos */}
-                  {upcomingEvents.length > 0 && (
+                  {upcomingEvents.length > 0 ? (
                     <section>
                       <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                        Próximos Eventos ({upcomingEvents.length})
+                        Próximos Eventos
                       </h3>
                       <div className="grid gap-4">
                         {upcomingEvents.map(event => (
@@ -182,6 +200,10 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     </section>
+                  ) : (
+                    <div className="text-center py-10">
+                      <p className="text-gray-400">Não tens eventos próximos agendados.</p>
+                    </div>
                   )}
 
                   {/* Eventos Recentes */}
@@ -189,7 +211,7 @@ export default function DashboardPage() {
                     <section>
                       <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                         <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                        Eventos Recentes ({recentEvents.length})
+                        Eventos Recentes
                       </h3>
                       <div className="grid gap-4">
                         {recentEvents.map(event => (
@@ -206,10 +228,18 @@ export default function DashboardPage() {
                   {/* Eventos Passados */}
                   {pastEvents.length > 0 && (
                     <section>
-                      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                        Eventos Passados ({pastEvents.length})
-                      </h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                          Eventos Passados
+                        </h3>
+                        <button
+                          onClick={() => setShowAllPastEvents(!showAllPastEvents)}
+                          className="text-sm text-gray-400 hover:text-white transition-colors"
+                        >
+                          {showAllPastEvents ? 'Ver menos' : 'Ver todos'}
+                        </button>
+                      </div>
                       <div className="grid gap-4">
                         {pastEvents.map(event => (
                           <EventCard
@@ -225,16 +255,16 @@ export default function DashboardPage() {
               )}
             </>
           )}
+
+          {/* QR Modal */}
+          <QRModal
+            isOpen={qrModalOpen}
+            onClose={() => setQrModalOpen(false)}
+            event={selectedEvent}
+          />
         </main>
-
+        
         <BottomNav />
-
-        {/* QR Modal */}
-        <QRModal
-          isOpen={qrModalOpen}
-          onClose={() => setQrModalOpen(false)}
-          event={selectedEvent}
-        />
       </div>
     </ProtectedRoute>
   )

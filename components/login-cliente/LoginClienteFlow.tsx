@@ -85,17 +85,17 @@ export function LoginClienteFlow({ onComplete, initialPhone = '' }: LoginCliente
           if (redirectUrl) {
             router.push(redirectUrl + '?success=true')
           } else {
-            router.push('/user/dashboard')
+            router.push('/cliente/dashboard')
           }
         } else {
           console.error('[LOGIN-CLIENTE-FLOW] Erro ao criar guest:', result.error)
           // Mesmo com erro, redirecionar para o destino
-          router.push(redirectUrl || '/user/dashboard')
+          router.push(redirectUrl || '/cliente/dashboard')
         }
       } catch (error) {
         console.error('[LOGIN-CLIENTE-FLOW] Erro na criação do guest:', error)
         // Mesmo com erro, redirecionar para o destino
-        router.push(redirectUrl || '/user/dashboard')
+        router.push(redirectUrl || '/cliente/dashboard')
       }
     } else {
       // ✅ SOLUÇÃO DEFINITIVA: Redirecionamento direto e simples
@@ -105,7 +105,7 @@ export function LoginClienteFlow({ onComplete, initialPhone = '' }: LoginCliente
         console.log('[LOGIN-CLIENTE-FLOW] Redirecionando para dashboard (direto)...')
         // Pequeno delay apenas para feedback visual
         setTimeout(() => {
-          router.push('/user/dashboard')
+          router.push('/cliente/dashboard')
         }, 300)
       }
     }

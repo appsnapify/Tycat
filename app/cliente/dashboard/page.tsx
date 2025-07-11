@@ -1,31 +1,16 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useClienteIsolado } from '@/hooks/useClienteIsolado'
 import ProtectedRoute from '@/components/cliente-isolado/ProtectedRoute'
-import Header from '@/components/user/Header'
+import Header from '@/components/cliente-isolado/Dashboard/Header'
 import BottomNav from '@/components/user/BottomNav'
-import EventCard from '@/components/user/EventCard'
-import QRModal from '@/components/user/QRModal'
-import { useState, useEffect } from 'react'
-import { Calendar, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { Loader2, Users, Ticket, Calendar, QrCode, ChevronRight, Clock } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { toast } from '@/hooks/use-toast'
 
-interface Event {
-  id: string
-  event_id: string
-  qr_code_url: string
-  checked_in: boolean
-  check_in_time: string | null
-  title: string
-  description: string
-  date: string
-  time: string
-  location: string
-  flyer_url: string
-  status: string
-  event_datetime: string
-}
-
-// ✅ Interface compatível com EventCard existente
 interface EventGuest {
   id: string
   event_id: string
@@ -40,251 +25,241 @@ interface EventGuest {
   time?: string
 }
 
-export default function DashboardPage() {
+export default function ClienteDashboardPage() {
   const { user } = useClienteIsolado()
-  const [events, setEvents] = useState<Event[]>([])
-  const [isLoadingEvents, setIsLoadingEvents] = useState(true)
-  const [eventsError, setEventsError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  
-  // ✅ Estados QR Modal
-  const [qrModalOpen, setQrModalOpen] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<EventGuest | null>(null)
+  const [events, setEvents] = useState<EventGuest[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // ✅ Carregar eventos do utilizador
+  // ✅ Fetch eventos ultrarrápido
   const fetchEvents = async (force = false) => {
     if (!user?.id) return
-    
-    try {
-      console.log('🔥 [CLIENTE-DASHBOARD] Carregando eventos para:', user.id)
-      setIsLoadingEvents(true)
-      setEventsError(null)
 
+    try {
+      setError(null)
+      
       const response = await fetch(`/api/cliente-isolado/events?userId=${user.id}`, {
-        method: 'GET',
         cache: force ? 'no-store' : 'default'
       })
 
       const data = await response.json()
 
       if (data.success) {
-        console.log('✅ [CLIENTE-DASHBOARD] Eventos carregados:', data.events.length)
         setEvents(data.events || [])
+        console.log(`🚀 [CLIENTE-DASHBOARD] ${data.events?.length || 0} eventos carregados`)
       } else {
         throw new Error(data.error || 'Erro ao carregar eventos')
       }
-
     } catch (error) {
-      console.error('❌ [CLIENTE-DASHBOARD] Erro carregar eventos:', error)
-      setEventsError(error instanceof Error ? error.message : 'Erro ao carregar eventos')
+      console.error('❌ [CLIENTE-DASHBOARD] Erro:', error)
+      setError(error instanceof Error ? error.message : 'Erro ao carregar eventos')
     } finally {
-      setIsLoadingEvents(false)
-      setIsRefreshing(false)
+      setIsLoading(false)
     }
   }
 
+  // ✅ Carregar eventos na inicialização
   useEffect(() => {
-    fetchEvents()
+    if (user?.id) {
+      fetchEvents()
+    }
   }, [user?.id])
 
-  // ✅ Refresh manual
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    await fetchEvents(true)
+  // ✅ Handler para Guest Lists
+  const handleGuestLists = () => {
+    // Navegar para seção de guest lists dos eventos
+    toast({
+      title: "Guest Lists",
+      description: "Acesso às suas guest lists de eventos.",
+      duration: 2000,
+    });
   }
 
-  // ✅ Converter eventos para interface compatível
-  const convertToEventGuest = (events: Event[]): EventGuest[] => {
-    return events.map(event => ({
-      id: event.id,
-      event_id: event.event_id,
-      qr_code_url: event.qr_code_url,
-      checked_in: event.checked_in,
-      check_in_time: event.check_in_time,
-      title: event.title,
-      date: event.date,
-      location: event.location,
-      flyer_url: event.flyer_url,
-      description: event.description,
-      time: event.time
-    }))
+  // ✅ Handler para Bilhetes (desativado)
+  const handleBilhetes = () => {
+    toast({
+      title: "Em breve",
+      description: "Funcionalidade de bilhetes estará disponível em breve.",
+      duration: 2000,
+    });
   }
 
-  // ✅ Categorizar eventos por data (mesmo sistema do user/dashboard)
-  const categorizeEvents = (events: EventGuest[]) => {
-    const now = new Date()
-    const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000))
-
-    const upcomingEvents = events
-      .filter(event => new Date(event.date) >= now)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-    const recentEvents = events
-      .filter(event => {
-        const eventDate = new Date(event.date)
-        return eventDate < now && eventDate >= twentyFourHoursAgo
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-    const pastEvents = events
-      .filter(event => new Date(event.date) < twentyFourHoursAgo)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 4) // Limite de 4 eventos passados
-
-    return { upcomingEvents, recentEvents, pastEvents }
-  }
-
-  const eventGuests = convertToEventGuest(events)
-  const { upcomingEvents, recentEvents, pastEvents } = categorizeEvents(eventGuests)
-
-  // ✅ Handler QR Modal
-  const handleViewQR = (event: EventGuest) => {
-    setSelectedEvent(event)
-    setQrModalOpen(true)
+  // ✅ Calcular estatísticas
+  const stats = {
+    totalEvents: events.length,
+    upcomingEvents: events.filter(event => new Date(event.date) >= new Date()).length,
+    usedTickets: events.filter(event => event.checked_in).length
   }
 
   return (
     <ProtectedRoute>
-      {/* Layout original: flex flex-col min-h-screen */}
-      <div className="flex flex-col min-h-screen">
-        <Header 
-          userFirstName={user?.firstName} 
-          avatarUrl={user?.avatarUrl} 
-        />
+      {/* Fundo Azul Gradiente */}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 pb-24">
+        <Header />
         
-        <main className="flex-grow p-4 bg-white">
-          {/* Header interno com visual moderno */}
-          <div className="mb-6">
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Olá, {user?.firstName || 'Cliente'}!</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {isLoadingEvents 
-                      ? 'A carregar os seus eventos...'
-                      : `${events.length} eventos encontrados`
-                    }
-                  </p>
-                </div>
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
+        <main className="p-4 space-y-6">
+          {/* Header de Boas-vindas */}
+          <div className="text-center py-6">
+            <h1 className="text-2xl font-bold text-blue-900 mb-2">
+              Bem-vindo, {user?.firstName || 'Cliente'}!
+            </h1>
+            <p className="text-blue-700">Gerencie seus eventos e acessos</p>
+          </div>
+
+          {/* Estatísticas Rápidas */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white/80 backdrop-blur rounded-xl p-4 text-center border border-blue-200">
+              <div className="text-2xl font-bold text-blue-900">{stats.totalEvents}</div>
+              <div className="text-sm text-blue-700">Eventos</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur rounded-xl p-4 text-center border border-blue-200">
+              <div className="text-2xl font-bold text-blue-900">{stats.upcomingEvents}</div>
+              <div className="text-sm text-blue-700">Próximos</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur rounded-xl p-4 text-center border border-blue-200">
+              <div className="text-2xl font-bold text-blue-900">{stats.usedTickets}</div>
+              <div className="text-sm text-blue-700">Usados</div>
             </div>
           </div>
 
-          {/* Estados de carregamento e erro */}
-          {isLoadingEvents && (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-              <p className="text-gray-600">A carregar os seus eventos...</p>
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+                <p className="text-blue-700">A carregar...</p>
+              </div>
             </div>
-          )}
-
-          {eventsError && (
-            <div className="text-center py-12">
-              <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Erro ao carregar eventos</h3>
-              <p className="text-gray-500 mb-4">{eventsError}</p>
-              <button
-                onClick={handleRefresh}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors"
-              >
-                Tentar novamente
-              </button>
-            </div>
-          )}
-
-          {/* Lista de eventos */}
-          {!isLoadingEvents && !eventsError && (
+          ) : (
             <>
-              {/* Próximos Eventos */}
-              {upcomingEvents.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    Próximos Eventos ({upcomingEvents.length})
-                  </h2>
-                  <div className="space-y-4">
-                    {upcomingEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onViewQR={() => handleViewQR(event)}
-                      />
-                    ))}
+              {/* Seção Guest Lists */}
+              <Card className="bg-white/90 backdrop-blur border-blue-200 shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Users className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-blue-900">Guest Lists</CardTitle>
+                        <CardDescription className="text-blue-700">
+                          Acesso às suas listas de convidados
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Ativo
+                    </Badge>
                   </div>
-                </div>
-              )}
-
-              {/* Eventos Recentes */}
-              {recentEvents.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                    Eventos Recentes ({recentEvents.length})
-                  </h2>
-                  <div className="space-y-4">
-                    {recentEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onViewQR={() => handleViewQR(event)}
-                      />
-                    ))}
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {events.length > 0 ? (
+                      events.slice(0, 3).map(event => (
+                        <div key={event.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                          <div className="flex items-center gap-3">
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <div>
+                              <div className="font-medium text-blue-900">{event.title}</div>
+                              <div className="text-sm text-blue-700">
+                                {new Date(event.date).toLocaleDateString('pt-PT')}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {event.checked_in ? (
+                              <Badge className="bg-red-100 text-red-800">Usado</Badge>
+                            ) : (
+                              <Badge className="bg-green-100 text-green-800">Válido</Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleGuestLists}
+                              className="text-blue-600 hover:bg-blue-100"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-blue-700">
+                        <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Nenhuma guest list encontrada</p>
+                      </div>
+                    )}
+                    
+                    <Button
+                      onClick={handleGuestLists}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Ver Todas as Guest Lists
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
                   </div>
-                </div>
-              )}
+                </CardContent>
+              </Card>
 
-              {/* Eventos Passados */}
-              {pastEvents.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                    Eventos Passados ({pastEvents.length})
-                  </h2>
-                  <div className="space-y-4">
-                    {pastEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onViewQR={() => handleViewQR(event)}
-                      />
-                    ))}
+              {/* Seção Bilhetes (Desativada) */}
+              <Card className="bg-white/60 backdrop-blur border-gray-300 shadow-lg opacity-75">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gray-100 rounded-lg">
+                        <Ticket className="w-6 h-6 text-gray-500" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-gray-700">Bilhetes</CardTitle>
+                        <CardDescription className="text-gray-500">
+                          Gestão de bilhetes de eventos
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                      Em breve
+                    </Badge>
                   </div>
-                </div>
-              )}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-gray-600 mb-4">
+                      Funcionalidade de bilhetes estará disponível em breve
+                    </p>
+                    <Button
+                      onClick={handleBilhetes}
+                      disabled
+                      className="bg-gray-300 text-gray-500 cursor-not-allowed"
+                    >
+                      Indisponível
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {/* Empty State */}
-              {events.length === 0 && (
-                <div className="text-center py-20">
-                  <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Nenhum evento encontrado</h3>
-                  <p className="text-gray-500 mb-4">Ainda não está registado em nenhum evento.</p>
-                  <button
-                    onClick={handleRefresh}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors"
-                  >
-                    Atualizar
-                  </button>
-                </div>
+              {/* Error State */}
+              {error && (
+                <Card className="bg-red-50 border-red-200">
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-red-600 mb-3">{error}</p>
+                      <Button
+                        onClick={() => fetchEvents(true)}
+                        variant="outline"
+                        className="border-red-300 text-red-700 hover:bg-red-50"
+                      >
+                        Tentar novamente
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           )}
         </main>
 
         <BottomNav />
-
-        {/* QR Modal */}
-        <QRModal
-          isOpen={qrModalOpen}
-          onClose={() => setQrModalOpen(false)}
-          event={selectedEvent}
-        />
       </div>
     </ProtectedRoute>
   )
