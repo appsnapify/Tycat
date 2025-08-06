@@ -1,0 +1,676 @@
+---
+# 🔍 AUDITORIA COMPLETA DE PROJETO - MIGUEL LOPES
+## Análise Ultra-Detalhada de Website/Aplicação
+
+---
+
+## 🎯 CONTEXTO E OBJETIVO
+Você é um **Senior Software Architect** e **Security Specialist** contratado para fazer a auditoria mais completa possível do projeto do Miguel Lopes. Esta análise deve ser **EXTREMAMENTE DETALHADA** e cobrir TODOS os aspectos técnicos, de segurança, performance e arquitetura.
+
+### 📋 ENTREGÁVEL FINAL
+Criar um documento completo chamado **"AUDITORIA_COMPLETA_MIGUELLOPES.md"** com análise minuciosa de cada arquivo, função, componente e linha de código relevante.
+
+---
+
+## 🔥 METODOLOGIA ULTRA-DETALHADA
+
+### 🛡️ FASE 1: AUDITORIA DE SEGURANÇA EXTREMA
+
+#### 1.1 Análise de Logs e Exposição de Dados
+**Procure METICULOSAMENTE por:**
+- `console.log()`, `console.error()`, `console.warn()`, `console.info()`, `console.debug()`
+- `alert()`, `confirm()`, `prompt()` com dados sensíveis
+- `localStorage.setItem()`, `sessionStorage.setItem()` com dados críticos
+- Cookies com informações sensíveis
+- Headers HTTP expostos
+- Tokens JWT decodificados no frontend
+- Passwords em plaintext
+- API keys hardcoded
+- Database connection strings
+- Email addresses e dados pessoais
+- Números de telefone e dados RGPD
+- Chaves de encriptação
+- Dados de cartão de crédito
+- Informações de sessão ativas
+
+**Para cada ocorrência encontrada:**
+```
+🚨 VAZAMENTO DE DADOS CRÍTICO
+📁 Arquivo: /caminho/exato/arquivo.js
+📍 Linha: 123
+💀 Tipo: Password em plaintext
+🔍 Código: console.log("User password:", userPassword)
+⚠️ Risco: CRÍTICO - Exposição total de credenciais
+💡 Solução: Remover imediatamente + implementar logger seguro
+🕐 Descoberto em: [timestamp]
+```
+
+#### 1.2 Análise de Autenticação e Autorização
+- Verificação de tokens JWT (expiração, algoritmos, claims)
+- Sistemas de refresh tokens
+- Middleware de autenticação
+- Proteção de rotas administrativas
+- Validação de permissões por endpoint
+- Rate limiting implementado
+- Proteção contra CSRF
+- Validação de CORS
+- Headers de segurança (HSTS, CSP, X-Frame-Options)
+
+#### 1.4 Análise de Logs e Sistemas de Monitorização
+**Verificar OBRIGATORIAMENTE:**
+- Logs de aplicação (Winston, Morgan, etc.)
+- Logs de sistema (PM2, Docker, etc.)
+- Logs de servidor web (Nginx, Apache)
+- Logs de base de dados
+- Logs de CDN e proxy
+- Error tracking (Sentry, Bugsnag)
+- Performance monitoring (New Relic, DataDog)
+- User activity logs
+- Audit trails de alterações críticas
+
+#### 1.5 Análise de Infraestrutura e Deploy
+**Security Infrastructure:**
+- Certificados SSL/TLS (validade, configuração)
+- Firewall rules e network security
+- Environment variables exposure
+- Container security (Docker, K8s)
+- CI/CD pipeline security
+- Secrets management
+- Backup security e encryption
+- Access control (IAM, roles)
+
+#### 1.6 Análise de Compliance e Regulamentações
+**Verificar conformidade:**
+- RGPD/GDPR compliance
+- Cookies policy implementation
+- Data retention policies
+- Right to be forgotten
+- Privacy policy adequacy
+- Terms of service accuracy
+- Age verification systems
+- Data processing agreements
+
+### 🗄️ FASE 2: ANÁLISE DE BASE DE DADOS E QUERIES
+
+#### 2.1 Auditoria de Performance de Queries
+**Para cada query encontrada:**
+```sql
+-- Exemplo de análise
+SELECT * FROM users WHERE email = ? AND active = 1
+```
+
+**Análise detalhada:**
+```
+🔍 QUERY ANALYSIS #001
+📍 Localização: /api/users/getUserByEmail.js:45
+📊 Tipo: SELECT com WHERE clause
+⚡ Performance: 
+  - Índice em 'email': ✅ Existente
+  - Índice em 'active': ❌ Ausente
+  - Estimativa: ~150ms (LENTO)
+  - Registros afetados: ~1000
+🔧 Otimização sugerida: 
+  - Criar índice composto (email, active)
+  - Evitar SELECT *
+  - Usar paginação
+📈 Impacto: Redução de 150ms → 5ms
+```
+
+#### 2.2 Análise de Estrutura de Dados
+- Normalização vs denormalização
+- Índices existentes vs necessários
+- Chaves estrangeiras e integridade
+- Triggers e stored procedures
+- Backups e recovery
+- Migrations e versionamento
+
+#### 2.3 Análise de Segurança da BD
+- Proteção contra SQL injection
+- Permissões de utilizador da BD
+- Encriptação de dados sensíveis
+- Auditoria de acessos
+- Conexões seguras (SSL/TLS)
+
+### 🧩 FASE 3: MAPEAMENTO ARQUITETURAL COMPLETO
+
+#### 3.1 Inventário Molecular de Ficheiros
+**Para CADA ficheiro:**
+```
+📄 FICHEIRO: /src/components/UserProfile.jsx
+📏 Tamanho: 2.3KB (145 linhas)
+🔗 Imports: 8 dependências
+🎯 Exports: 1 componente principal + 2 helpers
+📊 Complexidade: Média (cyclomatic: 12)
+🔄 Utilizações: 3 locais
+💡 Estado: Ativo e necessário
+🧪 Testes: ❌ Ausentes
+📚 Documentação: ❌ Ausente
+🔍 Problemas: 2 console.log desnecessários
+```
+
+#### 3.2 Mapa de Dependências Completo
+**Gráfico de dependências:**
+```
+🌐 DEPENDENCY GRAPH
+├── 📦 react (18.2.0)
+│   ├── 🧩 UserProfile.jsx
+│   ├── 🧩 Dashboard.jsx
+│   └── 🧩 LoginForm.jsx
+├── 📦 axios (1.4.0)
+│   ├── 🔧 api/userService.js
+│   ├── 🔧 api/authService.js
+│   └── ❌ NÃO USADO: api/oldService.js
+└── 📦 lodash (4.17.21)
+    ├── 🔧 utils/helpers.js
+    └── ⚠️ SUBUTILIZADO: apenas 2 funções de 300+
+```
+
+#### 3.3 Análise COMPLETA de Cada Página Individual
+**OBRIGATÓRIO: Para CADA página encontrada, criar análise detalhada:**
+
+```
+📄 PÁGINA: /admin/users (AdminUsers.jsx)
+📍 Localização: /src/pages/AdminUsers.jsx
+📏 Tamanho: 3.2KB (189 linhas)
+🔐 Proteção: ✅ RequireAuth + AdminRole
+📊 Tráfego: 15 acessos/dia
+🔗 Links entrada: 3 locais
+📱 Responsiva: ✅ Sim
+♿ Acessibilidade: ⚠️ Parcial (falta alt text)
+⚡ Performance: 850ms load time (LENTO)
+🧪 Testes: ❌ Ausentes
+💡 SEO: ❌ Meta tags ausentes
+
+🔍 PROBLEMAS IDENTIFICADOS:
+❌ console.log("User data:", userData) - LINHA 45
+❌ Sem validação de input no campo search - LINHA 67
+❌ Query SQL lenta: getUsersWithRoles() - LINHA 89
+❌ Re-render desnecessário a cada keystroke - LINHA 23
+❌ Sem error boundaries - GERAL
+❌ CSS não otimizado: 45KB carregados, 12KB usados - STYLES
+❌ Sem lazy loading de tabela - LINHA 112
+❌ Falta loading states - LINHA 134
+
+💡 MELHORIAS ESPECÍFICAS:
+1. Remover console.log da linha 45
+2. Adicionar validação Joi/Yup no campo search
+3. Implementar índice composto na query getUsersWithRoles
+4. Usar useDebounce para search input
+5. Adicionar ErrorBoundary component
+6. Implementar CSS tree-shaking
+7. Adicionar React.lazy() para tabela
+8. Implementar skeleton loading
+
+⏱️ ESTIMATIVA CORREÇÃO: 4 horas
+💰 IMPACTO PERFORMANCE: +300ms velocidade
+🎯 PRIORIDADE: ALTA (dados sensíveis expostos)
+```
+
+**REPETIR ESTA ANÁLISE PARA CADA PÁGINA SEM EXCEÇÃO**
+
+### ⚡ FASE 4: ANÁLISE DE PERFORMANCE MICROSCÓPICA
+
+#### 4.1 Análise de Bundle e Assets
+- Tamanho total do bundle
+- Code splitting implementado
+- Lazy loading de componentes
+- Compression de assets
+- Otimização de imagens
+- Fonts e icons otimizados
+- Service workers implementados
+
+#### 4.2 Análise de Rendering
+**Para cada componente:**
+```
+🎨 COMPONENT RENDER ANALYSIS: UserList.jsx
+🔄 Re-renders: 15 por minuto (EXCESSIVO)
+📊 Props changes: 8 desnecessárias
+🐌 Bottleneck: map() sem key otimizada
+💾 Memoização: ❌ Ausente
+🔧 Sugestões:
+  - React.memo() implementation
+  - useMemo() for expensive calculations
+  - useCallback() for event handlers
+📈 Impacto: -60% re-renders
+```
+
+#### 4.3 Análise de Network
+- Número de requests por página
+- Tamanho dos requests
+- Cache headers configurados
+- CDN implementado
+- API response times
+- Waterfall de carregamento
+
+### 🔍 FASE 5: ANÁLISE DE CÓDIGO MORTO E REDUNDANTE
+
+#### 5.1 Dead Code Detection
+**Algoritmo de detecção:**
+1. Mapear todas as importações
+2. Rastrear todas as utilizações
+3. Identificar código inalcançável
+4. Encontrar funções não chamadas
+5. Localizar variáveis não utilizadas
+6. Detectar CSS não usado
+
+**Formato de reporte:**
+```
+💀 DEAD CODE DETECTED
+📁 Arquivo: /utils/oldHelpers.js
+📊 Tamanho: 1.2KB
+🕐 Última modificação: 2023-06-15
+🔍 Razão: Função exportada mas nunca importada
+💰 Impacto: Redução de 1.2KB no bundle
+🗑️ Ação: REMOVER SEGURAMENTE
+```
+
+#### 5.2 Análise de Duplicação
+- Código duplicado entre componentes
+- Lógica repetida
+- Estilos CSS duplicados
+- Funções similares
+- Componentes redundantes
+
+### 🧪 FASE 6: ANÁLISE DE TESTES E QUALIDADE
+
+#### 6.1 Cobertura de Testes
+- Percentagem de cobertura por arquivo
+- Tipos de testes (unit, integration, e2e)
+- Testes críticos ausentes
+- Qualidade dos testes existentes
+- Mocking e stubbing adequados
+
+#### 6.2 Análise de Code Quality
+- Complexidade ciclomática
+- Padrões de naming
+- Consistent code style
+- Documentation coverage
+- Error handling patterns
+- Logging patterns
+
+### 🔥 FASE 8: ANÁLISE DE VULNERABILIDADES AVANÇADAS
+
+#### 8.1 Testes de Penetração Automatizados
+**Verificar através de:**
+- OWASP ZAP scanning
+- Burp Suite analysis
+- Nmap port scanning
+- SQLMap injection tests
+- XSS payload testing
+- CSRF token validation
+- Session fixation tests
+- Directory traversal attempts
+
+#### 8.2 Análise de Dependências Vulneráveis
+**Para cada dependência:**
+```
+📦 DEPENDENCY VULNERABILITY SCAN
+📍 Package: express@4.17.1
+🚨 CVE: CVE-2022-24999
+⚠️ Severity: HIGH
+🔍 Description: ReDoS vulnerability in Express.js
+💡 Fix: Upgrade to express@4.18.2
+📅 Published: 2022-03-15
+🎯 CVSS Score: 7.5
+```
+
+#### 8.3 Análise de Configuração de Servidor
+- Server headers disclosure
+- Error page information leakage
+- Admin interfaces exposed
+- Default credentials usage
+- SSL/TLS configuration strength
+- HTTP security headers
+- Content Security Policy adequacy
+
+### 🎨 FASE 9: ANÁLISE DE UX/UI E ACESSIBILIDADE
+
+#### 9.1 Auditoria de Acessibilidade (WCAG 2.1)
+**Para cada página:**
+```
+♿ ACCESSIBILITY AUDIT: /contact
+📊 WCAG Level: AA Target
+🔍 Issues encontradas:
+❌ Contraste insuficiente: botão azul #3498db (3.2:1 - mínimo 4.5:1)
+❌ Falta alt text: imagem linha 67
+❌ Sem focus indicators: inputs do form
+❌ Heading hierarchy incorreta: h1 → h3 (saltou h2)
+❌ Sem labels para form inputs
+❌ Tab order inconsistente
+
+💡 Correções:
+1. Alterar cor botão para #2980b9 (4.7:1)
+2. Adicionar alt="Ícone de contacto" na linha 67
+3. Implementar :focus-visible styles
+4. Adicionar h2 antes do h3 existente
+5. Adicionar <label> para cada input
+6. Configurar tabindex adequadamente
+```
+
+#### 9.2 Análise de Performance UX
+- Core Web Vitals detalhados
+- Loading states implementados
+- Error states adequados
+- Empty states design
+- Skeleton screens
+- Progressive loading
+- Image optimization
+- Font loading strategy
+
+#### 9.3 Análise de Mobile Experience
+- Touch target sizes (mínimo 44px)
+- Viewport configuration
+- Mobile-first design
+- Gesture navigation
+- Offline functionality
+- App-like experience (PWA)
+
+### 🌐 FASE 10: ANÁLISE DE SEO E MARKETING
+
+#### 10.1 Technical SEO Audit
+**Para cada página:**
+```
+🔍 SEO AUDIT: /products
+📊 SEO Score: 65/100 (MÉDIO)
+❌ Title tag: Ausente
+❌ Meta description: Ausente  
+❌ H1 tag: Duplicado (2 H1s)
+❌ Alt text: 12 imagens sem alt
+❌ Schema markup: Ausente
+❌ Canonical URL: Ausente
+✅ URL structure: Adequada
+✅ HTTPS: Implementado
+⚠️ Page speed: 2.3s (LENTO)
+⚠️ Mobile friendly: Parcial
+
+💡 Correções:
+1. Adicionar title único: "Produtos - Loja Miguel"
+2. Meta description: "Descubra nossa linha completa..."
+3. Converter segundo H1 para H2
+4. Adicionar alt text descritivo
+5. Implementar JSON-LD schema
+6. Adicionar canonical link
+7. Otimizar imagens (WebP)
+8. Implementar lazy loading
+```
+
+#### 10.2 Análise de Marketing Digital
+- Google Analytics implementação
+- Facebook Pixel tracking
+- Google Tag Manager setup
+- Conversion tracking
+- A/B testing framework
+- Email capture optimization
+- Social media integration
+
+### 💾 FASE 11: ANÁLISE DE DADOS E BACKUP
+
+#### 11.1 Data Management Audit
+- Database backup frequency
+- Data retention policies
+- Data encryption at rest
+- Data encryption in transit
+- Personal data handling
+- Data export capabilities
+- Data import validation
+- Data migration scripts
+
+#### 11.2 Business Continuity
+- Disaster recovery plan
+- High availability setup
+- Load balancing configuration
+- CDN implementation
+- Monitoring and alerting
+- Incident response procedures
+
+#### 7.1 Error Tracking
+- Sistema de error tracking implementado
+- Logs de aplicação estruturados
+- Monitoring de performance
+- Alertas configurados
+- Métricas de negócio
+
+#### 7.2 Analytics e Métricas
+- User behavior tracking
+- Performance metrics
+- Business metrics
+- Conversion tracking
+- A/B testing setup
+
+---
+
+## 📋 ESTRUTURA DO DOCUMENTO FINAL
+
+### 1. 📊 DASHBOARD EXECUTIVO
+```
+🎯 PROJETO: [Nome do projeto]
+📅 DATA AUDITORIA: [Data]
+👨‍💻 AUDITOR: AI Assistant
+📊 RESUMO CRÍTICO:
+  - 🚨 Problemas críticos: X
+  - ⚠️ Problemas médios: Y  
+  - 💡 Melhorias sugeridas: Z
+  - 💰 Impacto estimado: €€€
+```
+
+### 2. 🛡️ RELATÓRIO DE SEGURANÇA
+#### 2.1 Vulnerabilidades Críticas
+[Lista detalhada com localização exata]
+
+#### 2.2 Dados Sensíveis Expostos
+[Todos os casos encontrados]
+
+#### 2.3 Plano de Correção Imediata
+[Ações prioritárias]
+
+### 3. 🗃️ MAPA COMPLETO DO PROJETO
+#### 3.1 Estrutura de Arquivos
+```
+📁 PROJECT STRUCTURE
+├── 📁 src/
+│   ├── 📁 components/ (45 arquivos)
+│   │   ├── ✅ Header.jsx (ATIVO - 12 usos)
+│   │   ├── ✅ Footer.jsx (ATIVO - 8 usos)
+│   │   ├── ⚠️ OldModal.jsx (DEPRECATED - 1 uso)
+│   │   └── ❌ UnusedButton.jsx (MORTO - 0 usos)
+│   ├── 📁 pages/ (23 arquivos)
+│   │   ├── ✅ Dashboard.jsx (ATIVO - rota principal)
+│   │   ├── ⚠️ AdminPanel.jsx (RESTRITO - poucos acessos)
+│   │   └── ❌ OldLanding.jsx (MORTO - sem referências)
+│   └── 📁 utils/ (12 arquivos)
+│       ├── ✅ helpers.js (ATIVO - 89 usos)
+│       └── ❌ oldUtils.js (MORTO - 0 usos)
+└── 📁 public/ (assets analysis)
+```
+
+#### 3.2 Componentes por Utilização
+[Lista ordenada por frequência de uso]
+
+#### 3.3 Páginas por Tráfego
+[Lista ordenada por acessos]
+
+### 4. 🗄️ ANÁLISE DE BASE DE DADOS
+#### 4.1 Performance Report
+[Todas as queries analisadas]
+
+#### 4.2 Otimizações Sugeridas
+[Plano detalhado de melhorias]
+
+### 5. ⚡ RELATÓRIO DE PERFORMANCE
+#### 5.1 Métricas Atuais
+- First Contentful Paint: Xms
+- Largest Contentful Paint: Xms
+- Cumulative Layout Shift: X
+- Time to Interactive: Xms
+
+#### 5.2 Bottlenecks Identificados
+[Lista detalhada com soluções]
+
+### 6. 💀 CÓDIGO MORTO IDENTIFICADO
+#### 6.1 Arquivos Não Utilizados
+[Lista completa para remoção]
+
+#### 6.2 Funções Não Chamadas
+[Detalhes de cada função]
+
+#### 6.3 Dependências Desnecessárias
+[Package.json cleanup]
+
+### 7. 🔧 PLANO DE AÇÃO DETALHADO
+#### 7.1 Correções Imediatas (24h)
+```
+□ Remover todos os console.log com dados sensíveis
+□ Implementar headers de segurança básicos
+□ Corrigir vulnerabilidades críticas
+□ Remover arquivos mortos óbvios
+```
+
+#### 7.2 Melhorias Curto Prazo (1 semana)
+```
+□ Otimizar queries lentas identificadas
+□ Implementar lazy loading
+□ Consolidar componentes similares
+□ Adicionar testes críticos
+```
+
+#### 7.3 Refatoração Médio Prazo (1 mês)
+```
+□ Reestruturar arquitetura de componentes
+□ Implementar state management adequado
+□ Otimizar bundle size
+□ Melhorar documentação
+```
+
+#### 7.4 Evolução Longo Prazo (3+ meses)
+```
+□ Migração para arquitetura moderna
+□ Implementar micro-frontends se necessário
+□ Setup completo de CI/CD
+□ Monitorização avançada
+```
+
+### 8. 💰 ANÁLISE DE IMPACTO
+#### 8.1 Economia Estimada
+- Redução de custos de infraestrutura
+- Melhoria de performance
+- Redução de bugs
+- Economia de tempo de desenvolvimento
+
+#### 8.2 ROI das Melhorias
+[Cálculo detalhado do retorno]
+
+### 9. 🎯 RECOMENDAÇÕES ESTRATÉGICAS
+#### 9.1 Tecnologias a Considerar
+[Stack moderno sugerido]
+
+#### 9.2 Melhores Práticas
+[Guidelines para o futuro]
+
+### 10. 📈 PLANO DE MONITORIZAÇÃO
+#### 10.1 Métricas a Implementar
+[KPIs técnicos e de negócio]
+
+#### 10.2 Alertas e Notificações
+[Sistema de monitorização]
+
+---
+
+## 🎯 INSTRUÇÕES DE EXECUÇÃO
+
+### 🎯 INSTRUÇÕES DE EXECUÇÃO ULTRA-RIGOROSAS
+
+### 1. ANÁLISE PÁGINA POR PÁGINA OBRIGATÓRIA
+**CADA página deve ter análise individual completa:**
+```
+📄 TEMPLATE DE ANÁLISE POR PÁGINA:
+Página: [nome]
+Localização: [path exato]
+Função: [propósito da página]
+Problemas: [lista detalhada]
+Melhorias: [soluções específicas]
+Prioridade: [alta/média/baixa]
+Tempo estimado: [horas]
+```
+
+### 2. VERIFICAÇÃO DE PRECAUÇÕES DE SISTEMA
+**Checklist obrigatório:**
+- [ ] Todos os console.log identificados
+- [ ] Todas as variáveis de ambiente verificadas
+- [ ] Todos os endpoints API testados
+- [ ] Todas as queries SQL auditadas
+- [ ] Todos os uploads de ficheiros verificados
+- [ ] Todas as autenticações validadas
+- [ ] Todos os acessos administrativos verificados
+- [ ] Todas as integrações de terceiros auditadas
+- [ ] Todos os logs de sistema analisados
+- [ ] Todas as configurações de servidor verificadas
+
+### 3. ANÁLISE DE CADA PROBLEMA INDIVIDUAL
+**Para cada problema encontrado:**
+```
+🔍 PROBLEMA #XXX
+📍 Localização: arquivo.js:linha
+🚨 Tipo: [segurança/performance/manutenção]
+💀 Descrição: [explicação detalhada]
+💡 Solução: [passos específicos]
+⏱️ Tempo: [estimativa]
+🎯 Prioridade: [justificação]
+📊 Impacto: [métrica específica]
+```
+
+### 4. PLANO DE MELHORIA DETALHADO
+**Cada melhoria deve incluir:**
+- Código específico a alterar
+- Antes vs depois
+- Testes a implementar
+- Validação da correção
+- Impacto na performance
+- Riscos da alteração
+
+### 2. FORMATO DE DOCUMENTAÇÃO
+- Usar emojis para categorização visual
+- Incluir sempre localização exata (arquivo:linha)
+- Priorizar por criticidade (🚨 > ⚠️ > 💡)
+- Incluir estimativas de tempo/impacto
+- Fornecer soluções concretas
+
+### 3. MÉTRICAS OBRIGATÓRIAS
+Para cada arquivo analisado:
+- Tamanho em KB
+- Número de linhas
+- Complexidade ciclomática
+- Número de dependências
+- Frequência de utilização
+- Problemas encontrados
+- Sugestões de melhoria
+
+### 4. VERIFICAÇÕES ESPECÍFICAS
+- [ ] Todos os console.log verificados
+- [ ] Todas as queries SQL analisadas
+- [ ] Todos os componentes mapeados
+- [ ] Todas as rotas documentadas
+- [ ] Todas as dependências auditadas
+- [ ] Todos os assets verificados
+- [ ] Toda a estrutura de pastas mapeada
+
+### 5. ENTREGA FINAL
+Documento "AUDITORIA_COMPLETA_MIGUELLOPES.md" deve conter:
+- Mínimo 50 páginas de análise detalhada
+- Máximo 200 problemas identificados
+- Plano de ação com 100+ tarefas específicas
+- Estimativas de tempo para cada correção
+- Impacto financeiro das melhorias
+
+---
+
+## 🔥 COMEÇAR ANÁLISE AGORA
+
+**INÍCIO IMEDIATO:**
+1. Fazer scan completo de todos os arquivos
+2. Identificar IMEDIATAMENTE qualquer console.log
+3. Mapear estrutura completa do projeto
+4. Analisar cada query SQL encontrada
+5. Gerar relatório ultra-detalhado
+
+**LEMBRETE CRÍTICO:** Esta análise deve ser a mais completa possível. Não deixar NENHUM detalhe por analisar. O Miguel Lopes precisa de uma visão 360° completa do seu projeto.
+---

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/app/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createTeamsTables, checkTeamsTables } from '../schema'
 

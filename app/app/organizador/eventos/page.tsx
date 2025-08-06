@@ -574,7 +574,7 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
     // Usar rota específica baseada no tipo do evento
     const publicEventUrl = event.type === 'guest-list' 
       ? `${window.location.origin}/g/${event.id}`
-      : `${window.location.origin}/evento/${event.id}`;
+      : `${window.location.origin}/e/${event.id}`;
       
     navigator.clipboard.writeText(publicEventUrl)
       .then(() => {

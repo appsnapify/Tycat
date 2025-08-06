@@ -3,23 +3,51 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { motion } from 'framer-motion'
-import { Ticket, BarChart2, Users, CheckCircle, LayoutDashboard, ClipboardList, LogOut } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Ticket, BarChart2, Users, LayoutDashboard, LogOut, Sparkles, Zap, Shield } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
-// Cores modernizadas - alinhadas com o novo tema claro
+// Paleta de cores elegante para TYCAT - Código limpo
 const colors = {
-  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
-  textPrimary: 'text-gray-800',
-  textSecondary: 'text-gray-500',
-  accentLime: 'text-lime-600',
-  accentMagenta: 'text-fuchsia-600',
-  bgAccentLime: 'bg-lime-500',
-  bgAccentMagenta: 'bg-fuchsia-500',
-  borderLime: 'border-lime-400',
-  borderFuchsia: 'border-fuchsia-400',
-  borderLight: 'border-gray-200',
-  cardBg: 'bg-white/80',
+  background: 'bg-gradient-to-br from-slate-50 via-white to-emerald-50/30',
+  textPrimary: 'text-slate-800',
+  textSecondary: 'text-slate-600',
+  textMuted: 'text-slate-500',
+  accentEmerald: 'text-emerald-600',
+  accentViolet: 'text-violet-600',
+  accentAmber: 'text-amber-600',
+  bgAccentEmerald: 'bg-emerald-500',
+  borderLight: 'border-slate-200',
+}
+
+// Componente TextRotate integrado
+const TextRotate = ({ texts, className = "" }) => {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % texts.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [texts.length])
+
+  return (
+    <span className={`inline-block ${className}`}>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={currentIndex}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -20, opacity: 0 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="inline-block"
+        >
+          {texts[currentIndex]}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  )
 }
 
 export default function HomePage() {
@@ -67,190 +95,337 @@ export default function HomePage() {
     }
   }
 
-  // Mostrar loading básico enquanto verifica autenticação
+  // Loading state elegante
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+        <div className="flex items-center space-x-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+          <span className="text-slate-600 font-medium">Carregando TYCAT...</span>
+        </div>
       </div>
     )
   }
 
   return (
     <div className={`${colors.background} ${colors.textPrimary} min-h-screen overflow-x-hidden relative`}>
-      {/* Elementos decorativos no fundo */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -left-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-20 right-20 w-96 h-96 bg-fuchsia-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-[70%] left-[20%] w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-[40%] right-[15%] w-96 h-96 bg-fuchsia-200 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
+      {/* Elementos decorativos responsivos */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="absolute -top-10 -left-10 w-48 h-48 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
+        <div className="absolute top-10 right-10 w-48 h-48 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-violet-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
+        <div className="absolute top-[60%] left-[5%] w-32 h-32 sm:w-60 sm:h-60 lg:w-80 lg:h-80 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
+        <div className="absolute top-[40%] right-[10%] w-40 h-40 sm:w-56 sm:h-56 lg:w-72 lg:h-72 bg-emerald-100 rounded-full mix-blend-multiply filter blur-2xl opacity-20"></div>
       </div>
 
-      {/* Navbar com autenticação */}
-      <nav className={`flex justify-between items-center py-2 px-3 ${colors.borderLight} border-b sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm`}>
-        <Link href="/" className={`${colors.accentLime} font-bold text-base md:text-lg`}>SNAPIFY</Link>
-        <div className="flex items-center">
+      {/* Navbar elegante */}
+      <nav className={`flex justify-between items-center py-3 px-4 ${colors.borderLight} border-b sticky top-0 z-50 bg-white/95 backdrop-blur-lg shadow-sm`}>
+        <div className="flex items-center space-x-2">
+          <Link href="/" className={`${colors.accentEmerald} font-bold text-lg md:text-xl tracking-tight`}>TYCAT</Link>
+          <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hidden sm:inline-flex">
+            Beta
+          </Badge>
+        </div>
+        <div className="flex items-center space-x-2">
           {user ? (
             <>
               <Link href="/app/organizador/dashboard">
-                <Button variant="ghost" className={`mr-1 text-xs md:text-sm ${colors.textSecondary} hover:${colors.textPrimary} flex items-center h-8`}>
-                  <LayoutDashboard className="h-3 w-3 mr-1" />
+                <Button variant="ghost" className={`text-sm ${colors.textSecondary} hover:${colors.textPrimary} flex items-center h-9`}>
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
                   Dashboard
                 </Button>
               </Link>
               <Button 
                 variant="ghost" 
                 onClick={handleLogout} 
-                className={`${colors.textSecondary} hover:${colors.textPrimary} flex items-center gap-1 text-xs md:text-sm h-8`}
+                className={`${colors.textSecondary} hover:${colors.textPrimary} flex items-center gap-2 text-sm h-9`}
               >
-                <LogOut className="h-3 w-3" />
+                <LogOut className="h-4 w-4" />
                 Sair
               </Button>
             </>
           ) : (
             <>
               <Link href="/login">
-                <Button variant="ghost" className={`mr-1 text-xs md:text-sm ${colors.textSecondary} hover:${colors.textPrimary} h-8`}>Login</Button>
+                <Button variant="ghost" className={`text-sm ${colors.textSecondary} hover:${colors.textPrimary} h-9`}>
+                  Entrar
+                </Button>
               </Link>
               <Link href="/register">
-                <Button className={`${colors.bgAccentLime} text-white hover:${colors.bgAccentLime}/90 text-xs md:text-sm px-2 md:px-3 h-8`}>Criar Conta</Button>
+                <Button className={`${colors.bgAccentEmerald} text-white hover:bg-emerald-600 text-sm px-4 h-9 shadow-sm`}>
+                  Começar Grátis
+                </Button>
               </Link>
             </>
           )}
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="text-center pt-24 pb-16 md:pt-32 md:pb-24 px-4 relative z-10">
+      {/* Hero Section Moderno */}
+      <section className="text-center pt-12 pb-16 md:pt-16 md:pb-20 px-4 relative z-10">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            {/* Título com TextRotate otimizado */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-6 leading-tight tracking-tight">
+              <span className="block">Gestão Completa de</span>
+              <TextRotate 
+                texts={["Eventos", "Equipas", "Bilhetes", "Promotores"]}
+                className={`${colors.accentEmerald} block`}
+              />
+              <span className="block mt-2">
+                Simples e <span className={colors.accentViolet}>Poderosa</span>
+              </span>
+            </h1>
+
+            {/* Descrição melhorada */}
+            <motion.p 
+              className={`${colors.textSecondary} mb-10 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+            >
+              Transforme a gestão dos seus eventos com ferramentas intuitivas para{" "}
+              <span className={`${colors.accentEmerald} font-medium`}>guest lists</span>,{" "}
+              <span className={`${colors.accentViolet} font-medium`}>venda de bilhetes</span> e{" "}
+              <span className={`${colors.accentAmber} font-medium`}>relatórios detalhados</span>.
+            </motion.p>
+
+            {/* CTAs modernos */}
         <motion.div
+              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-        >
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-5 leading-tight">
-            Gestão Completa de <span className={colors.accentLime}>Eventos</span>, Equipas e <span className={colors.accentMagenta}>Bilhetes.</span>
-          </h1>
-          <p className={`${colors.textSecondary} mb-8 text-base md:text-lg max-w-xl md:max-w-3xl mx-auto`}>
-            Potencialize seus eventos com ferramentas intuitivas para <span className={colors.accentLime}>guest lists</span>, venda de <span className={colors.accentMagenta}>bilhetes</span> online, gestão de <span className={colors.accentLime}>promotores e equipas</span>, e relatórios detalhados.
-          </p>
+              transition={{ delay: 0.6, duration: 0.6 }}
+            >
           <Link href="/register">
-            <Button size="lg" className={`${colors.bgAccentLime} text-white hover:${colors.bgAccentLime}/90 px-6 md:px-8 py-2.5 md:py-3 text-base md:text-lg shadow-md`}>
+                <Button size="lg" className={`${colors.bgAccentEmerald} text-white hover:bg-emerald-600 px-8 py-3 text-lg shadow-lg hover:shadow-xl transition-all duration-300`}>
               Começar Gratuitamente
+                  <Zap className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="#features">
+                <Button variant="outline" size="lg" className={`px-8 py-3 text-lg border-slate-200 hover:bg-slate-50 ${colors.textSecondary}`}>
+                  Ver Funcionalidades
             </Button>
           </Link>
         </motion.div>
+          </motion.div>
+
+          {/* Mockup placeholder - será adicionado posteriormente */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.8 }}
+            className="mt-16 relative"
+          >
+            <div className="relative mx-auto max-w-4xl">
+              <div className="bg-gradient-to-r from-emerald-500/10 to-violet-500/10 rounded-2xl p-8 backdrop-blur-sm border border-white/20">
+                <div className="bg-white rounded-xl shadow-2xl p-6 aspect-video flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-violet-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+                      <Ticket className="w-8 h-8 text-white" />
+                    </div>
+                    <p className={`${colors.textMuted} text-lg`}>Dashboard Preview</p>
+                    <p className={`${colors.textSecondary} text-sm mt-1`}>Em breve...</p>
+                  </div>
+                </div>
+              </div>
+              {/* Glow effect */}
+              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-violet-500/20 rounded-3xl blur-2xl -z-10"></div>
+            </div>
+          </motion.div>
+        </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 md:py-20 px-4 relative z-10">
-        <div className="max-w-5xl mx-auto text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Plataforma <span className={colors.accentLime}>Tudo-em-Um</span> para Organizadores</h2>
-          <p className={`${colors.textSecondary} text-base md:text-lg`}>Simplifique cada etapa do seu evento.</p>
-        </div>
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
-          {features.map((feature, index) => (
+      {/* Features Section Moderna */}
+      <section id="features" className="py-20 md:py-28 px-4 relative z-10 bg-gradient-to-b from-transparent to-slate-50/50">
+        <div className="max-w-6xl mx-auto">
+          {/* Header da seção */}
+          <div className="text-center mb-16">
             <motion.div
-              key={feature.title}
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`p-6 ${colors.cardBg} rounded-xl border ${colors.borderLight} shadow-md hover:shadow-lg transition-all duration-300 relative overflow-hidden backdrop-blur-sm`}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
             >
-              {/* Borda decorativa lateral */}
-              <div className={`absolute left-0 top-0 h-full w-1 ${index % 2 === 0 ? 'bg-gradient-to-b from-lime-400 to-lime-500' : 'bg-gradient-to-b from-fuchsia-400 to-fuchsia-500'}`}></div>
-              
-              <div className="flex justify-center mb-4">
+              <Badge variant="outline" className="mb-4 bg-violet-50 text-violet-700 border-violet-200">
+                <Shield className="w-4 h-4 mr-2" />
+                Funcionalidades Principais
+              </Badge>
+              <h2 className="text-4xl md:text-5xl xl:text-6xl font-bold mb-4 tracking-tight">
+                Plataforma <span className={colors.accentEmerald}>Completa</span> para{" "}
+                <span className={colors.accentViolet}>Organizadores</span>
+              </h2>
+              <p className={`${colors.textSecondary} text-lg md:text-xl max-w-2xl mx-auto`}>
+                Todas as ferramentas que precisa numa única plataforma elegante e intuitiva.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Grid de features com decoradores */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {featuresData.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="group relative"
+              >
+                <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                  {/* Decorador visual */}
+                  <div className="relative mx-auto w-20 h-20 mb-6 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]">
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:16px_16px] opacity-30" />
+                    <div className={`absolute inset-0 m-auto flex w-12 h-12 items-center justify-center rounded-xl border-t border-l ${feature.bgColor} ${feature.borderColor}`}>
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+                  </div>
+
+                  {/* Conteúdo */}
+                  <h3 className="text-xl font-semibold mb-3 text-center">
                 {feature.title}
               </h3>
-              <p className={colors.textSecondary}>{feature.description}</p>
+                  <p className={`${colors.textSecondary} text-center leading-relaxed`}>
+                    {feature.description}
+                  </p>
+
+                  {/* Gradient overlay sutil */}
+                  <div className={`absolute inset-0 ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300 rounded-2xl`} />
+                </div>
             </motion.div>
           ))}
+          </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 md:py-24 px-4 relative z-10">
-        <div className="max-w-5xl mx-auto text-center">
-          <div className="bg-gradient-to-r from-lime-500 to-fuchsia-500 p-1 rounded-2xl">
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl py-12 px-8">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-                Pronto para começar?
+      {/* CTA Section Elegante */}
+      <section className="py-20 md:py-28 px-4 relative z-10">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="relative">
+            <div className="bg-gradient-to-r from-emerald-500 to-violet-500 p-1 rounded-3xl shadow-2xl">
+              <div className="bg-white/98 backdrop-blur-md rounded-3xl py-16 px-8 md:px-12 relative overflow-hidden">
+                {/* Elementos decorativos */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden" aria-hidden="true">
+                  <div className="absolute top-4 left-4 w-20 h-20 bg-emerald-100 rounded-full opacity-20"></div>
+                  <div className="absolute bottom-4 right-4 w-16 h-16 bg-violet-100 rounded-full opacity-20"></div>
+                </div>
+                
+                <div className="relative z-10">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    viewport={{ once: true }}
+                  >
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold mb-6 tracking-tight">
+                      Pronto para <span className={colors.accentEmerald}>revolucionar</span> os seus eventos?
               </h2>
-              <p className={`text-lg sm:text-xl mb-8 ${colors.textSecondary}`}>
-                Junte-se a milhares de organizadores que já estão usando o Snapify
+                    <p className={`text-lg sm:text-xl mb-10 ${colors.textSecondary} max-w-2xl mx-auto leading-relaxed`}>
+                      Junte-se aos organizadores que já estão usando o <strong className={colors.accentViolet}>TYCAT</strong> para criar eventos memoráveis
               </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/register">
-                <Button size="lg" className={`min-w-[200px] ${colors.bgAccentMagenta} text-white hover:bg-fuchsia-600 shadow-md`}>
-                  Criar Conta Grátis
+                        <Button size="lg" className={`${colors.bgAccentEmerald} text-white hover:bg-emerald-600 px-8 py-4 text-lg shadow-lg hover:shadow-xl transition-all duration-300 min-w-[200px]`}>
+                          Começar Gratuitamente
+                          <Sparkles className="ml-2 h-5 w-5" />
+                        </Button>
+                      </Link>
+                      <Link href="/login">
+                        <Button variant="outline" size="lg" className={`px-8 py-4 text-lg border-slate-300 hover:bg-slate-50 ${colors.textSecondary} min-w-[200px]`}>
+                          Já tenho conta
                 </Button>
               </Link>
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
             </div>
+            {/* Glow effect */}
+            <div className="absolute -inset-6 bg-gradient-to-r from-emerald-500/20 to-violet-500/20 rounded-3xl blur-2xl -z-10"></div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className={`${colors.borderLight} border-t py-10 px-4 mt-10 relative z-10 bg-white/50 backdrop-blur-sm`}>
-        <div className={`max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8 text-sm ${colors.textSecondary}`}>
-          {/* Colunas do Footer */}
+      {/* Footer Elegante */}
+      <footer className="border-t border-slate-200 py-12 px-4 mt-16 relative z-10 bg-slate-50/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-8">
           <div>
-            <h4 className={`${colors.textPrimary} font-semibold mb-3 text-base`}>Plataforma</h4>
-            <ul>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Organizador</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Promotor</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Preços</li>
+              <h4 className={`${colors.textPrimary} font-semibold mb-4 text-base`}>Plataforma</h4>
+              <ul className="space-y-2">
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Organizador</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Promotor</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Preços</li>
             </ul>
           </div>
           <div>
-            <h4 className={`${colors.textPrimary} font-semibold mb-3 text-base`}>Empresa</h4>
-            <ul>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Sobre Nós</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Blog</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Contacto</li>
+              <h4 className={`${colors.textPrimary} font-semibold mb-4 text-base`}>Empresa</h4>
+              <ul className="space-y-2">
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Sobre Nós</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Blog</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Contacto</li>
             </ul>
           </div>
           <div>
-            <h4 className={`${colors.textPrimary} font-semibold mb-3 text-base`}>Recursos</h4>
-            <ul>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Documentação</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Guias</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Suporte</li>
+              <h4 className={`${colors.textPrimary} font-semibold mb-4 text-base`}>Recursos</h4>
+              <ul className="space-y-2">
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Documentação</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Guias</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Suporte</li>
             </ul>
           </div>
           <div>
-            <h4 className={`${colors.textPrimary} font-semibold mb-3 text-base`}>Legal</h4>
-            <ul>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Termos</li>
-              <li className={`mb-2 hover:${colors.accentLime} cursor-pointer`}>Privacidade</li>
+              <h4 className={`${colors.textPrimary} font-semibold mb-4 text-base`}>Legal</h4>
+              <ul className="space-y-2">
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Termos</li>
+                <li className={`${colors.textSecondary} hover:${colors.accentEmerald} cursor-pointer transition-colors`}>Privacidade</li>
             </ul>
           </div>
         </div>
-        <div className={`text-center ${colors.textSecondary} mt-12 text-xs`}>
-          © {new Date().getFullYear()} SNAPIFY. Todos os direitos reservados.
+          
+          <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center">
+            <div className="flex items-center space-x-2 mb-4 sm:mb-0">
+              <span className={`${colors.accentEmerald} font-bold text-lg`}>TYCAT</span>
+              <span className={`${colors.textMuted} text-sm`}>• Gestão de Eventos Inteligente</span>
+            </div>
+            <div className={`text-center ${colors.textMuted} text-sm`}>
+              © {new Date().getFullYear()} TYCAT. Todos os direitos reservados.
+            </div>
+          </div>
         </div>
       </footer>
     </div>
   )
 }
 
-// Atualizando os ícones para usar o novo tema
-const features = [
+// Dados das features com design moderno
+const featuresData = [
   {
     title: "Gestão de Eventos",
-    description: "Crie e gerencie eventos de forma simples e eficiente",
-    icon: <Ticket className="h-10 w-10 text-lime-500" />,
+    description: "Crie e gerencie eventos de forma simples e eficiente com ferramentas intuitivas e poderosas.",
+    icon: <Ticket className="h-6 w-6 text-emerald-600" />,
+    bgColor: "bg-emerald-50",
+    borderColor: "border-emerald-200",
+    gradient: "bg-gradient-to-br from-emerald-500 to-emerald-600"
   },
   {
-    title: "Gestão de Organizações",
-    description: "Mantenha todas as suas organizações em um só lugar",
-    icon: <Users className="h-10 w-10 text-fuchsia-500" />,
+    title: "Gestão de Equipas",
+    description: "Coordene equipas e promotores numa única plataforma, mantendo todos alinhados e produtivos.",
+    icon: <Users className="h-6 w-6 text-violet-600" />,
+    bgColor: "bg-violet-50",
+    borderColor: "border-violet-200",
+    gradient: "bg-gradient-to-br from-violet-500 to-violet-600"
   },
   {
-    title: "Analytics",
-    description: "Acompanhe o desempenho dos seus eventos em tempo real",
-    icon: <BarChart2 className="h-10 w-10 text-lime-500" />,
+    title: "Analytics Inteligentes",
+    description: "Acompanhe métricas em tempo real e tome decisões baseadas em dados concretos.",
+    icon: <BarChart2 className="h-6 w-6 text-amber-600" />,
+    bgColor: "bg-amber-50",
+    borderColor: "border-amber-200",
+    gradient: "bg-gradient-to-br from-amber-500 to-amber-600"
   },
 ] 

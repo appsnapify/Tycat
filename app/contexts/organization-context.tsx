@@ -40,10 +40,16 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     async function loadOrganizations() {
       if (!user) {
         // Throttle logs para evitar spam durante fast refresh
-        if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && !window.__orgNoUserLoggedRecently) {
+        if (
+          process.env.NODE_ENV === 'development' &&
+          typeof window !== 'undefined' &&
+          !(window as any).__orgNoUserLoggedRecently
+        ) {
           console.log('OrganizationContext: Nenhum usuário logado')
-          window.__orgNoUserLoggedRecently = true
-          setTimeout(() => { window.__orgNoUserLoggedRecently = false }, 3000)
+          ;(window as any).__orgNoUserLoggedRecently = true
+          setTimeout(() => {
+            ;(window as any).__orgNoUserLoggedRecently = false
+          }, 3000)
         }
         setIsLoading(false)
         return

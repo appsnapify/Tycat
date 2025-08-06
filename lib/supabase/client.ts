@@ -13,45 +13,57 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Cliente singleton para evitar múltiplas instâncias
 let clientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
+let readOnlyClientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 // Função inteligente para limpeza de cookies corrompidos
 function cleanupCorruptedCookies() {
   try {
     if (typeof window === 'undefined') return // Proteção SSR
     
-    // Sempre limpar cookies corrompidos - sem verificação de sessão ativa
-    
     let cookiesRemoved = 0
     document.cookie.split(';').forEach(cookie => {
       const [name, value] = cookie.trim().split('=')
       
-      // Verificar apenas cookies Supabase específicos que causam problemas
-      if (name?.includes('supabase') && value?.startsWith('base64-')) {
+      // Verificar cookies Supabase que causam problemas
+      if (name?.includes('supabase')) {
         try {
-          // Verificação mais rigorosa - tentar decodificar base64 e parsear JSON
-          const decoded = atob(value.substring(7))
-          const parsed = JSON.parse(decoded)
-          
-          // Verificar se é um token válido
-          if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
-            throw new Error('Token inválido')
+          // Se começa com base64-, tentar decodificar
+          if (value?.startsWith('base64-')) {
+            const decoded = atob(value.substring(7))
+            const parsed = JSON.parse(decoded)
+            
+            // Verificar se é um token válido
+            if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
+              throw new Error('Token inválido')
+            }
+          }
+          // Se não começa com base64- mas contém "eyJ" (JWT malformado), também remover
+          else if (value?.includes('eyJ') && !value.startsWith('base64-')) {
+            throw new Error('Cookie JWT malformado')
           }
         } catch {
-          // Cookie realmente corrupto - remover apenas este específico
-          console.log(`[Auth] Removendo cookie corrupto: ${name}`)
+          // Cookie corrupto - remover
+          console.log(`[Auth] 🧹 Removendo cookie corrupto: ${name}`)
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`
           cookiesRemoved++
         }
       }
     })
     
     if (cookiesRemoved > 0) {
-      console.log(`[Auth] Limpeza concluída: ${cookiesRemoved} cookies corrompidos removidos`)
+      console.log(`[Auth] ✅ Limpeza concluída: ${cookiesRemoved} cookies corrompidos removidos`)
+      // Forçar reload após limpeza para evitar problemas
+      setTimeout(() => {
+        if (cookiesRemoved > 2) { // Só reload se muitos cookies foram removidos
+          console.log('[Auth] 🔄 Recarregando página após limpeza extensiva...')
+          window.location.reload()
+        }
+      }, 100)
     }
   } catch (error) {
-    // Falha silenciosa para manter compatibilidade total
-    console.warn('[Auth] Aviso: Não foi possível verificar cookies:', error)
+    console.warn('[Auth] ⚠️ Aviso: Não foi possível verificar cookies:', error)
   }
 }
 
@@ -144,7 +156,42 @@ export const createClient = () => {
   return clientInstance
 }
 
+// Cliente read-only para operações públicas
+export const createReadOnlyClient = () => {
+  // Durante SSR/SSG, retornar proxy seguro que não quebra
+  if (typeof window === 'undefined') {
+    return createSSRSafeProxy()
+  }
+
+  // Retornar instância existente se já criada (browser)
+  if (readOnlyClientInstance) {
+    return readOnlyClientInstance
+  }
+
+  // Criar nova instância usando configuração nativa do Supabase
+  readOnlyClientInstance = createBrowserClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      // Configurações específicas para cliente read-only
+      auth: {
+        persistSession: false, // Não persistir sessão
+        detectSessionInUrl: false, // Não detectar sessão na URL
+        autoRefreshToken: false // Não renovar token automaticamente
+      },
+      global: {
+        headers: {
+          'x-client-info': 'promo-v2' // Identificar cliente para métricas
+        }
+      }
+    }
+  )
+
+  return readOnlyClientInstance
+}
+
 // Função para resetar o cliente (útil para testes ou logout)
 export const resetClient = () => {
   clientInstance = null
+  readOnlyClientInstance = null
 } 

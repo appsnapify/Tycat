@@ -164,7 +164,6 @@ export const config = {
     '/app/:path*',
     '/login',
     '/register',
-    '/api/guests/:path*',
     '/api/scanners/:path*',
   ],
 } 

@@ -1,13 +1,13 @@
 'use client'
 
 import React from 'react'
-import { Check, Phone, Shield, QrCode } from 'lucide-react'
+import { Phone, Shield, QrCode } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Step {
   id: string
   title: string
-  description: string
+  subtitle: string
   icon: React.ComponentType<{ className?: string }>
 }
 
@@ -20,88 +20,77 @@ interface ProgressStepsProps {
 const steps: Step[] = [
   {
     id: 'phone',
-    title: 'Verificar Telefone',
-    description: 'Confirme seu número',
+    title: 'Verificar',
+    subtitle: 'Confirme seu número',
     icon: Phone
   },
   {
     id: 'auth',
     title: 'Autenticar',
-    description: 'Login ou registro',
+    subtitle: 'Login ou registro',
     icon: Shield
   },
   {
     id: 'qr',
     title: 'QR Code',
-    description: 'Gerar acesso',
+    subtitle: 'Gerar acesso',
     icon: QrCode
   }
 ]
 
 export function ProgressSteps({ currentStep, completedSteps, className }: ProgressStepsProps) {
-  const getStepStatus = (stepId: string) => {
-    if (completedSteps.includes(stepId)) return 'completed'
-    if (stepId === currentStep) return 'current'
-    return 'pending'
-  }
-
   return (
-    <div className={cn('w-full py-2 sm:py-4', className)}>
+    <div className={cn("w-full max-w-3xl mx-auto px-4", className)}>
       <div className="flex items-center justify-between">
         {steps.map((step, index) => {
-          const status = getStepStatus(step.id)
-          const Icon = step.icon
+          const isActive = step.id === currentStep;
+          const isCompleted = completedSteps.includes(step.id);
+          const Icon = step.icon;
           
           return (
             <React.Fragment key={step.id}>
-              <div className="flex flex-col items-center">
-                {/* Ícone do step */}
-                <div
-                  className={cn(
-                    'w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200',
-                    {
-                      'bg-green-100 text-green-600 border-2 border-green-600': status === 'completed',
-                      'bg-blue-100 text-blue-600 border-2 border-blue-600 ring-2 ring-blue-200': status === 'current',
-                      'bg-gray-100 text-gray-400 border-2 border-gray-200': status === 'pending'
-                    }
-                  )}
-                >
-                  {status === 'completed' ? (
-                    <Check className="w-4 h-4 sm:w-5 sm:h-5" />
-                  ) : (
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                  )}
+              <div className="flex flex-col items-center text-center">
+                {/* Círculo com ícone */}
+                <div className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300",
+                  {
+                    "bg-[#7C3AED] text-white": isActive,
+                    "bg-[#F3F4F6] text-gray-400": !isActive && !isCompleted,
+                    "bg-[#7C3AED]/20 text-[#7C3AED]": !isActive && isCompleted
+                  }
+                )}>
+                  <Icon className="w-8 h-8" strokeWidth={1.5} />
                 </div>
-                
-                {/* Título e descrição */}
-                <div className="mt-1 sm:mt-2 text-center">
+
+                {/* Textos */}
+                <div className="mt-4 space-y-1">
                   <p className={cn(
-                    'text-xs font-medium',
+                    "text-sm font-semibold",
                     {
-                      'text-green-600': status === 'completed',
-                      'text-blue-600': status === 'current',
-                      'text-gray-400': status === 'pending'
+                      "text-[#7C3AED]": isActive,
+                      "text-gray-900": !isActive && isCompleted,
+                      "text-gray-500": !isActive && !isCompleted
                     }
                   )}>
                     {step.title}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">
-                    {step.description}
+                  <p className="text-xs text-gray-500">
+                    {step.subtitle}
                   </p>
                 </div>
               </div>
-              
+
               {/* Linha conectora */}
               {index < steps.length - 1 && (
-                <div
-                  className={cn(
-                    'flex-1 h-0.5 mx-2 sm:mx-4 transition-all duration-200',
-                    {
-                      'bg-green-600': completedSteps.includes(step.id),
-                      'bg-gray-200': !completedSteps.includes(step.id)
-                    }
-                  )}
-                />
+                <div className="flex-1 mx-4 h-[2px] bg-gray-200">
+                  <div 
+                    className="h-full bg-[#7C3AED] transition-all duration-300"
+                    style={{ 
+                      width: isCompleted ? '100%' : '0%',
+                      opacity: isCompleted ? 1 : 0
+                    }}
+                  />
+                </div>
               )}
             </React.Fragment>
           )

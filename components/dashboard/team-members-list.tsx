@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { TeamMemberType } from '@/lib/database.types';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/app/app/_providers/auth-provider';
 
 interface TeamMembersListProps {
   initialMembers: TeamMemberType[];

@@ -1,19 +1,25 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { createServerClient as createServerClientFromSSR } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import { Database } from '../../types/supabase'
 
-// Verificação para detectar ambiente do navegador
-const isBrowser = typeof window !== 'undefined'
+// Variáveis de ambiente
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    "Supabase URL or Anon Key is missing. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file."
+  )
+}
 
 // Helper para uso seguro de cookies
 const getCookieSafe = async (name: string) => {
   try {
-    const cookieStore = await cookies();
+    const cookieStore = await cookies(); // <-- await obrigatório!
     const cookie = cookieStore.get(name);
     return cookie?.value;
   } catch (e) {
-    // Silenciosamente ignorar erros de cookie no servidor
+    console.error('[Cookie Error]:', e);
     return undefined;
   }
 };
@@ -33,7 +39,7 @@ const setCookieSafe = async (name: string, value: string, options: any = {}) => 
     });
     return true;
   } catch (e) {
-    // Silenciosamente ignorar erros de cookie no servidor
+    console.error('[Cookie Set Error]:', e);
     return false;
   }
 };
@@ -50,79 +56,31 @@ const deleteCookieSafe = async (name: string, options: any = {}) => {
     });
     return true;
   } catch (e) {
-    // Silenciosamente ignorar erros de cookie no servidor
+    console.error('[Cookie Delete Error]:', e);
     return false;
   }
 };
 
-/**
- * Cria um cliente Supabase SOMENTE LEITURA para Server Components.
- * Não tenta modificar cookies, apenas lê-los.
- * 
- * IMPORTANTE: Use esta versão em Server Components (páginas, layouts)
- */
+// Cliente read-only para server components
 export const createReadOnlyClient = async () => {
-  // Se estiver no navegador, avise sobre o uso incorreto
-  if (isBrowser) {
-    console.warn('Atenção: Tentativa de usar createReadOnlyClient do servidor no navegador. Use @/lib/supabase/client em vez disso.')
-    // Fallback para um cliente básico sem manipulação de cookies
-    return createServerClientFromSSR<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: () => undefined,
-          set: () => {},
-          remove: () => {},
-        },
-      }
-    )
-  }
-  
-  // Criação segura de cliente no servidor SOMENTE LEITURA
-  return createServerClientFromSSR<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  return createServerClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get: getCookieSafe,
-        set: () => {}, // Silenciosamente ignorar modificações em Server Components
-        remove: () => {}, // Silenciosamente ignorar remoções em Server Components
+        set: () => Promise.resolve(), // Silenciosamente ignorar modificações
+        remove: () => Promise.resolve(), // Silenciosamente ignorar remoções
       },
     }
   )
 }
 
-/**
- * Cria um cliente Supabase com acesso total para Server Actions e Route Handlers.
- * Pode ler e modificar cookies.
- * 
- * IMPORTANTE: Use APENAS em:
- * 1. Server Actions (funções 'use server')
- * 2. Route Handlers (rotas da API)
- */
+// Cliente normal para server components
 export const createClient = async () => {
-  // Se estiver no navegador, avise sobre o uso incorreto
-  if (isBrowser) {
-    console.warn('Atenção: Tentativa de usar createClient do servidor no navegador. Use @/lib/supabase/client em vez disso.')
-    // Fallback para um cliente básico sem manipulação de cookies
-    return createServerClientFromSSR<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: () => undefined,
-          set: () => {},
-          remove: () => {},
-        },
-      }
-    )
-  }
-  
-  // Criação segura de cliente no servidor usando a biblioteca SSR do Supabase
-  return createServerClientFromSSR<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  return createServerClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get: getCookieSafe,
@@ -131,11 +89,4 @@ export const createClient = async () => {
       },
     }
   )
-}
-
-// Função para uso em funções de API (como RPC) que não precisam gerenciar cookies
-// Útil quando precisamos apenas fazer consultas ao banco de dados
-export const createServiceClient = async () => {
-  // Certifique-se de que o createClient seja awaited
-  return await createClient()
 } 

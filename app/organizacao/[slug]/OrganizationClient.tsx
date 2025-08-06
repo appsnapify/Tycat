@@ -5,8 +5,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { Loader2, Instagram, Facebook, Youtube, Twitter, Globe, Music, ClipboardList } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-// Inicializar o cliente Supabase aqui para estar disponível no escopo do componente e seus hooks/efeitos
+// Initialize Supabase client
 const supabase = createClient();
 
 interface Organization {
@@ -33,6 +34,7 @@ interface Event {
   date: string
   location: string
   flyer_url: string
+  event_slugs?: { slug: string }[] // Relação com event_slugs
 }
 
 interface OrganizationClientProps {
@@ -63,7 +65,7 @@ const renderSocialLink = (type: string, url?: string) => {
       href={ensureFullUrl(url)}
       target="_blank" 
       rel="noopener noreferrer"
-      className="text-gray-500 hover:text-gray-700 transition-colors"
+      className="text-slate-300 hover:text-white transition-colors duration-300 transform hover:scale-110"
       aria-label={type}
     >
       {icons[type as keyof typeof icons] || <Globe className="h-6 w-6" />}
@@ -76,6 +78,16 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([])
   const [pastEvents, setPastEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  // Helper para construir URL do evento
+  const getEventUrl = (event: Event) => {
+    const eventSlug = event.event_slugs?.[0]?.slug;
+    if (eventSlug) {
+      return `/organizacao/${slug}/${eventSlug}`;
+    }
+    // Fallback para o sistema antigo se não houver slug
+    return `/g/${event.id}`;
+  }
 
   useEffect(() => {
     async function loadOrganization() {
@@ -91,7 +103,12 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
 
         const { data: upcoming, error: upcomingError } = await supabase
           .from('events')
-          .select('*')
+          .select(`
+            *,
+            event_slugs!left (
+              slug
+            )
+          `)
           .eq('organization_id', org.id)
           .eq('is_published', true)
           .gte('date', new Date().toISOString())
@@ -102,7 +119,12 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
 
         const { data: past, error: pastError } = await supabase
           .from('events')
-          .select('*')
+          .select(`
+            *,
+            event_slugs!left (
+              slug
+            )
+          `)
           .eq('organization_id', org.id)
           .eq('is_published', true)
           .lt('date', new Date().toISOString())
@@ -122,61 +144,66 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        <Loader2 className="h-10 w-10 animate-spin text-slate-300" />
       </div>
     )
   }
 
   if (!organization) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-500">Organização não encontrada</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        <p className="text-slate-300 text-lg font-medium">Organização não encontrada</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white font-sans">
-      <div className="relative h-64 bg-gray-200 shadow-lg shadow-black/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 font-sans text-slate-100">
+      {/* Header with banner and logo */}
+      <div className="relative h-80 overflow-hidden shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/80 z-10" />
         {organization.banner_url ? (
           <Image
             src={organization.banner_url}
             alt="Banner da organização"
             fill
-            className="object-cover rounded-t-lg"
+            className="object-cover"
             priority
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center rounded-t-lg">
-            <p className="text-gray-400">Sem banner</p>
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-slate-800 to-slate-700">
+            <p className="text-slate-400">Sem banner</p>
           </div>
         )}
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-          <div className="w-28 h-28 rounded-full bg-gray-200 overflow-hidden border-8 border-white shadow-md">
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-20">
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-800 shadow-xl bg-slate-700">
             {organization.logo_url ? (
               <Image
                 src={organization.logo_url}
                 alt="Logo da organização"
-                width={112}
-                height={112}
+                width={128}
+                height={128}
                 className="object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <p className="text-xs text-gray-400 text-center">Sem logo</p>
+                <p className="text-xs text-slate-400 text-center">Sem logo</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="mt-16 flex flex-col items-center text-center font-oswald">
-          <h1 className="text-2xl font-bold text-gray-900">{organization.name}</h1>
-          <p className="mt-2 text-lg font-semibold text-gray-600">{organization.address}</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        {/* Organization info */}
+        <div className="mt-20 flex flex-col items-center text-center">
+          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-300">
+            {organization.name}
+          </h1>
+          <p className="mt-2 text-lg font-medium text-slate-300">{organization.address}</p>
 
-          <div className="mt-4 flex space-x-4 items-center justify-center">
+          <div className="mt-6 flex space-x-6 items-center justify-center">
              {renderSocialLink('instagram', organization.social_media?.instagram)}
              {renderSocialLink('facebook', organization.social_media?.facebook)}
              {renderSocialLink('youtube', organization.social_media?.youtube)}
@@ -186,94 +213,118 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
           </div>
         </div>
 
-        <div className="mt-12">
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-10">Próximos Eventos</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-              {upcomingEvents.map((event) => (
-                <Link href={`/g/${event.id}`} key={event.id} className="block no-underline group">
-                  <div className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md shadow-black/20 h-full">
-                    <div className="relative mx-4 -mt-6 h-40 overflow-hidden rounded-xl bg-clip-border text-white shadow-lg bg-gray-200">
-                      {event.flyer_url ? (
-                        <Image
-                          src={event.flyer_url}
-                          alt={event.title}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <p className="text-gray-400">Sem imagem</p>
+        {/* Events sections */}
+        <div className="mt-16">
+          {/* Upcoming events */}
+          <div className="mb-16">
+            <h2 className="text-2xl font-bold tracking-tight mb-10 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
+              Próximos Eventos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {upcomingEvents.length === 0 ? (
+                <p className="text-slate-400 col-span-full text-center py-8">Não existem eventos futuros agendados</p>
+              ) : (
+                upcomingEvents.map((event) => (
+                  <Link href={getEventUrl(event)} key={event.id} className="block no-underline group">
+                    <div className="relative flex flex-col rounded-xl bg-slate-800/50 backdrop-blur-sm text-slate-100 shadow-lg h-full overflow-hidden border border-slate-700/50 transition-all duration-300 hover:shadow-blue-500/20 hover:-translate-y-1">
+                      <div className="relative h-48 overflow-hidden">
+                        {event.flyer_url ? (
+                          <>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent z-10 opacity-60" />
+                            <Image
+                              src={event.flyer_url}
+                              alt={event.title}
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-700"
+                            />
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-slate-800 to-slate-700">
+                            <p className="text-slate-400">Sem imagem</p>
+                          </div>
+                        )}
+                        
+                        <div className="absolute top-4 right-4 z-20 bg-blue-500/90 backdrop-blur-sm p-2 rounded-md shadow-lg text-center">
+                          <span className="block text-xs font-bold uppercase text-white tracking-wide">
+                            {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
+                          </span>
+                          <span className="block text-xl font-bold text-white leading-tight">
+                            {new Date(event.date).getDate()}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                    <div className="p-6 flex flex-col flex-grow relative">
-                      <div className="absolute top-16 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
-                        <span className="block text-xs font-bold uppercase text-blue-600 tracking-wide">
-                          {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
-                        </span>
-                        <span className="block text-xl font-bold text-blue-600 leading-tight">
-                          {new Date(event.date).getDate()}
-                        </span>
                       </div>
-
-                      <h5 className="mb-4 block font-oswald text-xl font-semibold leading-snug tracking-normal text-blue-gray-900 antialiased">
-                        {event.title}
-                      </h5>
+                      
+                      <div className="p-6 flex flex-col flex-grow">
+                        <h3 className="text-xl font-bold leading-snug tracking-tight text-slate-100 mb-3 group-hover:text-blue-400 transition-colors">
+                          {event.title}
+                        </h3>
+                        <p className="text-sm text-slate-300 line-clamp-2 mb-4">
+                          {event.description}
+                        </p>
+                        <div className="mt-auto">
+                          <span className="inline-flex items-center justify-center rounded-md bg-blue-600/20 px-4 py-2 text-sm font-medium text-blue-400 transition-colors group-hover:bg-blue-600/30">
+                            Ver Detalhes
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-6 pt-0 flex justify-center">
-                       <span className="select-none rounded-lg bg-blue-500 py-2 px-4 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20">
-                         Ver Evento
-                       </span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))
+              )}
             </div>
           </div>
 
+          {/* Past events */}
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-10">Eventos Passados</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-              {pastEvents.map((event) => (
-                <Link href={`/g/${event.id}`} key={event.id} className="block no-underline group">
-                  <div className="relative flex w-full flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md shadow-black/20 h-full">
-                    <div className="relative mx-4 -mt-6 h-40 overflow-hidden rounded-xl bg-clip-border text-white shadow-lg bg-gray-200">
-                      {event.flyer_url ? (
-                        <Image
-                          src={event.flyer_url}
-                          alt={event.title}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <p className="text-gray-400">Sem imagem</p>
+            <h2 className="text-2xl font-bold tracking-tight mb-10 bg-clip-text text-transparent bg-gradient-to-r from-slate-400 to-slate-500">
+              Eventos Passados
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {pastEvents.length === 0 ? (
+                <p className="text-slate-400 col-span-full text-center py-8">Não existem eventos passados</p>
+              ) : (
+                pastEvents.map((event) => (
+                  <div key={event.id} className="block no-underline">
+                    <div className="relative flex flex-col rounded-xl bg-slate-800/30 backdrop-blur-sm text-slate-400 shadow-md h-full overflow-hidden border border-slate-700/30">
+                      <div className="relative h-48 overflow-hidden">
+                        {event.flyer_url ? (
+                          <>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent z-10 opacity-80" />
+                            <Image
+                              src={event.flyer_url}
+                              alt={event.title}
+                              fill
+                              className="object-cover grayscale"
+                            />
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-slate-800 to-slate-700">
+                            <p className="text-slate-500">Sem imagem</p>
+                          </div>
+                        )}
+                        
+                        <div className="absolute top-4 right-4 z-20 bg-slate-700/90 backdrop-blur-sm p-2 rounded-md shadow-md text-center">
+                          <span className="block text-xs font-bold uppercase text-slate-400 tracking-wide">
+                            {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
+                          </span>
+                          <span className="block text-xl font-bold text-slate-400 leading-tight">
+                            {new Date(event.date).getDate()}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                    <div className="p-6 flex flex-col flex-grow relative">
-                      <div className="absolute top-16 right-4 bg-blue-50 p-2 rounded-md shadow-sm text-center">
-                        <span className="block text-xs font-bold uppercase text-blue-600 tracking-wide">
-                          {new Date(event.date).toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase().replace('.', '')}
-                        </span>
-                        <span className="block text-xl font-bold text-blue-600 leading-tight">
-                          {new Date(event.date).getDate()}
-                        </span>
                       </div>
-
-                      <h5 className="mb-4 block font-oswald text-xl font-semibold leading-snug tracking-normal text-blue-gray-900 antialiased">
-                        {event.title}
-                      </h5>
-                    </div>
-                    <div className="p-6 pt-0 flex justify-center">
-                       <span className="select-none rounded-lg bg-blue-500 py-2 px-4 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20">
-                         Ver Evento
-                       </span>
+                      
+                      <div className="p-6 flex flex-col flex-grow">
+                        <h3 className="text-xl font-bold leading-snug tracking-tight text-slate-400 mb-3">
+                          {event.title}
+                        </h3>
+                        <p className="text-sm text-slate-500 line-clamp-2">
+                          {event.description}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

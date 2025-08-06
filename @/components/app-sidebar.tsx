@@ -9,7 +9,7 @@ import {
   Building,       // Para Organização
   Settings        // Para Configurações
 } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/app/app/_providers/auth-provider';
 
 export function AppSidebar() {
   const { user } = useAuth();
