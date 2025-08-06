@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, RotateCcw } from 'lucide-react';
+import { Download, Printer, Check } from 'lucide-react';
 import QRCode from 'qrcode';
 
 interface QRCodeDisplayProps {
@@ -73,16 +73,18 @@ export default function QRCodeDisplay({ qrCode, eventTitle, guestName, onReset }
   return (
     <div className="text-center space-y-6">
       {/* Success Header */}
-      <div className="space-y-2">
-        <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto">
-          <span className="text-2xl">✅</span>
+      <div className="space-y-3">
+        <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+          <Check className="w-8 h-8 text-white" strokeWidth={3} />
         </div>
-        <h3 className="text-xl font-bold text-white">
-          Registo Confirmado!
-        </h3>
-        <p className="text-gray-300 text-sm">
-          Olá <span className="text-white font-medium">{guestName}</span>
-        </p>
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold text-slate-800">
+            Registo Confirmado!
+          </h3>
+          <p className="text-slate-600 text-sm">
+            Olá <span className="text-slate-800 font-medium">{guestName}</span>
+          </p>
+        </div>
       </div>
 
       {/* QR Code Section */}
@@ -95,10 +97,10 @@ export default function QRCodeDisplay({ qrCode, eventTitle, guestName, onReset }
 
       {/* Event Info */}
       <div className="space-y-2">
-        <h4 className="text-lg font-semibold text-white">
+        <h4 className="text-lg font-semibold text-slate-800">
           {eventTitle}
         </h4>
-        <p className="text-gray-300 text-sm">
+        <p className="text-slate-600 text-sm">
           Guarda este QR Code! Será necessário na entrada do evento.
         </p>
       </div>
@@ -109,7 +111,7 @@ export default function QRCodeDisplay({ qrCode, eventTitle, guestName, onReset }
           <Button
             onClick={handleDownload}
             disabled={downloading}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-3 rounded-xl transition-colors"
           >
             <Download className="h-4 w-4 mr-2" />
             {downloading ? 'A descarregar...' : 'Descarregar'}
@@ -118,32 +120,12 @@ export default function QRCodeDisplay({ qrCode, eventTitle, guestName, onReset }
           <Button
             onClick={handlePrint}
             variant="outline"
-            className="border-gray-600 text-white hover:bg-gray-800"
+            className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-medium py-3 rounded-xl transition-colors"
           >
             <Printer className="h-4 w-4 mr-2" />
             Imprimir
           </Button>
         </div>
-
-        <Button
-          onClick={onReset}
-          variant="ghost"
-          className="w-full text-gray-400 hover:text-white"
-        >
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Registar Outro Telemóvel
-        </Button>
-      </div>
-
-      {/* Instructions */}
-      <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-4 text-left">
-        <h5 className="font-semibold text-white mb-2">📱 Instruções:</h5>
-        <ul className="text-sm text-gray-300 space-y-1">
-          <li>• Guarda este QR Code no teu telemóvel</li>
-          <li>• Mostra-o na entrada do evento</li>
-          <li>• Podes imprimir ou descarregar uma cópia</li>
-          <li>• Em caso de problemas, contacta o promotor</li>
-        </ul>
       </div>
     </div>
   );

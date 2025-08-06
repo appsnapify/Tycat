@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,11 +11,34 @@ import QRCodeDisplay from './QRCodeDisplay';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
+// Estilos para forçar fundo branco no PhoneInput
+const phoneInputStyles = `
+  .phone-input-white input {
+    background-color: white !important;
+    color: black !important;
+  }
+  .phone-input-white input:focus {
+    background-color: white !important;
+    color: black !important;
+  }
+  .phone-input-white input:hover {
+    background-color: white !important;
+  }
+  .phone-input-white input:active {
+    background-color: white !important;
+  }
+  .phone-input-white .PhoneInputInput {
+    background-color: white !important;
+    color: black !important;
+  }
+`;
+
 interface GuestRegistrationFormProps {
   eventId: string;
   promoterId: string | null; // Opcional para organizações
   eventTitle: string;
   teamId?: string | null; // Para organizações
+  onShowQRCode?: (showing: boolean) => void; // Callback para informar quando QR Code é mostrado
 }
 
 type FormStep = 'phone' | 'login' | 'register' | 'success';
@@ -41,7 +64,7 @@ interface GuestResult {
   error?: string;
 }
 
-export default function GuestRegistrationForm({ eventId, promoterId, eventTitle, teamId }: GuestRegistrationFormProps) {
+export default function GuestRegistrationForm({ eventId, promoterId, eventTitle, teamId, onShowQRCode }: GuestRegistrationFormProps) {
   const [step, setStep] = useState<FormStep>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,7 +329,13 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
     setClientUser(null);
     setQrCode(null);
     setError(null);
+    onShowQRCode?.(false);
   };
+
+  // Notificar quando QR Code é mostrado/escondido
+  useEffect(() => {
+    onShowQRCode?.(step === 'success' && !!qrCode);
+  }, [step, qrCode, onShowQRCode]);
 
   // Render based on current step
   if (step === 'success' && qrCode) {
@@ -329,8 +358,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         }
         
         .PhoneInputCountry {
-          background: rgba(31, 41, 55, 0.5);
-          border: 1px solid rgb(75, 85, 99);
+          background: white !important;
+          border: none !important;
           border-radius: 0.375rem 0 0 0.375rem;
           border-right: none;
           padding: 0.5rem;
@@ -341,13 +370,14 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         .PhoneInputCountrySelect {
           background: transparent;
           border: none;
-          color: white;
+          color: black !important;
           font-size: 0.875rem;
         }
         
         .PhoneInputCountrySelect:focus {
           outline: none;
-          box-shadow: 0 0 0 2px #3b82f6;
+          background: transparent !important;
+          color: black !important;
         }
         
         .PhoneInputCountryIcon {
@@ -358,11 +388,10 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         }
         
         .PhoneInputInput {
-          background: rgba(31, 41, 55, 0.5);
-          border: 1px solid rgb(75, 85, 99);
-          border-radius: 0 0.375rem 0.375rem 0;
-          border-left: none;
-          color: white;
+          background: white !important;
+          border: none !important;
+          border-radius: 0;
+          color: black !important;
           padding: 0.5rem 0.75rem;
           flex: 1;
           font-size: 0.875rem;
@@ -374,8 +403,9 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         
         .PhoneInputInput:focus {
           outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 1px #3b82f6;
+          background: white !important;
+          color: black !important;
+          border: none !important;
         }
         
         .PhoneInputInput:disabled {
@@ -394,8 +424,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
       {step === 'phone' && (
         <div className="space-y-5">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl mb-3">
-              <Phone className="w-5 h-5 text-emerald-600" />
+            <div className="inline-flex items-center justify-center w-8 h-8 bg-emerald-100 rounded-lg mb-3">
+              <Phone className="w-4 h-4 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-800 mb-1">Número de Telemóvel</h3>
             <p className="text-slate-500 text-sm">Para verificação e acesso</p>
@@ -403,7 +433,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
           
           <form onSubmit={handlePhoneSubmit} className="space-y-4">
             <div className="max-w-sm mx-auto">
-              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+              <div className="bg-white border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200 shadow-sm">
                 <PhoneInput
                   international
                   countryCallingCodeEditable={false}
@@ -415,22 +445,25 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                   }}
                   disabled={loading}
                   placeholder="93 588 6310"
+                  className="phone-input-white"
                   style={{
                     width: '100%',
                     '--PhoneInputCountrySelectArrow-color': '#059669',
                     '--PhoneInputCountrySelect-marginRight': '0.5rem',
-                    '--PhoneInput-color--focus': '#1e293b',
+                    '--PhoneInput-color--focus': '#000000',
+                    '--PhoneInput-color': '#000000',
+                    backgroundColor: 'white !important',
                   }}
                 />
               </div>
             </div>
             
             <div className="max-w-sm mx-auto">
-              <Button 
-                type="submit" 
+            <Button 
+              type="submit" 
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-medium transition-colors"
-                disabled={loading}
-              >
+              disabled={loading}
+            >
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -439,7 +472,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 ) : (
                   'Continuar'
                 )}
-              </Button>
+            </Button>
             </div>
           </form>
         </div>
@@ -449,8 +482,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
       {step === 'login' && clientUser && (
         <div className="space-y-5">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl mb-3">
-              <User className="w-5 h-5 text-emerald-600" />
+            <div className="inline-flex items-center justify-center w-8 h-8 bg-emerald-100 rounded-lg mb-3">
+              <User className="w-4 h-4 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-800 mb-1">
               Olá {clientUser.first_name}!
@@ -467,27 +500,27 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
                   <div className="relative">
                     <Lock className="absolute left-0 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-600" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                       className="pl-6 border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400"
-                      required
-                      disabled={loading}
-                    />
+                  required
+                  disabled={loading}
+                />
                   </div>
                 </div>
               </div>
             </div>
             
             <div className="max-w-sm mx-auto space-y-3">
-              <Button 
-                type="submit" 
+            <Button 
+              type="submit" 
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-medium transition-colors"
-                disabled={loading}
-              >
+              disabled={loading}
+            >
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -496,17 +529,17 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 ) : (
                   'Entrar'
                 )}
-              </Button>
-              
-              <Button 
-                type="button" 
-                variant="ghost" 
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="ghost" 
                 className="w-full text-slate-500 hover:text-emerald-600 text-sm py-2"
-                onClick={() => setStep('phone')}
-                disabled={loading}
-              >
-                ← Voltar
-              </Button>
+              onClick={() => setStep('phone')}
+              disabled={loading}
+            >
+              ← Voltar
+            </Button>
             </div>
           </form>
         </div>
@@ -516,8 +549,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
       {step === 'register' && (
         <div className="space-y-5">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-xl mb-3">
-              <User className="w-5 h-5 text-emerald-600" />
+            <div className="inline-flex items-center justify-center w-8 h-8 bg-emerald-100 rounded-lg mb-3">
+              <User className="w-4 h-4 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-800 mb-1">Criar Conta</h3>
             <p className="text-slate-500 text-sm">Só precisamos de alguns dados</p>
@@ -525,37 +558,37 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
 
           <form onSubmit={handleClientRegister} className="space-y-4">
             <div className="max-w-sm mx-auto space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                    <Input
-                      id="firstName"
-                      type="text"
-                      placeholder="Nome"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Nome"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                       className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                    <Input
-                      id="lastName"
-                      type="text"
-                      placeholder="Apelido"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
+                    required
+                    disabled={loading}
+                  />
                 </div>
               </div>
+              
+                <div>
+                  <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Apelido"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                      className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
+                  required
+                  disabled={loading}
+                />
+                  </div>
+              </div>
+            </div>
 
               <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
                 <Input
@@ -569,13 +602,13 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 />
               </div>
             </div>
-
+            
             <div className="max-w-sm mx-auto space-y-3">
-              <Button 
-                type="submit" 
+            <Button 
+              type="submit" 
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-medium transition-colors"
-                disabled={loading}
-              >
+              disabled={loading}
+            >
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -584,17 +617,17 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 ) : (
                   'Criar Conta'
                 )}
-              </Button>
-              
-              <Button 
-                type="button" 
-                variant="ghost" 
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="ghost" 
                 className="w-full text-slate-500 hover:text-emerald-600 text-sm py-2"
-                onClick={() => setStep('phone')}
-                disabled={loading}
-              >
-                ← Voltar
-              </Button>
+              onClick={() => setStep('phone')}
+              disabled={loading}
+            >
+              ← Voltar
+            </Button>
             </div>
           </form>
         </div>
