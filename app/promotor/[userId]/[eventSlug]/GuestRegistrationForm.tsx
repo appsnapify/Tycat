@@ -545,7 +545,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         </div>
       )}
 
-      {/* Step 2B: Registration Form Simplificado */}
+      {/* Step 2B: Registration Form COMPLETO */}
       {step === 'register' && (
         <div className="space-y-5">
           <div className="text-center">
@@ -553,62 +553,167 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
               <User className="w-4 h-4 text-emerald-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-800 mb-1">Criar Conta</h3>
-            <p className="text-slate-500 text-sm">Só precisamos de alguns dados</p>
+            <p className="text-slate-500 text-sm">Precisamos de alguns dados para o registo</p>
           </div>
 
           <form onSubmit={handleClientRegister} className="space-y-4">
             <div className="max-w-sm mx-auto space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+              {/* Nome e Apelido */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Nome"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    <Input
+                      id="firstName"
+                      type="text"
+                      placeholder="Nome"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
                       className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                    <Input
+                      id="lastName"
+                      type="text"
+                      placeholder="Apelido"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Email OBRIGATÓRIO */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm pl-10"
                     required
                     disabled={loading}
                   />
                 </div>
               </div>
-              
-                <div>
-                  <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Apelido"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                      className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
+
+              {/* Data de Nascimento */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Input
+                    id="birthDate"
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 text-sm pl-10"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Género */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <select
+                  id="gender"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as 'M' | 'F')}
+                  className="w-full border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 text-sm"
                   required
                   disabled={loading}
-                />
-                  </div>
+                >
+                  <option value="M">Masculino</option>
+                  <option value="F">Feminino</option>
+                </select>
               </div>
-            </div>
 
+              {/* Código Postal */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Input
+                    id="postalCode"
+                    type="text"
+                    placeholder="Código Postal (ex: 4750-850)"
+                    value={postalCode}
+                    onChange={(e) => handlePostalCodeChange(e.target.value)}
+                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm pl-10"
+                    disabled={loading || postalCodeLoading}
+                  />
+                  {postalCodeLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cidade */}
               <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="Email (opcional)"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="city"
+                  type="text"
+                  placeholder="Cidade"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
                   className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
                   disabled={loading}
                 />
               </div>
+
+              {/* Palavra-passe */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Palavra-passe (min. 8 caracteres)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm pl-10"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Confirmar Palavra-passe */}
+              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirmar palavra-passe"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm pl-10"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
             
             <div className="max-w-sm mx-auto space-y-3">
-            <Button 
-              type="submit" 
+              <Button 
+                type="submit" 
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-medium transition-colors"
-              disabled={loading}
-            >
+                disabled={loading}
+              >
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -617,17 +722,17 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 ) : (
                   'Criar Conta'
                 )}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="ghost" 
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="ghost" 
                 className="w-full text-slate-500 hover:text-emerald-600 text-sm py-2"
-              onClick={() => setStep('phone')}
-              disabled={loading}
-            >
-              ← Voltar
-            </Button>
+                onClick={() => setStep('phone')}
+                disabled={loading}
+              >
+                ← Voltar
+              </Button>
             </div>
           </form>
         </div>

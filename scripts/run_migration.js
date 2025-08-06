@@ -8,7 +8,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 // Configurações do Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xejpwdpumzalewamttjv.supabase.co';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAdminKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ADMIN_KEY;
 
 // Verifica se a chave de administrador está disponível

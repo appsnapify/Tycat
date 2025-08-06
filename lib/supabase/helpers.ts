@@ -71,8 +71,12 @@ export async function directSupabaseAPICall<T>(
   } = {}
 ): Promise<{ data: T | null; error: any; status: number; success: boolean }> {
   // Valores padrão para acesso à API
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xejpwdpumzalewamttjv.supabase.co';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlanB3ZHB1bXphbGV3YW10dGp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzNjc2ODQsImV4cCI6MjA1ODk0MzY4NH0.8HWAgcSoPL70uJ8OJXu3m7GD6NB-MhZTuBjurWXU7eI';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('SUPABASE_URL e SUPABASE_ANON_KEY devem estar definidas no .env.local');
+  }
   
   try {
     // Construir URL completa

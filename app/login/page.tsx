@@ -11,17 +11,18 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-// Cores modernizadas
+// Cores alinhadas com a homepage TYCAT
 const colors = {
-  background: 'bg-gradient-to-br from-gray-100 via-gray-50 to-white',
-  textPrimary: 'text-gray-800',
-  textSecondary: 'text-gray-500',
-  accentLime: 'text-lime-600',
-  accentMagenta: 'text-fuchsia-600',
-  bgAccentLime: 'bg-lime-500',
-  bgAccentMagenta: 'bg-fuchsia-500',
-  borderLime: 'border-lime-400',
-  borderFuchsia: 'border-fuchsia-200',
+  background: 'bg-gradient-to-br from-slate-50 via-white to-emerald-50/30',
+  textPrimary: 'text-slate-800',
+  textSecondary: 'text-slate-600',
+  textMuted: 'text-slate-500',
+  accentEmerald: 'text-emerald-600',
+  accentViolet: 'text-violet-600',
+  bgAccentEmerald: 'bg-emerald-500',
+  bgAccentViolet: 'bg-violet-500',
+  borderEmerald: 'border-emerald-400',
+  borderViolet: 'border-violet-200',
 }
 
 interface FormData {
@@ -149,11 +150,11 @@ export default function LoginPage() {
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center ${colors.background} py-12 px-4 sm:px-6 lg:px-8 relative`}>
-      {/* Elementos decorativos no fundo */}
+      {/* Elementos decorativos no fundo - alinhados com homepage */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -left-20 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute top-0 -right-20 w-96 h-96 bg-fuchsia-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-lime-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+        <div className="absolute -top-20 -left-20 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
+        <div className="absolute top-0 -right-20 w-96 h-96 bg-violet-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
+        <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
       </div>
 
       {/* Elemento decorativo superior */}
