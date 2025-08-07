@@ -3,6 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+// Interface para dados retornados pela função RPC get_available_teams_secure
+interface RPCTeamData {
+  team_id: string;
+  team_name: string;
+  team_code: string;
+  team_description: string | null;
+  created_by: string;
+  member_count: number;
+}
+
 export async function GET() {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -23,7 +33,7 @@ export async function GET() {
       console.log('[API /teams/available] Função segura OK:', secureTeams.length, 'equipas');
       return NextResponse.json({
         success: true,
-        teams: secureTeams.map((team: any) => ({
+        teams: secureTeams.map((team: RPCTeamData) => ({
           id: team.team_id,
           name: team.team_name,
           team_code: team.team_code,

@@ -26,7 +26,8 @@ interface Organization {
   name: string
 }
 
-interface UserOrganizationData {
+// Interface corrigida baseada na estrutura real retornada pelo Supabase
+interface SupabaseUserOrganizationData {
   organizations: Organization | null
 }
 
@@ -65,12 +66,22 @@ export default function AdicionarEquipePage() {
       if (error) throw error
       
             if (data && data.length > 0) {
-        const orgs = (data as UserOrganizationData[])
-          .filter(item => item.organizations) // Filtrar items com organizations válidas
-          .map(item => ({
-            id: item.organizations!.id,
-            name: item.organizations!.name
-          }))
+        // Processamento seguro sem type assertion problemática
+        const orgs: Organization[] = []
+        
+        for (const item of data) {
+          if (item.organizations && 
+              typeof item.organizations === 'object' && 
+              'id' in item.organizations && 
+              'name' in item.organizations &&
+              typeof item.organizations.id === 'string' &&
+              typeof item.organizations.name === 'string') {
+            orgs.push({
+              id: item.organizations.id,
+              name: item.organizations.name
+            })
+          }
+        }
         
         setOrganizations(orgs)
         

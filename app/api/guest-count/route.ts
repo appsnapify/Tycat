@@ -27,10 +27,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Log apenas em desenvolvimento
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API GuestCount - Buscando contagem para evento: ${eventId}`);
-    }
+
 
     // 🛡️ SEGURANÇA: Tentar função segura primeiro (usando cookies de sessão)
     try {
@@ -40,21 +37,13 @@ export async function GET(request: NextRequest) {
       const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
       
       if (userError || !user) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('Usuário não autenticado, usando fallback:', userError?.message);
-        }
+        // Usuário não autenticado, usar fallback
       } else {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`API GuestCount - Usuário autenticado: ${user.id}`);
-        }
         
         const { data: secureData, error: secureError } = await supabaseAuth
           .rpc('get_event_guest_count_secure', { p_event_id: eventId });
         
         if (!secureError && secureData && secureData.length > 0) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`API GuestCount - Função segura OK: ${secureData[0].count} guests, ${secureData[0].checked_in} checked-in`);
-          }
           
           return NextResponse.json(
             {
@@ -74,19 +63,12 @@ export async function GET(request: NextRequest) {
             }
           );
         }
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('Função segura falhou, usando fallback:', secureError?.message);
-        }
       }
     } catch (authError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Erro na autenticação, usando fallback:', authError);
-      }
+      // Erro na autenticação, usar fallback
     }
     
-    // 🚨 FALLBACK TEMPORÁRIO: SERVICE_ROLE (será removido na Fase 4)
-    console.warn('Usando fallback SERVICE_ROLE para guest-count:', eventId);
+    // Fallback: usar SERVICE_ROLE
     
     // 1. Buscar total de convidados na tabela guests
     const { data: guestsData, error: guestsError, count: totalCount } = await supabaseAdmin

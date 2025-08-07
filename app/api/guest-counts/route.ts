@@ -22,6 +22,13 @@ interface GuestCountResult {
   error?: string;
 }
 
+// Interface para dados retornados pela função RPC get_multiple_events_guest_count_secure
+interface RPCGuestCountData {
+  event_id: string;
+  count: number;
+  checked_in: number;
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Obter IDs dos eventos da URL (separados por vírgula)
@@ -69,7 +76,7 @@ export async function GET(request: NextRequest) {
           console.log(`API GuestCounts (Batch) - Função segura OK: ${secureData.length} eventos processados`);
         }
         
-        const secureResults: GuestCountResult[] = secureData.map((item: any) => ({
+        const secureResults: GuestCountResult[] = secureData.map((item: RPCGuestCountData) => ({
           eventId: item.event_id,
           count: item.count,
           checkedIn: item.checked_in,
