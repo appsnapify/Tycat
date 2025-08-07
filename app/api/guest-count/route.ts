@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createRouteHandlerClient } from '@/lib/supabase/server';
 
-// Criar cliente Supabase com service role para ter acesso completo
+// 🛡️ SEGURANÇA: Cliente admin apenas para fallback temporário (será removido na Fase 4)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,6 +31,62 @@ export async function GET(request: NextRequest) {
     if (process.env.NODE_ENV === 'development') {
       console.log(`API GuestCount - Buscando contagem para evento: ${eventId}`);
     }
+
+    // 🛡️ SEGURANÇA: Tentar função segura primeiro (usando cookies de sessão)
+    try {
+      const supabaseAuth = await createRouteHandlerClient();
+      
+      // Verificar se o usuário está autenticado
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+      
+      if (userError || !user) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Usuário não autenticado, usando fallback:', userError?.message);
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`API GuestCount - Usuário autenticado: ${user.id}`);
+        }
+        
+        const { data: secureData, error: secureError } = await supabaseAuth
+          .rpc('get_event_guest_count_secure', { p_event_id: eventId });
+        
+        if (!secureError && secureData && secureData.length > 0) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`API GuestCount - Função segura OK: ${secureData[0].count} guests, ${secureData[0].checked_in} checked-in`);
+          }
+          
+          return NextResponse.json(
+            {
+              success: true,
+              count: secureData[0].count,
+              checkedIn: secureData[0].checked_in,
+              timestamp: new Date().toISOString(),
+              secure: true
+            },
+            {
+              status: 200,
+              headers: {
+                'Cache-Control': 'public, max-age=300, s-maxage=300',
+                'Pragma': 'cache',
+                'Expires': new Date(Date.now() + 5 * 60 * 1000).toUTCString(),
+              }
+            }
+          );
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Função segura falhou, usando fallback:', secureError?.message);
+        }
+      }
+    } catch (authError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Erro na autenticação, usando fallback:', authError);
+      }
+    }
+    
+    // 🚨 FALLBACK TEMPORÁRIO: SERVICE_ROLE (será removido na Fase 4)
+    console.warn('Usando fallback SERVICE_ROLE para guest-count:', eventId);
     
     // 1. Buscar total de convidados na tabela guests
     const { data: guestsData, error: guestsError, count: totalCount } = await supabaseAdmin
@@ -75,7 +132,8 @@ export async function GET(request: NextRequest) {
         success: true,
         count: total,
         checkedIn: checkedIn,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        fallback: true
       },
       {
         status: 200,

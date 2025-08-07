@@ -48,6 +48,8 @@ interface Team {
   name: string
   team_code: string
   member_count: number
+  created_by: string
+  created_by_role?: 'organization' | 'team_leader'
 }
 
 interface Organization {
@@ -131,7 +133,8 @@ export default function OrganizadorEquipesPage() {
           id,
           name,
           team_code,
-          organization_id
+          organization_id,
+          created_by
         `)
         .eq('organization_id', organizationId)
         .eq('is_active', true);
@@ -145,18 +148,33 @@ export default function OrganizadorEquipesPage() {
         return;
       }
 
+
+
       // Buscar contagem de membros separadamente para cada equipe
       let teamsWithCounts = [];
       if (teamsData && teamsData.length > 0) {
+        // Verificar quais utilizadores são organizadores
+        const { data: orgUsers } = await supabase
+          .from('user_organizations')
+          .select('user_id')
+          .eq('organization_id', organizationId)
+          .in('role', ['owner', 'organizador']);
+        
+        const organizationUserIds = orgUsers?.map(ou => ou.user_id) || [];
+        
         for (const team of teamsData) {
           const { count } = await supabase
             .from('team_members')
             .select('*', { count: 'exact', head: true })
             .eq('team_id', team.id);
           
+          // Determinar se foi criada pela organização ou por um chefe de equipa
+          const isCreatedByOrganization = organizationUserIds.includes(team.created_by);
+          
           teamsWithCounts.push({
             ...team,
-            member_count: count || 0
+            member_count: count || 0,
+            created_by_role: isCreatedByOrganization ? 'organization' : 'team_leader'
           });
         }
       }
@@ -235,11 +253,13 @@ export default function OrganizadorEquipesPage() {
       setShowCreateTeamDialog(false);
       setCreatingTeam(false);
       
-      requestAnimationFrame(() => {
+      // Mostrar sucesso e recarregar equipas
         toast.success('Equipe criada com sucesso!');
         
+      // Pequeno delay para garantir que a BD foi atualizada
+      setTimeout(() => {
         loadOrganizationAndTeams();
-      });
+      }, 500);
       
     } catch (error) {
       console.error('Erro ao criar equipe:', error);
@@ -429,8 +449,13 @@ export default function OrganizadorEquipesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTeams.map((team) => (
-            <Card key={team.id} className="hover:shadow-md transition-all border-l-4 border-l-blue-500">
+          {filteredTeams.map((team) => {
+            const borderColor = team.created_by_role === 'organization' 
+              ? 'border-l-red-500' 
+              : 'border-l-blue-500';
+            
+            return (
+            <Card key={team.id} className={`hover:shadow-md transition-all border-l-4 ${borderColor}`}>
               <CardHeader className="pb-3 text-center">
                 <CardTitle className="text-gray-900">{team.name}</CardTitle>
                 <CardDescription className="flex items-center justify-center">
@@ -443,6 +468,17 @@ export default function OrganizadorEquipesPage() {
                   <div>
                     <span className="text-sm text-muted-foreground">Código:</span>
                     <span className="font-mono ml-2 font-semibold">{team.team_code}</span>
+                  </div>
+                  <div className="flex justify-center">
+                    <Badge 
+                      variant="secondary" 
+                      className={team.created_by_role === 'organization' 
+                        ? 'bg-red-100 text-red-800 border-red-200' 
+                        : 'bg-blue-100 text-blue-800 border-blue-200'
+                      }
+                    >
+                      {team.created_by_role === 'organization' ? 'Criada pela Organização' : 'Criada por Chefe'}
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -458,7 +494,8 @@ export default function OrganizadorEquipesPage() {
                 </Button>
               </CardFooter>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

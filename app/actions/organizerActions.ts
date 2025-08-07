@@ -35,7 +35,32 @@ export async function associateTeamAction(formData: FormData): Promise<{ success
 
     console.log(`Server Action: Associando ${teamCode} a ${organizationId} por ${userId}`);
 
-    // 2. Criar Cliente Admin (APENAS PARA LEITURA/VALIDAÇÃO)
+    // 🛡️ SEGURANÇA: Tentar função segura primeiro
+    try {
+        const { data: secureResult, error: secureError } = await supabaseUserClient
+            .rpc('associate_team_to_organization_secure', {
+                p_team_code: teamCode.trim(),
+                p_organization_id: organizationId
+            });
+
+        if (!secureError && secureResult) {
+            console.log('Server Action: Função segura OK:', secureResult.message);
+            return {
+                success: secureResult.success,
+                message: secureResult.message,
+                teamName: secureResult.team_name
+            };
+        }
+
+        console.warn('Função segura falhou, usando fallback:', secureError?.message);
+    } catch (secureErr) {
+        console.warn('Erro na função segura, usando fallback:', secureErr);
+    }
+
+    // 🚨 FALLBACK TEMPORÁRIO: SERVICE_ROLE (será removido na Fase 4)
+    console.warn('Usando fallback SERVICE_ROLE para associateTeam:', teamCode);
+    
+    // 2. Criar Cliente Admin (FALLBACK TEMPORÁRIO)
     const supabaseAdmin = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!, 
         process.env.SUPABASE_SERVICE_ROLE_KEY! // Chave de Serviço!

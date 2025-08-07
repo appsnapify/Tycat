@@ -157,14 +157,23 @@ export default function LoginPage() {
         <div className="absolute -bottom-32 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
       </div>
 
-      {/* Elemento decorativo superior */}
+      {/* Logo TYCAT Melhorado */}
       <div className="absolute top-8 left-1/2 transform -translate-x-1/2 flex items-center justify-center mb-8">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
+        <div className="relative">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-violet-600 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+            <div className="w-8 h-8 relative">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v1a2 2 0 001 1.732l1 .732a2 2 0 011 1.732V14a2 2 0 002 2h2M15 5h2a2 2 0 012 2v1a2 2 0 01-1 1.732l-1 .732a2 2 0 01-1 1.732V14a2 2 0 01-2 2h-2m-6-4h6m2 5.5V19a2 2 0 01-2 2H6a2 2 0 01-2-2v-1.5"/>
+              </svg>
+            </div>
+            <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-br from-violet-400 to-emerald-400 rounded-full border-2 border-white shadow-md"></div>
         </div>
-        <div className="ml-3 text-2xl font-bold text-gray-800">SNAP</div>
+        <div className={`ml-4 text-3xl font-bold ${colors.textPrimary} tracking-tight`}>
+          <span className="bg-gradient-to-r from-emerald-600 to-violet-600 bg-clip-text text-transparent">TY</span>
+          <span className={colors.textPrimary}>CAT</span>
+        </div>
       </div>
 
       <motion.div
@@ -172,16 +181,16 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md z-10 mt-24"
       >
-        <div className="border border-gray-100 rounded-xl shadow-lg p-8 bg-white/80 backdrop-blur-lg relative overflow-hidden">
-          {/* Borda decorativa lateral */}
-          <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-lime-500 to-fuchsia-500"></div>
+        <div className="border border-slate-200 rounded-xl shadow-lg p-8 bg-white/90 backdrop-blur-lg relative overflow-hidden">
+          {/* Borda decorativa lateral - cores TYCAT */}
+          <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-emerald-500 to-violet-500"></div>
           
           <div className="flex justify-between items-center">
             <div>
               <h2 className={`text-3xl font-bold ${colors.textPrimary}`}>Iniciar Sessão</h2>
               <p className={`mt-2 text-sm ${colors.textSecondary}`}>
                 Não tem uma conta?{' '}
-                <Link href="/register" className={`${colors.accentLime} font-medium`}>
+                <Link href="/register" className={`${colors.accentEmerald} font-medium hover:${colors.accentViolet} transition-colors`}>
                   Registre-se
                 </Link>
               </p>
@@ -195,7 +204,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mt-4 border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800">
+            <Alert variant="destructive" className="mt-4 border-red-200 bg-red-50 text-red-800">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -203,35 +212,54 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6 mt-6">
             <div>
-              <Label htmlFor="email" className={`block text-sm font-medium ${colors.textPrimary}`}>
+              <Label htmlFor="email" className={`block text-sm font-medium ${colors.textPrimary} mb-2`}>
                 Email
               </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className={`mt-1 block w-full ${colors.textPrimary}`}
-              />
+              <div className="relative">
+                <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${colors.accentEmerald}`} />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className={`pl-10 block w-full ${colors.textPrimary} border-slate-300 focus:border-emerald-500 focus:ring-emerald-500`}
+                  placeholder="seu@email.com"
+                />
+              </div>
             </div>
             <div>
-              <Label htmlFor="password" className={`block text-sm font-medium ${colors.textPrimary}`}>
-                Senha
+              <Label htmlFor="password" className={`block text-sm font-medium ${colors.textPrimary} mb-2`}>
+                Palavra-passe
               </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                className={`mt-1 block w-full ${colors.textPrimary}`}
-              />
+              <div className="relative">
+                <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${colors.accentEmerald}`} />
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  className={`pl-10 block w-full ${colors.textPrimary} border-slate-300 focus:border-emerald-500 focus:ring-emerald-500`}
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
-            <Button type="submit" disabled={isLoading} className={`w-full ${colors.bgAccentLime} text-white`}>
-              {isLoading ? 'Entrando...' : 'Entrar'}
+            <Button 
+              type="submit" 
+              disabled={isLoading} 
+              className={`w-full ${colors.bgAccentEmerald} hover:bg-emerald-600 text-white py-3 font-medium transition-colors shadow-sm hover:shadow-md`}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Entrando...</span>
+                </div>
+              ) : (
+                'Entrar'
+              )}
             </Button>
           </form>
         </div>

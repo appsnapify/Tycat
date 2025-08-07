@@ -26,6 +26,10 @@ interface Organization {
   name: string
 }
 
+interface UserOrganizationData {
+  organizations: Organization | null
+}
+
 export default function AdicionarEquipePage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -60,11 +64,13 @@ export default function AdicionarEquipePage() {
         
       if (error) throw error
       
-      if (data && data.length > 0) {
-        const orgs = data.map(item => ({
-          id: item.organizations.id,
-          name: item.organizations.name
-        }))
+            if (data && data.length > 0) {
+        const orgs = (data as UserOrganizationData[])
+          .filter(item => item.organizations) // Filtrar items com organizations válidas
+          .map(item => ({
+            id: item.organizations!.id,
+            name: item.organizations!.name
+          }))
         
         setOrganizations(orgs)
         

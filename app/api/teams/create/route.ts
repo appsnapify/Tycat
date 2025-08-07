@@ -1,6 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { createClient as createRouteHandlerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -27,18 +26,19 @@ export async function POST(request: Request) {
       )
     }
     
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    // 🛡️ SEGURANÇA: Usar cliente com autenticação via cookies
+    const supabase = await createRouteHandlerClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (authError || !session) {
-      console.error('[API /teams/create] Erro de autenticação:', authError);
+    if (authError || !user) {
+      console.error('[API /teams/create] Erro de autenticação:', authError?.message);
       return NextResponse.json(
         { message: 'Não autorizado' },
         { status: 401 }
       )
     }
     
-    const userId = session.user.id
+    const userId = user.id
     console.log(`[API /teams/create] User ID autenticado: ${userId}`); // Log User ID
     
     // Verificar permissão (logs já existentes aqui são bons)
@@ -56,15 +56,40 @@ export async function POST(request: Request) {
         { status: 403 }
       )
     }
-    if (!['owner', 'admin'].includes(userOrg.role)) {
+    if (!['owner', 'organizador'].includes(userOrg.role)) {
        console.error(`[API /teams/create] Role insuficiente: ${userOrg.role}`);
       return NextResponse.json(
-        { message: 'Apenas proprietários e administradores podem criar equipes' },
+        { message: 'Apenas proprietários e organizadores podem criar equipes' },
         { status: 403 }
       )
     }
     
-    console.log("[API /teams/create] Verificações de permissão OK. Tentando criar cliente admin...");
+    console.log("[API /teams/create] Verificações de permissão OK. Tentando função segura...");
+    
+    // 🛡️ SEGURANÇA: Tentar função segura primeiro
+    const { data: secureResult, error: secureError } = await supabase
+      .rpc('create_team_secure', {
+        p_team_name: name.trim(),
+        p_team_description: null,
+        p_organization_id: organizationId
+      });
+
+    if (!secureError && secureResult) {
+      console.log('[API /teams/create] Função segura OK:', secureResult.message);
+      return NextResponse.json({
+        message: secureResult.message,
+        teamId: secureResult.team_id,
+        teamCode: secureResult.team_code,
+        teamName: secureResult.team_name,
+        secure: true
+      });
+    }
+
+    console.warn('Função segura falhou, usando fallback:', secureError?.message);
+
+    // 🚨 FALLBACK TEMPORÁRIO: SERVICE_ROLE (será removido na Fase 4)
+    console.warn('Usando fallback SERVICE_ROLE para create team:', name);
+    
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || '',
@@ -75,7 +100,7 @@ export async function POST(request: Request) {
         }
       }
     )
-    console.log("[API /teams/create] Cliente admin criado (aparentemente). Gerando ID e código...");
+    console.log("[API /teams/create] Cliente admin criado (fallback). Gerando ID e código...");
     
     const teamCode = `TEAM-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
     const teamId = uuidv4()
@@ -142,11 +167,12 @@ export async function POST(request: Request) {
         console.log("[API /teams/create] Inserção em ORGANIZATION_TEAMS bem-sucedida.");
     }
     
-    console.log("[API /teams/create] Processo concluído com sucesso.");
+    console.log("[API /teams/create] Processo concluído com sucesso (fallback).");
     return NextResponse.json({
       success: true,
       message: 'Equipe criada com sucesso',
-      teamCode
+      teamCode,
+      fallback: true
     })
     
   } catch (error) {

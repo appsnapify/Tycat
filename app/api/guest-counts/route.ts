@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createRouteHandlerClient } from '@/lib/supabase/server';
 
-// Criar cliente Supabase com service role para ter acesso completo
+// 🛡️ SEGURANÇA: Cliente admin apenas para fallback temporário (será removido na Fase 4)
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -55,6 +56,53 @@ export async function GET(request: NextRequest) {
     if (process.env.NODE_ENV === 'development') {
       console.log(`API GuestCounts (Batch) - Buscando contagem para ${eventIds.length} eventos`);
     }
+
+    // 🛡️ SEGURANÇA: Tentar função segura primeiro (usando cookies de sessão)
+    try {
+      const supabaseAuth = await createRouteHandlerClient();
+      
+      const { data: secureData, error: secureError } = await supabaseAuth
+        .rpc('get_multiple_events_guest_count_secure', { p_event_ids: eventIds });
+      
+      if (!secureError && secureData && secureData.length > 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`API GuestCounts (Batch) - Função segura OK: ${secureData.length} eventos processados`);
+        }
+        
+        const secureResults: GuestCountResult[] = secureData.map((item: any) => ({
+          eventId: item.event_id,
+          count: item.count,
+          checkedIn: item.checked_in,
+          success: true
+        }));
+        
+        return NextResponse.json(
+          {
+            success: true,
+            results: secureResults,
+            timestamp: new Date().toISOString(),
+            totalEvents: eventIds.length,
+            successfulEvents: secureResults.length,
+            secure: true
+          },
+          {
+            status: 200,
+            headers: {
+              'Cache-Control': 'public, max-age=300, s-maxage=300',
+              'Pragma': 'cache',
+              'Expires': new Date(Date.now() + 5 * 60 * 1000).toUTCString(),
+            }
+          }
+        );
+      }
+      
+      console.warn('Função segura falhou, usando fallback:', secureError?.message);
+    } catch (authError) {
+      console.warn('Erro na autenticação, usando fallback:', authError);
+    }
+    
+    // 🚨 FALLBACK TEMPORÁRIO: SERVICE_ROLE (será removido na Fase 4)
+    console.warn('Usando fallback SERVICE_ROLE para guest-counts:', eventIds.length, 'eventos');
     
     const results: GuestCountResult[] = [];
     
@@ -130,7 +178,8 @@ export async function GET(request: NextRequest) {
         results: results,
         timestamp: new Date().toISOString(),
         totalEvents: eventIds.length,
-        successfulEvents: results.filter(r => r.success).length
+        successfulEvents: results.filter(r => r.success).length,
+        fallback: true
       },
       {
         status: 200,

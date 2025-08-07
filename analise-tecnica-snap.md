@@ -220,7 +220,7 @@ O sistema comporta múltiplos perfis de usuário, cada um com seu próprio dashb
 - Restrições de integridade (unique, not null, check)
 
 **Problemas Identificados:**
-- **Segurança crítica:** RLS não habilitado em tabelas financeiras (`financial_transactions`, `reports`)
+- **Segurança crítica:** ~~RLS não habilitado em tabelas financeiras~~ (RESOLVIDO: tabelas não implementadas removidas)
 - **Desempenho:** Índices ausentes em colunas frequentemente consultadas (ex: `created_at`, `status`)
 - **Arquitetura:** Funções SQL com lógica de negócio que deveria estar na aplicação
 - **Segurança:** Políticas RLS com condições muito permissivas (`USING (true)`)
@@ -311,27 +311,9 @@ O sistema comporta múltiplos perfis de usuário, cada um com seu próprio dashb
 1. **Habilitar RLS em todas as tabelas críticas:**
 
 ```sql
--- Para tabela financial_transactions
-ALTER TABLE financial_transactions ENABLE ROW LEVEL SECURITY;
-
--- Para tabela reports
-ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
-
--- Criar políticas adequadas
-CREATE POLICY "Usuários podem ver apenas suas próprias transações" 
-ON financial_transactions FOR SELECT 
-USING (auth.uid() = user_id);
-
-CREATE POLICY "Organizadores podem ver transações de sua organização" 
-ON financial_transactions FOR SELECT 
-USING (
-  EXISTS (
-    SELECT 1 FROM user_organizations 
-    WHERE user_organizations.user_id = auth.uid() 
-    AND user_organizations.organization_id = financial_transactions.organization_id
-    AND user_organizations.role IN ('owner', 'organizador')
-  )
-);
+-- REMOVIDO: Tabelas financial_transactions e reports não existem na implementação atual
+-- O sistema financeiro real usa: commissions, commission_payments, commission_payment_items
+-- Estas tabelas já possuem RLS adequado implementado
 ```
 
 2. **Remover uso de service role e substituir por RLS adequado:**
@@ -560,8 +542,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 - **teams**: Equipes de promotores
 - **team_members**: Associação entre usuários e equipes
 - **guests**: Convidados para eventos
-- **financial_transactions**: Transações financeiras (comissões, pagamentos)
-- **reports**: Relatórios gerados pelo sistema
+
 
 #### 5.1.2 Relações Principais
 - Organizações têm múltiplos eventos (1:N)
@@ -579,11 +560,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ### 5.2 Análise Detalhada das Políticas de RLS
 
 #### 5.2.1 Políticas Existentes
-- Políticas para guests, teams, financial_transactions e reports
+- Políticas para guests, teams, ~~financial_transactions e reports~~ (tabelas removidas)
 - Maioria baseada em associação de usuário com organização
 
 #### 5.2.2 Problemas Específicos
-- RLS não habilitado em tabelas com políticas definidas (financial_transactions, reports)
+- ~~RLS não habilitado em tabelas com políticas definidas~~ (RESOLVIDO: tabelas fantasma removidas)
 - Algumas políticas com expressões complexas difíceis de manter
 - Ausência de políticas para operações DELETE em algumas tabelas
 - Políticas inconsistentes entre tabelas relacionadas
