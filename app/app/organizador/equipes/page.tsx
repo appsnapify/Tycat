@@ -111,7 +111,6 @@ export default function OrganizadorEquipesPage() {
       }
 
       if (!orgDataArray || orgDataArray.length === 0) {
-         console.log('Nenhuma organização encontrada para o usuário nesta página.');
          requestAnimationFrame(() => {
            toast.error('Nenhuma organização associada encontrada.');
          });

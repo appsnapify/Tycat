@@ -190,8 +190,8 @@ async function duplicateEvent(event: Event) {
         eventId: event.id
       }));
       
-      // Redirecionar para login com parâmetro de retorno
-      window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+      // Redirecionar para login com parâmetro de retorno de forma segura
+      window.location.assign(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
       throw new Error('Sessão expirada. Por favor, faça login novamente.');
     }
     

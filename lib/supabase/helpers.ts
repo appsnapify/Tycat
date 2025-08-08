@@ -113,7 +113,6 @@ export async function directSupabaseAPICall<T>(
     }
     
     // Executar a requisição
-    console.log(`Fazendo requisição direta para: ${url}`);
     const response = await fetch(url, requestOptions);
     const status = response.status;
     

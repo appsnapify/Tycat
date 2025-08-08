@@ -88,8 +88,8 @@ export default function HomePage() {
       const supabase = createClient()
       await supabase.auth.signOut()
       setUser(null)
-      // Redirecionar para página inicial
-      window.location.href = '/'
+      // Redirecionar para página inicial de forma segura
+      window.location.assign('/')
     } catch (error) {
       console.error('Erro ao fazer logout:', error)
     }

@@ -60,7 +60,7 @@ const EmptyState = ({
     {actionLabel && (
       <Button
         variant="outline"
-        onClick={onAction || (actionLink ? () => window.location.href = actionLink : undefined)}
+        onClick={onAction || (actionLink ? () => window.location.assign(actionLink) : undefined)}
       >
         {actionLabel}
       </Button>

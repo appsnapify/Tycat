@@ -32,8 +32,6 @@ interface FormData {
 
 // FUNÇÃO CRÍTICA: Redirecionamento baseado no role
 const getRedirectUrlByRole = (role: string, userMetadata?: any): string => {
-  console.log('[LOGIN] Determinando redirect para role:', role, 'metadata:', userMetadata)
-  
   const normalizedRole = role?.toLowerCase() || 'desconhecido'
   
   switch (normalizedRole) {
@@ -78,7 +76,6 @@ export default function LoginPage() {
         if (session?.user) {
           const userRole = session.user.user_metadata?.role
           const redirectUrl = getRedirectUrlByRole(userRole, session.user.user_metadata)
-          console.log('[LOGIN] Usuário já logado, redirecionando para:', redirectUrl)
           router.push(redirectUrl)
         }
       } catch (error) {
@@ -122,8 +119,6 @@ export default function LoginPage() {
       if (data.user) {
         const userRole = data.user.user_metadata?.role
         const redirectUrl = getRedirectUrlByRole(userRole, data.user.user_metadata)
-        
-        console.log('[LOGIN] Login successful for role:', userRole, 'redirecting to:', redirectUrl)
         router.push(redirectUrl)
       }
 
