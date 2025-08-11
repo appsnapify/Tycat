@@ -26,10 +26,21 @@ interface Organization {
   name: string
 }
 
-// Interface corrigida baseada na estrutura real retornada pelo Supabase
-interface SupabaseUserOrganizationData {
-  organizations: Organization | null
+// Interface para dados retornados pelo Supabase (estrutura real)
+interface SupabaseOrgData {
+  organizations: {
+    id: string;
+    name: string;
+  } | null;
 }
+    name: string;
+  } | null;
+}
+    name: string;
+  } | null;
+}
+
+
 
 export default function AdicionarEquipePage() {
   const router = useRouter()
