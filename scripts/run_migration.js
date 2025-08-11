@@ -35,13 +35,6 @@ function isSecurePath(filePath, allowedDirectories) {
       console.error('Caminho fora dos diretórios permitidos:', absolutePath);
       return false;
     }
-    
-    // Verificar se o arquivo existe
-    if (!fs.existsSync(absolutePath)) {
-      console.error('Arquivo não encontrado:', absolutePath);
-      return false;
-    }
-    
     return true;
   } catch (error) {
     console.error('Erro na validação do caminho:', error);
@@ -55,13 +48,12 @@ function isSecurePath(filePath, allowedDirectories) {
  * @param {string[]} allowedDirectories - Diretórios permitidos
  * @returns {string|null} - Conteúdo do arquivo ou null se inválido
  */
-function readFileSecurely(filePath, allowedDirectories) {
+async function readFileSecurely(filePath, allowedDirectories) {
   if (!isSecurePath(filePath, allowedDirectories)) {
     throw new Error(`Acesso negado: caminho inseguro ou não permitido: ${filePath}`);
   }
-  
   try {
-    return fs.readFileSync(filePath, 'utf8');
+    return await fs.promises.readFile(filePath, 'utf8');
   } catch (error) {
     throw new Error(`Erro ao ler arquivo: ${error.message}`);
   }
@@ -95,7 +87,7 @@ async function main() {
     ];
     
     console.log('Validando caminho seguro:', migrationPath);
-    const sqlContent = readFileSecurely(migrationPath, allowedDirectories);
+    const sqlContent = await readFileSecurely(migrationPath, allowedDirectories);
     
     // Executa o SQL usando a função RPC
     console.log('Executando SQL...');

@@ -33,12 +33,6 @@ function isSecurePath(filePath: string, allowedDirectories: string[]): boolean {
       return false;
     }
     
-    // Verificar se o arquivo existe
-    if (!fs.existsSync(absolutePath)) {
-      console.error('Arquivo não encontrado:', absolutePath);
-      return false;
-    }
-    
     return true;
   } catch (error) {
     console.error('Erro na validação do caminho:', error);
@@ -53,13 +47,12 @@ function isSecurePath(filePath: string, allowedDirectories: string[]): boolean {
  * @returns Conteúdo do arquivo
  * @throws Error se o caminho for inseguro
  */
-function readFileSecurely(filePath: string, allowedDirectories: string[]): string {
+async function readFileSecurely(filePath: string, allowedDirectories: string[]): Promise<string> {
   if (!isSecurePath(filePath, allowedDirectories)) {
     throw new Error(`Acesso negado: caminho inseguro ou não permitido: ${filePath}`);
   }
-  
   try {
-    return fs.readFileSync(filePath, 'utf8');
+    return await fs.promises.readFile(filePath, 'utf8');
   } catch (error) {
     throw new Error(`Erro ao ler arquivo: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -133,15 +126,8 @@ export async function runMigration(migrationName: string) {
       path.join(process.cwd(), 'migrations')
     ];
     
-    if (!fs.existsSync(migrationPath)) {
-      return {
-        success: false,
-        message: `Arquivo de migração não encontrado: ${migrationName}.sql`
-      };
-    }
-    
     console.log('Validando caminho seguro:', migrationPath);
-    const sqlContent = readFileSecurely(migrationPath, allowedDirectories);
+    const sqlContent = await readFileSecurely(migrationPath, allowedDirectories);
     
     // Executar a migração usando RPC
     console.log(`Executando migração: ${migrationName}`);
