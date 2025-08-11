@@ -47,6 +47,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { toast } from 'sonner'
+import { API_BASE_URL } from '@/lib/constants'
 import {
   Dialog,
   DialogContent,
@@ -178,10 +179,7 @@ export default function EquipePage() {
   // Nova função para copiar o link da página pública
   const copyPublicProfileLink = () => {
     if (!user?.id) return;
-    // Determinar o URL base dinamicamente ou usar um valor fixo para produção
-    const baseUrl = window.location.origin.includes('localhost') 
-      ? 'http://localhost:3000' 
-      : 'https://snapify-xm3c.vercel.app';
+    const baseUrl = API_BASE_URL;
     const publicLink = `${baseUrl}/promotor/${user.id}`;
     navigator.clipboard.writeText(publicLink);
     setCopiedLink(true);
@@ -392,7 +390,7 @@ export default function EquipePage() {
                   {copiedLink ? 'Copiado!' : 'Copiar'}
                 </button>
                 <button 
-                  onClick={() => window.open(`${typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:3000' : 'https://snapify-xm3c.vercel.app'}/promotor/${user.id}`, '_blank')}
+                  onClick={() => window.open(`${API_BASE_URL}/promotor/${user.id}`, '_blank')}
                   className="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
                 >
                   <ArrowUpDown className="w-3 h-3" />
