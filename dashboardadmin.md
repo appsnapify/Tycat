@@ -245,3 +245,136 @@ Este documento consolida a análise do site, descreve todas as funcionalidades e
 - Definir requisitos de MFA (TOTP, WebAuthn) e políticas (bloqueios/expirações).
 - Alinhar com equipas de infra (DNS, Vercel, Supabase Auth Allowed Origins).
 - Iniciar Fase 1 do Roadmap (papéis/guardas) e Fase 2 (scaffold + DNS).
+
+---
+
+## 12) Funcionalidades Detalhadas por Área
+
+### 12.1 Organizador — Operações end-to-end
+- Organizações
+  - Criar com uploads (logo/banner) e redes sociais; geração automática de `slug`.
+  - Gerir membros e papéis (owner/admin/member) via relação `user_organizations`.
+- Equipas
+  - Associar equipas por `team_code` (regex `^TEAM-[A-Z0-9]{5}$`).
+  - Ao associar: criar vínculo `organization_teams` e garantir criador como `member` da organização.
+- Eventos
+  - Criar/editar: `title`, `description`, `date/time`, `end_date/end_time`, `location`, `type` (ex.: guest-list), `guest_list_open/close_datetime`.
+  - Estado: `scheduled`, `active`, `completed` (cron com margem de 8h após fim oficial).
+  - Página de Detalhe (tabs):
+    - Estatísticas: total convidados, total check-ins, taxa; distribuição por género; horário(s) de pico de registos; análise temporal; top equipas; top promotores; top localizações (código postal/cidade).
+    - Convidados: tabela com filtros/ordenação; operações de gestão individuais.
+    - Informações: dados do evento; ações rápidas (Check-in, Página pública, Editar evento).
+- Check-in
+  - Link direto para modo check-in; integração com Scanner.
+- Comissões
+  - Gestão de regras e relatórios por equipa/promotor.
+- Configurações do organizador (Business Details)
+  - Faturação, IBAN/prova, contactos admin, morada de faturação (upsert por `user_id`).
+
+### 12.2 Chefe de Equipa
+- Criar/gerir equipa, definir líder, gerir membros.
+- Vendas, financeiro, wallet, acesso a eventos da organização.
+- Métricas operacionais da equipa.
+
+### 12.3 Promotor
+- Entrar numa equipa com `team_code` (atualiza `user_metadata` com `team_id` e `team_role`).
+- Criar/registar convidados, gerir QR codes, verificar existência e atualizar.
+- Ver eventos e comissões; configurações pessoais.
+
+### 12.4 Scanner
+- Leitura robusta com Html5Qrcode e fallback WebRTC + `jsQR`.
+- Prevenção de duplicados, sons/vibração, limpeza de recursos; PWA com SW/manifest.
+- Pesquisa/listagem/stats/cleanup via APIs dedicadas.
+
+## 13) Modelos de Dados Essenciais (campos principais)
+- organizations: `id`, `name`, `email`, `address`, `logo_url`, `banner_url`, `social_media (json)`, `slug`, `created_at`, `updated_at`.
+- user_organizations: `user_id`, `organization_id`, `role ('owner'|'admin'|'member')`, `created_at`.
+- teams: `id`, `name`, `team_code (TEAM-XXXXX)`, `organization_id?`, `created_by`.
+- organization_teams: `organization_id`, `team_id`.
+- events: `id`, `organization_id`, `title`, `description?`, `date`, `time?`, `end_date?`, `end_time?`, `location?`, `type? ('guest-list'|...)`, `guest_list_open_datetime?`, `guest_list_close_datetime?`, `status ('scheduled'|'active'|'completed')`.
+- guests: `id`, `event_id`, `name`, `phone`, `client_user_id`, `promoter_id`, `team_id`, `qr_code (assinado)`, `qr_code_url`, `checked_in (bool)`, timestamps.
+- profiles: `id`, `first_name`, `last_name`, `role?`, timestamps.
+
+## 14) Endpoints por Domínio (resumo prático)
+- Organizations
+  - POST `/api/organizations` — Criar organização
+    - FormData: `name`, `email`, `address`, `logo(File)`, `banner(File)`, `userId`, socials (`instagram/facebook/youtube/tiktok/twitter/website`).
+    - Retorna: `{ id, slug, name }`.
+- Teams
+  - POST `/api/teams/create` — Criar equipa (se existir)
+  - GET `/api/teams/available` — Descobrir equipas
+- Guests
+  - POST `/api/guest/create` — Criar convidado
+  - POST `/api/guest/login` — Login convidado
+  - POST `/api/guest/register` — Registo convidado
+  - GET `/api/guest/status` — Estado convidado/QR
+  - POST `/api/guest/verify-phone` — Verificar telefone
+- Guest Counts
+  - GET `/api/guest-count?eventId=UUID`
+  - GET `/api/guest-counts?eventIds=UUID,UUID`
+- Scanners
+  - GET `/api/scanners/list` — Listar sessões
+  - GET `/api/scanners/search?q=...` — Buscar
+  - GET `/api/scanners/stats` — Estatísticas
+  - POST `/api/scanners/create` — Criar sessão
+  - POST `/api/scanners/cleanup` — Limpar inativos
+  - GET `/api/scanners/healthcheck` — Saúde
+- Health
+  - GET `/api/health/system-status` — Status de serviços
+- Cron
+  - GET `/api/cron/update-event-status` — Recalcular estados
+- Admin utilitários
+  - `/api/admin/*` — db-setup, run-migrations, update-status, wallet, cleanup-scanners
+
+## 15) Matriz de Permissões (alto nível)
+- Admin (global)
+  - Acesso total a `/admin/*` e leitura/escrita de todas as entidades; ações destrutivas com step-up MFA.
+- Organizador
+  - R/W na(s) suas organizações, equipas associadas, eventos e convidados; acesso a scanners conforme políticas.
+- Chefe de Equipa
+  - R/W na sua equipa (membros, vendas, financeiro), leitura de eventos ligados e métricas.
+- Promotor
+  - Ler eventos/organização associada, criar convidados seus; ver comissões; gerir perfil.
+
+## 16) Jornadas de Utilizador (User Journeys)
+- Organizador: login → criar organização → associar equipas → criar eventos → gerir guest list/check-in → consultar stats/comissões → ajustar configs.
+- Chefe de Equipa: login → criar/gerir equipa → recrutar/gerir membros → operar em eventos → acompanhar vendas/financeiro.
+- Promotor: login/aderir equipa → ver eventos → registar convidados (QR) → acompanhar comissões.
+- Scanner: login → iniciar sessão scanner → validar convidados → monitorizar stats.
+- Admin: login admin → overview KPIs → gerir users/orgs/teams/events/guests/scanners → manutenção (cleanup/cron/migrations) → auditar logs.
+
+## 17) KPIs por Área
+- Visão Geral: utilizadores, organizações/equipas ativas, eventos ativos, convidados totais, scans/dia, taxa sucesso scans.
+- Evento: total convidados, total check-ins, taxa check-in, picos de registo, distribuição por género, top equipas/promotores, top localizações.
+- Equipa: nº membros, convidados registados, check-ins, conversão por evento.
+
+## 18) Erros e Edge Cases Relevantes
+- Códigos de equipa inválidos (regex falha) ou duplicados.
+- Falhas RLS (permission denied) — usar RPCs seguras; evitar service role no cliente.
+- QR duplicado/scan repetido — mitigado no hook com anti-duplicação temporal.
+- Permissão de câmara negada — fallback WebRTC e mensagens claras.
+- Sessões de scanner órfãs — resolver com `cleanup` e expiração.
+- Cron de estado de eventos — garantir robustez e logging; reprocessar em falhas.
+
+## 19) Segurança Recomendada (Admin 10/10)
+- MFA obrigatória (TOTP; preferível WebAuthn/passkeys); step-up MFA para ações destrutivas.
+- Rate limiting por IP/rota (ex.: login, /admin/* APIs).
+- Cookies: `Secure`, `HttpOnly`, `SameSite=Strict`, segregados por subdomínio; sem SSO com público.
+- CSRF: tokens em POSTs no admin; validação de `Origin`/`Host` no middleware.
+- CSP: apenas domínios whitelisted; `frame-ancestors 'none'`; `upgrade-insecure-requests`;
+  - Exemplo (alto nível): `default-src 'self'; script-src 'self' 'sha256-...'; connect-src 'self' https://<supabase-url>; img-src 'self' data: https://storage-url; frame-ancestors 'none'; base-uri 'self';`.
+- HSTS (subdomínios incluídos), X-Frame-Options DENY, Referrer-Policy strict-origin-when-cross-origin.
+- Rotação de tokens e expiração de sessão (ex.: 12h), logout global.
+
+## 20) Subdomínio Admin — Implementação Técnica
+- DNS: `admin` → CNAME/ALIAS conforme provider.
+- Deploy: projeto Admin separado (recomendado) ou route group + verificação de `Host` no middleware.
+- Supabase Auth: adicionar `admin.nomedosite.com` a Allowed Origins/Redirects.
+- Cookies: domínio limitado ao subdomínio; sem partilha com `www`.
+- Middleware dedicado do Admin: bloquear não-admin; registar IP/tentativas; opcional allowlist IP.
+- Endpoints Admin-only: sob `/api/admin/*` com validação adicional de role e, se necessário, assinatura server-to-server.
+
+## 21) Completaridade e Próximos Detalhes
+- Para cada endpoint, definir contrato formal (OpenAPI opcional) com `request/response` e códigos de erro.
+- Para cada tabela crítica, validar índices (ex.: `event_id`, `team_id`) e chaves para performance.
+- Testes E2E: login admin, fluxos CRUD críticos, segurança (CSRF, rate limit), scanner e cron.
