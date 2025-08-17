@@ -41,7 +41,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/mcp-server-supabase": "^0.3.4",
     "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/react-simple-maps": "^3.0.6",
