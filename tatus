@@ -1,0 +1,10 @@
+[33mc32496b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Security: async fs reads (remove existsSync/readFileSync), HTTPS em produção, brace-expansion@2.0.2
+[33m9cc4ebf[m Security: HTTPS em prod, remover hardcodes de URL, fs seguro, brace-expansion@2.0.2
+[33m1543b45[m test protection
+[33m931b9da[m 🔧 Fix: Corrigir erro de sintaxe no interface SupabaseOrgData
+[33mf990a2b[m 🔒 Security: Remove JWT hardcoded + Add Codacy analysis docs
+[33m06f8a80[m 🛡️ Fase 1: Correções de Segurança Ultra-Seguras
+[33m291652f[m \🔧 TYPESCRIPT: Correção completa de erros de tipo\n\n✅ ERROS CORRIGIDOS:\n- Removido 'Forbidden non-null assertion' (page.tsx)\n- Substituído 'any' por interfaces específicas (guest-counts, teams/available)\n- Implementado processamento type-safe sem assertions perigosas\n\n🛡️ MELHORIAS DE SEGURANÇA DE TIPOS:\n- Interface RPCGuestCountData para dados de guest counts\n- Interface RPCTeamData para dados de equipas\n- Verificações de tipo completas com typeof guards\n- Zero type assertions perigosas (!)\n\n🎯 ARQUIVOS AFETADOS:\n- app/api/guest-counts/route.ts (interface + substituição any)\n- app/api/teams/available/route.ts (interface + substituição any)  \n- app/app/organizador/equipes/adicionar/page.tsx (processamento seguro)\n- app/api/guest-count/route.ts (limpeza de logs)\n\n🧪 RESULTADO:\n- Zero erros de linting ✓\n- Type safety completa ✓\n- Funcionalidade mantida 100% ✓\n- Código mais robusto e maintível ✓"
+[33m2514353[m 🛡️ SEGURANÇA: Implementação completa do plano de segurança
+[33m8c305ba[m security: fix exposed API keys and credentials
+[33mf73a9dd[m[33m ([m[1;31morigin/feature/promo-v2-pixel-perfect[m[33m, [m[1;32mfeature/promo-v2-pixel-perfect[m[33m)[m feat: melhorias sistema promotor antes correção segurança
