@@ -60,15 +60,15 @@ export async function POST(request: Request) {
     const client = authResultData.client;
 
     // 🛡️ VERIFICAR SE GUEST JÁ EXISTE NESTE EVENTO (PREVENIR DUPLICADOS)
-          // console.log('🔍 Checking if guest already exists...');
-    const { data: existingGuest, error: checkError } = await supabase
-      .from('guests')
-      .select('id, qr_code, created_at')
-      .eq('client_user_id', client.id)
-      .eq('event_id', eventId)
-      .single();
+    // ✅ CORREÇÃO: Usar função SECURITY DEFINER em vez de acesso direto
+    // console.log('🔍 Checking if guest already exists...');
+    const { data: checkResult, error: checkError } = await supabase
+      .rpc('check_existing_guest', {
+        p_client_id: client.id,
+        p_event_id: eventId
+      });
 
-    if (checkError && checkError.code !== 'PGRST116') {
+    if (checkError) {
       console.error('❌ Guest check error:', checkError);
       return NextResponse.json(
         { success: false, error: 'Erro interno na verificação' },
@@ -77,9 +77,11 @@ export async function POST(request: Request) {
     }
 
     let finalGuestResult;
+    const checkData = checkResult as any;
 
-    if (existingGuest) {
+    if (checkData.exists) {
       // ✅ GUEST JÁ EXISTS - RETORNAR QR CODE EXISTENTE
+      const existingGuest = checkData.guest;
       // console.log('✅ Guest already exists, returning existing QR:', existingGuest);
       finalGuestResult = {
         success: true,
