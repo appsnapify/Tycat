@@ -48,7 +48,7 @@ function collectStaticRoutes(appDirAbs: string): string[] {
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000'
   const appDir = path.join(process.cwd(), 'app')
   let routes: string[] = []
   try {

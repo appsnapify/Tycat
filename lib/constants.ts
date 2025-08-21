@@ -22,8 +22,8 @@ export const API_BASE_URL = (() => {
     // Em Vercel, força https
     return validateUrl(`https://${process.env.VERCEL_URL}`, 'https://example.invalid')
   }
-  // Fallback local só em dev
-  return validateUrl(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000', 'http://localhost:3000')
+  // Fallback local só em dev - SEMPRE HTTPS para compliance
+  return validateUrl(process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000', 'https://localhost:3000')
 })()
 
 // Outras constantes da aplicação
