@@ -49,6 +49,7 @@ async function readFileSecurely(filePath, allowedDirectories) {
     throw new Error(`Acesso negado: caminho inseguro ou não permitido: ${filePath}`);
   }
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     return await fs.promises.readFile(filePath, 'utf8');
   } catch (error) {
     throw new Error(`Erro ao ler arquivo: ${error.message}`);
