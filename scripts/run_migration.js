@@ -53,8 +53,7 @@ async function readFileSecurely(filePath, allowedDirectories) {
     throw new Error(`Acesso negado: caminho inseguro ou não permitido: ${filePath}`);
   }
   try {
-    const resolvedPath = path.resolve(filePath);
-    return await fs.promises.readFile(resolvedPath, 'utf8');
+    return await fs.promises.readFile(filePath, 'utf8');
   } catch (error) {
     throw new Error(`Erro ao ler arquivo: ${error.message}`);
   }
