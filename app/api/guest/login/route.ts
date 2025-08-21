@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const cookieStore = await cookies();
+    const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
     // 🚨 SISTEMA GUEST ISOLADO - Usar função authenticate_client (NOVA ESTRUTURA SEGURA)
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     let finalGuestResult;
-    const checkData = checkResult as any;
+    const checkData = checkResult as unknown;
 
     if (checkData.exists) {
       // ✅ GUEST JÁ EXISTS - RETORNAR QR CODE EXISTENTE
