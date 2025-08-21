@@ -52,14 +52,14 @@ const safeClone = (value: any): any => {
 }
 
 // 🔒 FUNÇÃO DE LOG SEGURO
-export function secureLog(message: string, data?: any): void {
+export function secureLog(message: string, data?: unknown): void {
   if (process.env.NODE_ENV === 'development') {
     if (data && LOGGING_CONFIG.MASK_SENSITIVE_DATA) {
       const safeData = safeClone(data)
       const sensitiveFields = [
         'phone', 'telemóvel', 'telefone', 'userId', 'user_id', 'email', 'password', 'token', 'auth', 'authorization', 'bearer'
       ]
-      function maskObject(obj: any, depth = 0): any {
+      function maskObject(obj: unknown, depth = 0): unknown {
         if (depth > LOGGING_CONFIG.MAX_DEPTH) return '[Object too deep]'
         if (typeof obj === 'string') {
           const noSpaces = obj.replace(/\s/g, '')
@@ -73,7 +73,7 @@ export function secureLog(message: string, data?: any): void {
         }
         if (Array.isArray(obj)) return obj.map((item, i) => (i > 100 ? '[...more items]' : maskObject(item, depth + 1)))
         if (obj && typeof obj === 'object') {
-          const masked: any = {}
+          const masked: Record<string, unknown> = {}
           let keyCount = 0
           for (const [key, value] of Object.entries(obj)) {
             if (keyCount > 50) { masked['...'] = '[more properties]'; break }
@@ -94,7 +94,7 @@ export function secureLog(message: string, data?: any): void {
 }
 
 // 🔒 FUNÇÃO AUXILIAR PARA LOGS CONDICIONAIS
-export function conditionalLog(condition: boolean, message: string, data?: any): void {
+export function conditionalLog(condition: boolean, message: string, data?: unknown): void {
   if (condition) secureLog(message, data)
 }
 
