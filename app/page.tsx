@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { motion, AnimatePresence } from 'framer-motion'
+// Removed framer-motion for performance - using CSS animations instead
 import { Ticket, BarChart2, Users, LayoutDashboard, LogOut, Sparkles, Zap, Shield } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
@@ -21,7 +21,7 @@ const colors = {
   borderLight: 'border-slate-200',
 }
 
-// Componente TextRotate integrado
+// Componente TextRotate otimizado com CSS puro
 const TextRotate = ({ texts, className = "" }) => {
   const [currentIndex, setCurrentIndex] = useState(0)
 
@@ -34,18 +34,15 @@ const TextRotate = ({ texts, className = "" }) => {
 
   return (
     <span className={`inline-block ${className}`}>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={currentIndex}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -20, opacity: 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="inline-block"
-        >
-          {texts[currentIndex]}
-        </motion.span>
-      </AnimatePresence>
+      <span
+        key={currentIndex}
+        className="inline-block animate-text-rotate"
+        style={{
+          animation: 'textRotate 0.5s ease-in-out'
+        }}
+      >
+        {texts[currentIndex]}
+      </span>
     </span>
   )
 }
@@ -163,11 +160,7 @@ export default function HomePage() {
       {/* Hero Section Moderno */}
       <section className="text-center pt-12 pb-16 md:pt-16 md:pb-20 px-4 relative z-10">
         <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
+          <div className="animate-fade-in-up">
             {/* Título com TextRotate otimizado */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-6 leading-tight tracking-tight">
               <span className="block">Gestão Completa de</span>
