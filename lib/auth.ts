@@ -37,12 +37,12 @@ export async function signUp(email: string, password: string, metadata: { [key: 
 
 // ✅ FUNÇÃO DE VALIDAÇÃO DE CREDENCIAIS (seguindo regrascodacy.md)
 function validateCredentials(email: string, password: string): void {
-  // Verificar se o email é válido usando regex básico
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    console.error('Formato de email inválido:', email);
-    throw new Error('Invalid email format');
-  }
+    // Verificar se o email é válido usando regex básico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.error('Formato de email inválido:', email);
+      throw new Error('Invalid email format');
+    }
 
   // Validação de senha removida para compatibilidade
   if (!password || password.length === 0) {
@@ -52,24 +52,24 @@ function validateCredentials(email: string, password: string): void {
 
 // ✅ FUNÇÃO DE VERIFICAÇÃO DE TOKENS EXISTENTES
 async function checkExistingTokens(): Promise<string | null> {
-  try {
-    if (typeof window !== 'undefined') {
-      const supabaseKey = Object.keys(localStorage).find(key => 
-        key.startsWith('sb-') && key.includes('-auth-token')
-      );
-      
-      if (supabaseKey) {
-        console.log('Token de autenticação existente encontrado');
-        const tokenData = JSON.parse(localStorage.getItem(supabaseKey) || '{}');
-        if (tokenData?.access_token) {
-          console.log('O usuário já tem um token de acesso');
+    try {
+      if (typeof window !== 'undefined') {
+        const supabaseKey = Object.keys(localStorage).find(key => 
+          key.startsWith('sb-') && key.includes('-auth-token')
+        );
+        
+        if (supabaseKey) {
+          console.log('Token de autenticação existente encontrado');
+          const tokenData = JSON.parse(localStorage.getItem(supabaseKey) || '{}');
+          if (tokenData?.access_token) {
+            console.log('O usuário já tem um token de acesso');
           return tokenData.access_token;
+          }
         }
       }
+    } catch (tokenErr) {
+      console.error('Erro ao verificar tokens existentes:', tokenErr);
     }
-  } catch (tokenErr) {
-    console.error('Erro ao verificar tokens existentes:', tokenErr);
-  }
   return null;
 }
 
@@ -99,7 +99,7 @@ async function handleRoleValidation(user: any): Promise<void> {
     console.warn('⚠️ Aviso: O papel do usuário não está definido nos metadados!');
   } else if (!['organizador', 'promotor', 'chefe-equipe', 'team-leader'].includes(user.user_metadata.role)) {
     console.warn(`⚠️ Aviso: Papel de usuário desconhecido: ${user.user_metadata.role}`);
-  } else {
+      } else {
     console.log(`✅ Papel do usuário válido: ${user.user_metadata.role}`);
     
     if (['chefe-equipe', 'team-leader'].includes(user.user_metadata.role)) {
@@ -109,7 +109,7 @@ async function handleRoleValidation(user: any): Promise<void> {
       try {
         localStorage.setItem('auth_redirect', redirectUrl);
         console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
-      } catch (e) {
+          } catch (e) {
         console.error('Erro ao salvar redirecionamento:', e);
       }
     }
@@ -120,35 +120,35 @@ async function handleRoleValidation(user: any): Promise<void> {
 async function handleLegacyRoleCompatibility(supabase: any, userData: any): Promise<void> {
   if (userData.user.user_metadata?.is_team_leader === true && 
       !['chefe-equipe', 'team-leader'].includes(userData.user.user_metadata?.role)) {
-    console.log('⚠️ Compatibilidade: Usuário marcado como líder de equipe (formato antigo)');
-    console.log('⚙️ Atualizando para o formato atual...');
-    
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          role: 'chefe-equipe',
+        console.log('⚠️ Compatibilidade: Usuário marcado como líder de equipe (formato antigo)');
+        console.log('⚙️ Atualizando para o formato atual...');
+        
+        try {
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: {
+              role: 'chefe-equipe',
           previous_role: userData.user.user_metadata?.role || 'promotor',
-          team_role: 'chefe',
+              team_role: 'chefe',
           ...userData.user.user_metadata,
-        }
-      });
-      
-      if (updateError) {
-        console.error('Erro ao atualizar metadados do usuário:', updateError);
-      } else {
-        console.log('✅ Metadados atualizados com sucesso para o formato atual');
+            }
+          });
+          
+          if (updateError) {
+            console.error('Erro ao atualizar metadados do usuário:', updateError);
+          } else {
+            console.log('✅ Metadados atualizados com sucesso para o formato atual');
         userData.user.user_metadata.role = 'chefe-equipe';
         
         const redirectUrl = '/app/chefe-equipe/dashboard';
-        try {
-          localStorage.setItem('auth_redirect', redirectUrl);
-          console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
-        } catch (e) {
-          console.error('Erro ao salvar redirecionamento:', e);
-        }
-      }
-    } catch (updateErr) {
-      console.error('Exceção ao atualizar metadados:', updateErr);
+            try {
+              localStorage.setItem('auth_redirect', redirectUrl);
+              console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
+            } catch (e) {
+              console.error('Erro ao salvar redirecionamento:', e);
+            }
+          }
+        } catch (updateErr) {
+          console.error('Exceção ao atualizar metadados:', updateErr);
     }
   }
 }
@@ -160,8 +160,8 @@ async function storeUserMetadata(user: any): Promise<void> {
     console.log(`👤 Papel na equipe: ${user.user_metadata.team_role || 'não especificado'}`);
   }
   
-  try {
-    const authData = {
+      try {
+        const authData = {
       id: user.id,
       email: user.email,
       role: user.user_metadata?.role || 'unknown',
@@ -169,20 +169,20 @@ async function storeUserMetadata(user: any): Promise<void> {
     };
     localStorage.setItem('auth', JSON.stringify(authData));
     console.log('Metadados do usuário salvos no localStorage');
-  } catch (e) {
+      } catch (e) {
     console.error('Erro ao salvar metadados no localStorage:', e);
-  }
-}
-
+      }
+    }
+    
 // ✅ FUNÇÃO DE ESTABELECIMENTO DE SESSÃO
 async function establishSession(supabase: any, sessionData: any): Promise<void> {
-  try {
+    try {
     console.log('Definindo sessão manualmente');
-    await supabase.auth.setSession({
+      await supabase.auth.setSession({
       access_token: sessionData.access_token,
       refresh_token: sessionData.refresh_token
     });
-  } catch (sessionError) {
+    } catch (sessionError) {
     console.error('Erro ao definir sessão manualmente:', sessionError);
   }
   
@@ -194,39 +194,39 @@ async function verifySessionEstablishment(supabase: any, originalSessionData: an
   let sessionEstablished = false;
   let attempts = 0;
   const maxAttempts = 3;
-  
-  while (!sessionEstablished && attempts < maxAttempts) {
+    
+    while (!sessionEstablished && attempts < maxAttempts) {
     attempts++;
     console.log(`Verificando estabelecimento de sessão (tentativa ${attempts})`);
-    
-    try {
-      const { data: sessionCheck } = await supabase.auth.getSession();
       
-      if (sessionCheck?.session?.access_token) {
+      try {
+      const { data: sessionCheck } = await supabase.auth.getSession();
+        
+        if (sessionCheck?.session?.access_token) {
         console.log(`✅ Sessão verificada com sucesso na tentativa ${attempts}!`);
         sessionEstablished = true;
-      } else {
+        } else {
         console.warn(`⚠️ Verificação de sessão falhou na tentativa ${attempts}`);
         
         if (attempts < maxAttempts && originalSessionData) {
           console.log('Tentando estabelecer sessão novamente...');
-          try {
-            await supabase.auth.setSession({
+              try {
+                await supabase.auth.setSession({
               access_token: originalSessionData.access_token,
               refresh_token: originalSessionData.refresh_token
             });
             await new Promise(resolve => setTimeout(resolve, 300));
-          } catch (err) {
+              } catch (err) {
             console.error(`Erro na tentativa ${attempts} de definir sessão:`, err);
+            }
           }
         }
-      }
-    } catch (checkError) {
+      } catch (checkError) {
       console.error(`Erro ao verificar sessão (tentativa ${attempts}):`, checkError);
+      }
     }
-  }
-  
-  if (!sessionEstablished) {
+    
+    if (!sessionEstablished) {
     console.error('⛔ Não foi possível estabelecer sessão após múltiplas tentativas');
     throw new Error('Falha persistente ao estabelecer sessão após login');
   }

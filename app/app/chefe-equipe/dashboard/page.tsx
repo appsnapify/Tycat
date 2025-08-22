@@ -53,87 +53,107 @@ function getTeamDetailsFromMetadata(userData: any): TeamType | null {
   }
 }
 
-// Função para carregar dados da equipe
-async function loadTeamData(userData: any) {
-  console.log("[loadTeamData] Iniciando...");
-  // Verificar se o usuário está autenticado
-  if (!userData || !userData.user) {
+// ✅ FUNÇÃO AUXILIAR 1: Validar usuário (Complexidade: 2)
+function validateUserData(userData: any): { isValid: boolean; userId?: string; userRole?: string; teamId?: string } {
+  if (!userData?.user) {
     console.log('Usuário não autenticado')
-    return { teamData: null, members: [] }
+    return { isValid: false }
   }
 
   const userId = userData.user.id
   const userRole = normalizeRole(userData.user?.user_metadata?.role)
   const teamId = userData.user?.user_metadata?.team_id
 
-  console.log(`Carregando dados para usuário: ${userId}, papel: ${userRole}, equipe: ${teamId}`)
-
-  // Verificar se é um chefe de equipe com ID de equipe
   if (userRole !== 'chefe-equipe' || !teamId) {
     console.log('Usuário não é chefe de equipe ou não tem equipe atribuída')
-    return { teamData: null, members: [] }
+    return { isValid: false }
   }
+
+  return { isValid: true, userId, userRole, teamId }
+}
+
+// ✅ FUNÇÃO AUXILIAR 2: Carregar dados da equipe (Complexidade: 3)
+async function fetchTeamData(supabase: any, teamId: string): Promise<any> {
+  console.log(`[fetchTeamData] Tentando carregar equipe via RPC: get_team_details para teamId=${teamId}`);
+  
+  try {
+    const teamResponse = await supabase.rpc('get_team_details', { team_id_param: teamId });
+    console.log('[fetchTeamData] Resultado RPC get_team_details:', { data: !!teamResponse.data, error: teamResponse.error });
+    
+    if (teamResponse.error) throw new Error(`Erro RPC: ${teamResponse.error.message}`);
+    return teamResponse;
+  } catch (rpcError: any) {
+    console.log('[fetchTeamData] Falha na RPC, tentando select direto:', rpcError.message);
+    return await supabase.from('teams').select('*').eq('id', teamId).single();
+  }
+}
+
+// ✅ FUNÇÃO AUXILIAR 3: Carregar membros da equipe (Complexidade: 3)
+async function fetchTeamMembers(supabase: any, teamId: string, userId: string): Promise<any[]> {
+  console.log(`[fetchTeamMembers] Tentando carregar membros via RPC para teamId=${teamId}`);
+  
+  try {
+    const membersResponse = await supabase.rpc('get_team_members', { team_id_param: teamId });
+    console.log('[fetchTeamMembers] Resultado RPC get_team_members:', { dataLength: membersResponse.data?.length, error: membersResponse.error });
+    
+    if (membersResponse.error) throw new Error(`Erro RPC: ${membersResponse.error.message}`);
+    return membersResponse.data || [];
+  } catch (membersRpcError: any) {
+    console.log('[fetchTeamMembers] Falha na RPC, tentando alternativo:', membersRpcError.message);
+    return await loadTeamMembersAlternative(teamId, userId);
+  }
+}
+
+// ✅ FUNÇÃO AUXILIAR 4: Processar fallback com metadados (Complexidade: 2)
+async function processMetadataFallback(userData: any, teamId: string, userId: string): Promise<{ teamData: any; members: any[] }> {
+  console.log('[processMetadataFallback] Usando metadados como fallback');
+  
+  const metadataTeam = getTeamDetailsFromMetadata(userData);
+  if (!metadataTeam) {
+    throw new Error("Não foi possível obter dados da equipe de nenhuma fonte.");
+  }
+  
+  console.log("[processMetadataFallback] Obtendo membros (alternativo)...");
+  const members = await loadTeamMembersAlternative(teamId, userId);
+  return { teamData: metadataTeam, members };
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 21 → 6)
+async function loadTeamData(userData: any) {
+  console.log("[loadTeamData] Iniciando...");
+  
+  // 1. Validar dados do usuário
+  const validation = validateUserData(userData);
+  if (!validation.isValid) {
+    return { teamData: null, members: [] };
+  }
+  
+  const { userId, teamId } = validation;
+  console.log(`Carregando dados para usuário: ${userId}, equipe: ${teamId}`);
 
   try {
     const supabase = createClient();
     console.log("[loadTeamData] Cliente Supabase criado.");
 
-    let teamResponse: any = { data: null, error: null };
-    try {
-      console.log(`[loadTeamData] Tentando carregar equipe via RPC: get_team_details para teamId=${teamId}`);
-      teamResponse = await supabase.rpc('get_team_details', { team_id_param: teamId });
-      console.log('[loadTeamData] Resultado RPC get_team_details:', { data: !!teamResponse.data, error: teamResponse.error });
-      
-      if (teamResponse.error) throw new Error(`Erro RPC get_team_details: ${teamResponse.error.message}`);
-
-    } catch (rpcError: any) {
-      console.log('[loadTeamData] Falha na RPC get_team_details, tentando select direto:', rpcError.message);
-      console.log(`[loadTeamData] Tentando carregar equipe via SELECT direto para teamId=${teamId}`);
-      teamResponse = await supabase.from('teams').select('*').eq('id', teamId).single();
-      console.log('[loadTeamData] Resultado SELECT direto teams:', { data: !!teamResponse.data, error: teamResponse.error });
+    // 2. Carregar dados da equipe
+    const teamResponse = await fetchTeamData(supabase, teamId!);
+    
+    if (teamResponse.error || !teamResponse.data) {
+      return await processMetadataFallback(userData, teamId!, userId!);
     }
     
-      if (teamResponse.error || !teamResponse.data) {
-      console.log('[loadTeamData] Falha ao carregar dados da equipe via RPC e SELECT. Usando metadados.');
-      const metadataTeam = getTeamDetailsFromMetadata(userData);
-      if (!metadataTeam) throw new Error("Não foi possível obter dados da equipe de nenhuma fonte.");
-      console.log("[loadTeamData] Obtendo membros (alternativo) para equipa dos metadados...");
-      const members = await loadTeamMembersAlternative(teamId, userId);
-      return { teamData: metadataTeam, members };
-    }
-      
     const teamData = teamResponse.data;
     console.log('[loadTeamData] Dados da equipe carregados com sucesso:', teamData?.id);
 
-    // Obter membros da equipe
-    let members = [];
-    try {
-      console.log(`[loadTeamData] Tentando carregar membros via RPC: get_team_members para teamId=${teamId}`);
-      const membersResponse = await supabase.rpc('get_team_members', { team_id_param: teamId });
-      console.log('[loadTeamData] Resultado RPC get_team_members:', { dataLength: membersResponse.data?.length, error: membersResponse.error });
-      if (membersResponse.error) throw new Error(`Erro RPC get_team_members: ${membersResponse.error.message}`);
-      members = membersResponse.data || [];
-
-    } catch (membersRpcError: any) {
-      console.log('[loadTeamData] Falha na RPC get_team_members, tentando alternativo:', membersRpcError.message);
-      console.log("[loadTeamData] Obtendo membros (alternativo) após falha RPC...");
-      members = await loadTeamMembersAlternative(teamId, userId);
-    }
-      
+    // 3. Carregar membros da equipe
+    const members = await fetchTeamMembers(supabase, teamId!, userId!);
     console.log(`[loadTeamData] Total de membros carregados: ${members.length}`);
+    
     return { teamData, members };
 
   } catch (error: any) {
     console.error('[loadTeamData] Erro CATCH GERAL:', error.message);
-    // Tentar fallback final para metadados
-    const metadataTeam = getTeamDetailsFromMetadata(userData);
-    if (!metadataTeam) {
-      console.error("[loadTeamData] Falha no fallback final para metadados.");
-      throw error; // Relançar erro se nem metadados funcionarem
-    }
-    console.log("[loadTeamData] Usando metadados no CATCH GERAL. Obtendo membros (alternativo)...");
-    const members = await loadTeamMembersAlternative(teamId, userId);
-    return { teamData: metadataTeam, members };
+    return await processMetadataFallback(userData, teamId!, userId!);
   }
 }
 

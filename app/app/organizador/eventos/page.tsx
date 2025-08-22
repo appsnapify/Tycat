@@ -609,9 +609,9 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
 
   // ✅ FUNÇÃO AUXILIAR: Verificar cache
   const checkCache = (): boolean => {
-    const cached = guestCountCache.get(event.id);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      setGuestCount(cached.count);
+      const cached = guestCountCache.get(event.id);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        setGuestCount(cached.count);
       return true;
     }
     return false;
@@ -632,11 +632,11 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
     if (checkCache()) return;
     
     const delay = calculateDelay();
-    const timeoutId = setTimeout(() => {
-      refreshGuestCount();
-    }, delay);
-    
-    return () => clearTimeout(timeoutId);
+      const timeoutId = setTimeout(() => {
+        refreshGuestCount();
+      }, delay);
+      
+      return () => clearTimeout(timeoutId);
   }, [event.id]);
 
   return (

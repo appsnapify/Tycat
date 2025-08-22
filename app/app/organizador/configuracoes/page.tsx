@@ -178,22 +178,22 @@ export default function ConfiguracoesPage() {
         const { data: singleData, error } = await fetchBusinessData();
 
         if (error && error.code !== 'PGRST116') {
-          console.error('Erro ao carregar detalhes da empresa:', error)
-          toast({
-            title: 'Erro',
-            description: 'Não foi possível carregar os detalhes da sua empresa.',
-            variant: 'destructive',
-          })
+        console.error('Erro ao carregar detalhes da empresa:', error)
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar os detalhes da sua empresa.',
+          variant: 'destructive',
+        })
         } else if (singleData) {
           const mappedData = mapDataToForm(singleData)
-          setInitialData(mappedData)
-          reset(mappedData)
+        setInitialData(mappedData)
+        reset(mappedData)
         } else {
-          console.log('No business details found for this user (PGRST116), form will be empty.');
+        console.log('No business details found for this user (PGRST116), form will be empty.');
           resetToEmptyForm();
         }
       } finally {
-        setIsFetchingDetails(false)
+      setIsFetchingDetails(false)
       }
     }
 
