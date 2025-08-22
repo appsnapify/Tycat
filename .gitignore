@@ -26,6 +26,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# coverage reports
+coverage/
+*.lcov
+
 # Playwright
 node_modules/
 /test-results/
