@@ -43,8 +43,8 @@ function extractFileNameParts(fileName: string): { name: string; extension: stri
   };
 }
 
-// 🔄 FUNÇÃO AUXILIAR: Normalizar texto removendo acentos
-function normalizeText(text: string): string {
+// 🔄 FUNÇÃO AUXILIAR: Normalizar texto removendo acentos (Complexidade: 1)
+function removeAccents(text: string): string {
   return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
@@ -59,7 +59,7 @@ function cleanSpecialChars(text: string): string {
 // ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 19 → 3)
 function sanitizeFileName(fileName: string): string {
   const { name, extension } = extractFileNameParts(fileName);
-  const normalizedName = normalizeText(name);
+  const normalizedName = removeAccents(name);
   const cleanedName = cleanSpecialChars(normalizedName).toLowerCase();
   
   return cleanedName + extension;

@@ -224,7 +224,7 @@ __deepsource_handle_standard_completion_case() {
         __deepsource_debug "Removed description from single completion, which is now: ${comp}"
         COMPREPLY[0]=$comp
     else # Format the descriptions
-        __deepsource_format_comp_descriptions $longest
+        __deepsource_format_comp_descriptions "$longest"
     fi
 }
 

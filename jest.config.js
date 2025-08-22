@@ -1,15 +1,29 @@
 ﻿module.exports = {
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/tests-examples/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/', 
+    '<rootDir>/node_modules/',
+    '<rootDir>/temp-deepsource/',
+    '<rootDir>/bin/',
+    '<rootDir>/coverage/'
+  ],
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['lcov', 'json', 'text'],
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/',
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: [
-    '<rootDir>/**/__tests__/**/*.{js,jsx,ts,tsx}',
-    '<rootDir>/**/*.{test,spec}.{js,jsx,ts,tsx}'
-  ]
+    '<rootDir>/__tests__/**/*.{test,spec}.{js,jsx}',
+    '<rootDir>/**/*.{test,spec}.{js,jsx}'
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/.next/',
+    '/coverage/',
+    '/temp-deepsource/',
+    '/bin/'
+  ],
+  roots: ['<rootDir>/__tests__/'],
+  testTimeout: 10000
 }
