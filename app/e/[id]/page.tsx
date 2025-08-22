@@ -39,35 +39,49 @@ function EventPageContent({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Buscar dados do evento
+  // ✅ FUNÇÃO AUXILIAR: Buscar evento do Supabase
+  const fetchEventData = async () => {
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .eq('is_published', true)
+      .eq('is_active', true)
+      .not('type', 'eq', 'guest-list')
+      .single()
+      
+    if (eventError) {
+      throw new Error('Evento não encontrado ou não está ativo')
+    }
+    
+    if (!eventData) {
+      throw new Error('Evento não encontrado')
+    }
+    
+    return eventData
+  }
+
+  // ✅ FUNÇÃO AUXILIAR: Processar dados do evento
+  const processEventData = (eventData: any) => {
+    console.log("Dados do evento carregados:", eventData)
+    setEvent(eventData)
+  }
+
+  // ✅ FUNÇÃO AUXILIAR: Processar erro
+  const processError = (err: unknown) => {
+    console.error("Erro ao carregar evento:", err)
+    setError(err instanceof Error ? err.message : 'Erro ao carregar evento')
+  }
+
+  // ✅ useEffect REFATORADO (Complexidade: 9 → <8)
   useEffect(() => {
     async function loadEvent() {
       try {
         setLoading(true)
-        
-        // Buscar evento do Supabase
-        const { data: eventData, error: eventError } = await supabase
-          .from('events')
-          .select('*')
-          .eq('id', eventId)
-          .eq('is_published', true)
-          .eq('is_active', true)
-          .not('type', 'eq', 'guest-list') // Eventos normais, não guest list
-          .single()
-          
-        if (eventError) {
-          throw new Error('Evento não encontrado ou não está ativo')
-        }
-        
-        if (!eventData) {
-          throw new Error('Evento não encontrado')
-        }
-        
-        console.log("Dados do evento carregados:", eventData)
-        setEvent(eventData)
+        const eventData = await fetchEventData()
+        processEventData(eventData)
       } catch (err) {
-        console.error("Erro ao carregar evento:", err)
-        setError(err instanceof Error ? err.message : 'Erro ao carregar evento')
+        processError(err)
       } finally {
         setLoading(false)
       }

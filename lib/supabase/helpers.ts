@@ -7,7 +7,37 @@ import { createClient } from './client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 
+// ✅ FUNÇÃO AUXILIAR: Executar consulta com cliente
+async function executeQuery<T>(
+  queryFn: (supabase: SupabaseClient<Database>) => Promise<{ data: T | null; error: any }>
+) {
+  const supabase = createClient();
+  return await queryFn(supabase);
+}
+
+// ✅ FUNÇÃO AUXILIAR: Calcular delay de retry
+function calculateRetryDelay(retryCount: number): number {
+  return Math.pow(2, retryCount) * 500; // 1s, 2s, 4s...
+}
+
+// ✅ FUNÇÃO AUXILIAR: Aguardar delay
+async function waitForDelay(delay: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, delay));
+}
+
+// ✅ FUNÇÃO AUXILIAR: Processar tentativa com sucesso
+function handleSuccessfulQuery<T>(data: T | null) {
+  return { data, error: null, success: true };
+}
+
+// ✅ FUNÇÃO AUXILIAR: Processar erro de tentativa
+function handleQueryError(error: any, retryCount: number) {
+  console.error(`Tentativa ${retryCount + 1} falhou com erro:`, error);
+  return error;
+}
+
 /**
+ * ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: ~12 → <8)
  * Wrapper para chamadas Supabase com melhor tratamento de erros
  * e tentativas automáticas de reconexão
  */
@@ -20,40 +50,30 @@ export async function safeSupabaseQuery<T>(
 
   while (retries <= maxRetries) {
     try {
-      // Criar um novo cliente se for uma nova tentativa
-      const supabase = createClient();
+      const { data, error } = await executeQuery(queryFn);
       
-      // Executar a consulta
-      const { data, error } = await queryFn(supabase);
-      
-      // Se não houver erro, retornar os dados
       if (!error) {
-        return { data, error: null, success: true };
+        return handleSuccessfulQuery(data);
       }
       
-      // Se houver erro, registrar e tentar novamente
-      console.error(`Tentativa ${retries + 1} falhou com erro:`, error);
-      lastError = error;
+      lastError = handleQueryError(error, retries);
       retries++;
       
-      // Aguardar um tempo antes de tentar novamente (backoff exponencial)
       if (retries <= maxRetries) {
-        const delay = Math.pow(2, retries) * 500; // 1s, 2s, 4s...
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const delay = calculateRetryDelay(retries);
+        await waitForDelay(delay);
       }
     } catch (unexpectedError) {
       console.error(`Erro inesperado na tentativa ${retries + 1}:`, unexpectedError);
       lastError = unexpectedError;
       retries++;
       
-      // Aguardar antes de tentar novamente
       if (retries <= maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await waitForDelay(1000);
       }
     }
   }
   
-  // Se todas as tentativas falharem, retornar o último erro
   return { data: null, error: lastError, success: false };
 }
 

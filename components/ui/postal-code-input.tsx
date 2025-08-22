@@ -52,47 +52,51 @@ export const PostalCodeInput: React.FC<PostalCodeInputProps> = ({
     return () => clearTimeout(timeoutId);
   }, [value, onValidation]);
 
-  // ✅ FUNÇÃO DE VALIDAÇÃO
+  // ✅ FUNÇÃO AUXILIAR: Criar payload da requisição
+  const createValidationPayload = (code: string) => ({ postal_code: code });
+
+  // ✅ FUNÇÃO AUXILIAR: Processar resposta válida
+  const processValidResponse = (data: any) => {
+    const { valid, city, error } = data;
+    setValidationState({
+      isValid: valid,
+      city: city || null,
+      error: error || null
+    });
+    onValidation?.(valid, city || null);
+  };
+
+  // ✅ FUNÇÃO AUXILIAR: Processar erro
+  const processError = (errorMessage: string) => {
+    setValidationState({
+      isValid: false,
+      city: null,
+      error: errorMessage
+    });
+    onValidation?.(false, null);
+  };
+
+  // ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
   const validatePostalCode = async (code: string) => {
     setIsValidating(true);
     
     try {
       const response = await fetch('/api/postal-code/validate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ postal_code: code }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createValidationPayload(code)),
       });
 
       const result = await response.json();
 
       if (result.success && result.data) {
-        const { valid, city, error } = result.data;
-        
-        setValidationState({
-          isValid: valid,
-          city: city || null,
-          error: error || null
-        });
-
-        onValidation?.(valid, city || null);
+        processValidResponse(result.data);
       } else {
-        setValidationState({
-          isValid: false,
-          city: null,
-          error: result.error || 'Erro na validação'
-        });
-        onValidation?.(false, null);
+        processError(result.error || 'Erro na validação');
       }
     } catch (error) {
       console.error('Erro na validação do código postal:', error);
-      setValidationState({
-        isValid: false,
-        city: null,
-        error: 'Erro de conexão'
-      });
-      onValidation?.(false, null);
+      processError('Erro de conexão');
     } finally {
       setIsValidating(false);
     }

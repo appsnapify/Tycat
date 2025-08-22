@@ -30,22 +30,40 @@ interface Organizacao {
   logo_url: string | null;
 }
 
-// Helper function to safely parse date and time strings into a Date object
-function parseDateTime(dateStr: string | null | undefined, timeStr: string | null | undefined): Date | null {
+// ✅ FUNÇÃO AUXILIAR: Validar entrada de data
+function validateDateInput(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
-  const time = timeStr?.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/) ? timeStr : '00:00:00';
+  return dateStr;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Normalizar tempo
+function normalizeTime(timeStr: string | null | undefined): string {
+  return timeStr?.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/) ? timeStr : '00:00:00';
+}
+
+// ✅ FUNÇÃO AUXILIAR: Criar objeto Date
+function createDateTime(dateStr: string, time: string): Date | null {
   try {
     const dateTime = new Date(`${dateStr}T${time}`);
     if (isNaN(dateTime.getTime())) {
-       console.warn(`[parseDateTime] Invalid date/time combination: ${dateStr} T ${time}`);
-       const dateOnly = new Date(dateStr);
-       return isNaN(dateOnly.getTime()) ? null : dateOnly; // Fallback to date only if valid
+      console.warn(`[parseDateTime] Invalid date/time combination: ${dateStr} T ${time}`);
+      const dateOnly = new Date(dateStr);
+      return isNaN(dateOnly.getTime()) ? null : dateOnly;
     }
     return dateTime;
   } catch (e) {
     console.error("[parseDateTime] Error parsing date/time:", e);
     return null;
   }
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
+function parseDateTime(dateStr: string | null | undefined, timeStr: string | null | undefined): Date | null {
+  const validDate = validateDateInput(dateStr);
+  if (!validDate) return null;
+  
+  const time = normalizeTime(timeStr);
+  return createDateTime(validDate, time);
 }
 
 // Helper function to determine if event is past

@@ -311,11 +311,17 @@ export default function OrganizadorPagarComissoesPage() {
       if (paymentError) throw paymentError
       
       if (paymentData) {
+        // ✅ FUNÇÃO AUXILIAR: Encontrar comissão por ID
+        const findCommissionAmount = (commissionId: string): number => {
+          const commission = commissions.find(c => c.id === commissionId)
+          return commission?.amount || 0
+        }
+        
         // 3. Criar itens de pagamento para cada comissão
         const paymentItems = selectedCommissions.map(commissionId => ({
           payment_id: paymentData.id,
           commission_id: commissionId,
-          amount: commissions.find(c => c.id === commissionId)?.amount || 0,
+          amount: findCommissionAmount(commissionId),
           created_at: new Date().toISOString()
         }))
         

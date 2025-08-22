@@ -2,13 +2,26 @@
  * Utilitário para normalização e validação de números de telefone
  */
 
-// ✅ FUNÇÃO DE LIMPEZA INICIAL (seguindo regrascodacy.md)
-function cleanPhoneInput(phone: string): string {
+// ✅ FUNÇÃO AUXILIAR: Validar entrada de telefone
+function validatePhoneInput(phone: string): string {
   if (!phone || phone.trim() === '') {
     return '';
   }
+  return phone.trim();
+}
+
+// ✅ FUNÇÃO AUXILIAR: Remover caracteres especiais
+function removeSpecialChars(phone: string): string {
   // Remover espaços, traços, parênteses e outros caracteres não numéricos
   return phone.replace(/[\s\-()]/g, '');
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
+function cleanPhoneInput(phone: string): string {
+  const validPhone = validatePhoneInput(phone);
+  if (!validPhone) return '';
+  
+  return removeSpecialChars(validPhone);
 }
 
 // ✅ FUNÇÃO DE PROCESSAMENTO DE PREFIXO INTERNACIONAL

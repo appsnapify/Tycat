@@ -61,67 +61,67 @@ export async function GET(request: Request) {
   }
 }
 
-// 🌍 Deteção básica de códigos postais internacionais
-function detectInternationalPostalCode(postalCode: string) {
-  const code = postalCode.trim().toUpperCase();
+// ✅ FUNÇÃO AUXILIAR: Normalizar código postal
+function normalizePostalCode(postalCode: string): string {
+  return postalCode.trim().toUpperCase();
+}
 
-  // 🇪🇸 ESPANHA (5 dígitos)
-  if (/^\d{5}$/.test(code)) {
-    const firstTwo = code.substring(0, 2);
-    const spanishProvinces: { [key: string]: string } = {
-      '28': 'Madrid',
-      '08': 'Barcelona',
-      '41': 'Sevilla',
-      '46': 'Valencia',
-      '48': 'Bilbao',
-      '15': 'A Coruña'
-    };
-    
-    if (spanishProvinces[firstTwo]) {
-      return {
-        city: spanishProvinces[firstTwo],
-        country: 'Espanha'
-      };
-    }
-  }
+// ✅ FUNÇÃO AUXILIAR: Detectar código espanhol
+function detectSpanishCode(code: string) {
+  if (!/^\d{5}$/.test(code)) return null;
+  
+  const spanishProvinces: { [key: string]: string } = {
+    '28': 'Madrid', '08': 'Barcelona', '41': 'Sevilla',
+    '46': 'Valencia', '48': 'Bilbao', '15': 'A Coruña'
+  };
+  
+  const firstTwo = code.substring(0, 2);
+  return spanishProvinces[firstTwo] ? {
+    city: spanishProvinces[firstTwo],
+    country: 'Espanha'
+  } : null;
+}
 
-  // 🇫🇷 FRANÇA (5 dígitos)
-  if (/^\d{5}$/.test(code)) {
-    const firstTwo = code.substring(0, 2);
-    const frenchDepartments: { [key: string]: string } = {
-      '75': 'Paris',
-      '69': 'Lyon',
-      '13': 'Marseille',
-      '31': 'Toulouse',
-      '59': 'Lille'
-    };
-    
-    if (frenchDepartments[firstTwo]) {
-      return {
-        city: frenchDepartments[firstTwo],
-        country: 'França'
-      };
-    }
-  }
+// ✅ FUNÇÃO AUXILIAR: Detectar código francês
+function detectFrenchCode(code: string) {
+  if (!/^\d{5}$/.test(code)) return null;
+  
+  const frenchDepartments: { [key: string]: string } = {
+    '75': 'Paris', '69': 'Lyon', '13': 'Marseille',
+    '31': 'Toulouse', '59': 'Lille'
+  };
+  
+  const firstTwo = code.substring(0, 2);
+  return frenchDepartments[firstTwo] ? {
+    city: frenchDepartments[firstTwo],
+    country: 'França'
+  } : null;
+}
 
-  // 🇬🇧 REINO UNIDO (formato complexo)
+// ✅ FUNÇÃO AUXILIAR: Detectar outros países
+function detectOtherCountries(code: string) {
+  // Reino Unido
   if (/^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$/i.test(code)) {
-    return {
-      city: 'Reino Unido',
-      country: 'Reino Unido'
-    };
+    return { city: 'Reino Unido', country: 'Reino Unido' };
   }
-
-  // 🇩🇪 ALEMANHA (5 dígitos)
+  
+  // Alemanha (5 dígitos com validação)
   if (/^\d{5}$/.test(code)) {
     const firstTwo = code.substring(0, 2);
-    if (parseInt(firstTwo) >= 10 && parseInt(firstTwo) <= 99) {
-      return {
-        city: 'Alemanha',
-        country: 'Alemanha'
-      };
+    const firstTwoNum = parseInt(firstTwo);
+    if (firstTwoNum >= 10 && firstTwoNum <= 99) {
+      return { city: 'Alemanha', country: 'Alemanha' };
     }
   }
-
+  
   return null;
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
+function detectInternationalPostalCode(postalCode: string) {
+  const code = normalizePostalCode(postalCode);
+  
+  return detectSpanishCode(code) || 
+         detectFrenchCode(code) || 
+         detectOtherCountries(code);
 }

@@ -602,28 +602,41 @@ function EventCard({ event, onAction, isLCPImage }: { event: Event, onAction: (a
   
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // ✅ NOVO: Debounce inteligente baseado na posição do card
-  useEffect(() => {
-    if (event.type === 'guest-list' && !isInitialized && !isLoading) {
-      setIsInitialized(true);
-      
-      // Cache hit instantâneo
-      const cached = guestCountCache.get(event.id);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        setGuestCount(cached.count);
-        return;
-      }
-      
-      // Delay escalonado para evitar chamadas simultâneas (0ms, 100ms, 200ms, etc.)
-      const eventIndex = event.id.slice(-1); // Usar último char do ID para gerar delay único
-      const delay = (parseInt(eventIndex, 16) || 0) * 50; // 0-750ms baseado no ID
-      
-      const timeoutId = setTimeout(() => {
-        refreshGuestCount();
-      }, delay);
-      
-      return () => clearTimeout(timeoutId);
+  // ✅ FUNÇÃO AUXILIAR: Verificar se deve inicializar
+  const shouldInitialize = (): boolean => {
+    return event.type === 'guest-list' && !isInitialized && !isLoading;
+  };
+
+  // ✅ FUNÇÃO AUXILIAR: Verificar cache
+  const checkCache = (): boolean => {
+    const cached = guestCountCache.get(event.id);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      setGuestCount(cached.count);
+      return true;
     }
+    return false;
+  };
+
+  // ✅ FUNÇÃO AUXILIAR: Calcular delay baseado no ID
+  const calculateDelay = (): number => {
+    const eventIndex = event.id.slice(-1);
+    return (parseInt(eventIndex, 16) || 0) * 50;
+  };
+
+  // ✅ useEffect REFATORADO (Complexidade: 9 → <8)
+  useEffect(() => {
+    if (!shouldInitialize()) return;
+    
+    setIsInitialized(true);
+    
+    if (checkCache()) return;
+    
+    const delay = calculateDelay();
+    const timeoutId = setTimeout(() => {
+      refreshGuestCount();
+    }, delay);
+    
+    return () => clearTimeout(timeoutId);
   }, [event.id]);
 
   return (

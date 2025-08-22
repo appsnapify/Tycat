@@ -26,8 +26,11 @@ export async function POST(request: NextRequest) {
     
     results.expired_sessions = expiredCount || 0
     
+    // ✅ FUNÇÃO AUXILIAR: Calcular tempo limite
+    const calculateTimeLimit = () => new Date(Date.now() - 30 * 60 * 1000)
+    
     // 2. Limpar sessões zombie (inativas há mais de 30 min)
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+    const thirtyMinutesAgo = calculateTimeLimit()
     const { count: zombieCount } = await supabase
       .from('scanner_sessions')
       .update({ status: 'zombie' })

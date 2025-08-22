@@ -85,44 +85,47 @@ export default function OrganizadorEquipesPage() {
     filterTeams()
   }, [teams, searchQuery])
 
+  // ✅ FUNÇÃO AUXILIAR: Buscar organização do usuário
+  const fetchUserOrganization = async () => {
+    const { data: orgDataArray, error: orgError } = await supabase
+      .from('user_organizations')
+      .select('organization_id')
+      .eq('user_id', user?.id)
+      .in('role', ['owner', 'admin'])
+      .limit(1);
+
+    if (orgError) {
+      console.error('Erro DETALHADO ao buscar user_organizations na página de equipas:', {
+        message: orgError.message,
+        details: orgError.details,
+        hint: orgError.hint,
+        code: orgError.code
+      });
+      throw new Error('Não foi possível carregar os dados da organização.');
+    }
+
+    if (!orgDataArray || orgDataArray.length === 0) {
+      throw new Error('Nenhuma organização associada encontrada.');
+    }
+
+    return orgDataArray[0].organization_id;
+  };
+
+  // ✅ FUNÇÃO AUXILIAR: Processar erro de carregamento
+  const handleLoadingError = (errorMessage: string) => {
+    requestAnimationFrame(() => {
+      toast.error(errorMessage);
+    });
+    setLoading(false);
+    setTeams([]);
+    setFilteredTeams([]);
+  };
+
   const loadOrganizationAndTeams = async () => {
     setLoading(true);
     
     try {
-      const { data: orgDataArray, error: orgError } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('user_id', user?.id)
-        .in('role', ['owner', 'admin'])
-        .limit(1);
-
-      if (orgError) {
-        console.error('Erro DETALHADO ao buscar user_organizations na página de equipas:', {
-          message: orgError.message,
-          details: orgError.details,
-          hint: orgError.hint,
-          code: orgError.code
-        });
-        requestAnimationFrame(() => {
-           toast.error('Não foi possível carregar os dados da organização.');
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (!orgDataArray || orgDataArray.length === 0) {
-         requestAnimationFrame(() => {
-           toast.error('Nenhuma organização associada encontrada.');
-         });
-         setLoading(false);
-         setTeams([]);
-         setFilteredTeams([]);
-         return;
-      }
-
-      const orgData = orgDataArray[0];
-      const organizationId = orgData.organization_id;
-      
+      const organizationId = await fetchUserOrganization();
       setOrganization({ id: organizationId, name: '', slug: '' });
 
       // Consulta direta mais robusta para contornar problemas de autenticação

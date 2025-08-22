@@ -125,60 +125,69 @@ export default function ConfiguracoesPage() {
         return;
     }
 
-    const fetchBusinessDetails = async () => {
-      setIsFetchingDetails(true)
-      console.log('Fetching business details for userId:', userId); // Temporary log
+    // ✅ FUNÇÃO AUXILIAR: Buscar dados do negócio
+    const fetchBusinessData = async () => {
+      console.log('Fetching business details for userId:', userId);
       const { data, error } = await supabase
         .from('organizer_business_details')
         .select('*')
         .eq('user_id', userId)
-      // .single() // Temporarily commented out for testing
+      
+      return { data: Array.isArray(data) && data.length > 0 ? data[0] : null, error };
+    }
 
-      // If data is an array, get the first element (if it exists)
-      const singleData = Array.isArray(data) && data.length > 0 ? data[0] : null;
+    // ✅ FUNÇÃO AUXILIAR: Mapear dados para formulário
+    const mapDataToForm = (singleData: any): FormData => ({
+      business_name: singleData.business_name || '',
+      vat_number: singleData.vat_number || '',
+      billing_address_line1: singleData.billing_address_line1 || '',
+      billing_address_line2: singleData.billing_address_line2 || '',
+      billing_postal_code: singleData.billing_postal_code || '',
+      billing_city: singleData.billing_city || '',
+      billing_country: singleData.billing_country || '',
+      admin_contact_email: singleData.admin_contact_email || '',
+      admin_contact_phone: singleData.admin_contact_phone || '',
+      iban: singleData.iban || '',
+      iban_proof_url: singleData.iban_proof_url || '',
+    })
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is not an error if singleData is null
-        console.error('Erro ao carregar detalhes da empresa:', error)
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar os detalhes da sua empresa.',
-          variant: 'destructive',
-        })
-      } else if (singleData) { // Use singleData here
-        const mappedData: FormData = {
-          business_name: singleData.business_name || '',
-          vat_number: singleData.vat_number || '',
-          billing_address_line1: singleData.billing_address_line1 || '',
-          billing_address_line2: singleData.billing_address_line2 || '',
-          billing_postal_code: singleData.billing_postal_code || '',
-          billing_city: singleData.billing_city || '',
-          billing_country: singleData.billing_country || '',
-          admin_contact_email: singleData.admin_contact_email || '',
-          admin_contact_phone: singleData.admin_contact_phone || '',
-          iban: singleData.iban || '',
-          iban_proof_url: singleData.iban_proof_url || '',
+    // ✅ FUNÇÃO AUXILIAR: Resetar formulário vazio
+    const resetToEmptyForm = () => {
+      const emptyData = {
+        business_name: '', vat_number: '', billing_address_line1: '',
+        billing_address_line2: '', billing_postal_code: '', billing_city: '',
+        billing_country: '', admin_contact_email: '', admin_contact_phone: '',
+        iban: '', iban_proof_url: '',
+      };
+      setInitialData(null);
+      reset(emptyData);
+    }
+
+    // ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 19 → <8)
+    const fetchBusinessDetails = async () => {
+      setIsFetchingDetails(true)
+      
+      try {
+        const { data: singleData, error } = await fetchBusinessData();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Erro ao carregar detalhes da empresa:', error)
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível carregar os detalhes da sua empresa.',
+            variant: 'destructive',
+          })
+        } else if (singleData) {
+          const mappedData = mapDataToForm(singleData)
+          setInitialData(mappedData)
+          reset(mappedData)
+        } else {
+          console.log('No business details found for this user (PGRST116), form will be empty.');
+          resetToEmptyForm();
         }
-        setInitialData(mappedData)
-        reset(mappedData)
-      } else if (error && error.code === 'PGRST116') {
-        // This case means no record was found, which is fine. Form will be empty.
-        console.log('No business details found for this user (PGRST116), form will be empty.');
-        setInitialData(null); // Ensure initialData is null if no record
-        reset({ // Reset form to default empty values
-          business_name: '',
-          vat_number: '',
-          billing_address_line1: '',
-          billing_address_line2: '',
-          billing_postal_code: '',
-          billing_city: '',
-          billing_country: '',
-          admin_contact_email: '',
-          admin_contact_phone: '',
-          iban: '',
-          iban_proof_url: '',
-        });
+      } finally {
+        setIsFetchingDetails(false)
       }
-      setIsFetchingDetails(false)
     }
 
     // Added a more specific condition to call fetchBusinessDetails

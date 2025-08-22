@@ -316,39 +316,47 @@ const ChartLegendContent = React.forwardRef<
 )
 ChartLegendContent.displayName = "ChartLegend"
 
-// Helper to extract item config from a payload.
+// ✅ FUNÇÃO AUXILIAR: Validar payload
+function validatePayload(payload: unknown): Record<string, any> | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null
+  }
+  return payload as Record<string, any>
+}
+
+// ✅ FUNÇÃO AUXILIAR: Extrair payload aninhado
+function extractNestedPayload(payload: Record<string, any>) {
+  return "payload" in payload &&
+    typeof payload.payload === "object" &&
+    payload.payload !== null
+      ? payload.payload
+      : undefined
+}
+
+// ✅ FUNÇÃO AUXILIAR: Determinar chave de configuração
+function determineConfigKey(payload: Record<string, any>, key: string, payloadPayload: any): string {
+  if (key in payload && typeof payload[key] === "string") {
+    return payload[key] as string
+  }
+  
+  if (payloadPayload && key in payloadPayload && typeof payloadPayload[key] === "string") {
+    return payloadPayload[key] as string
+  }
+  
+  return key
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
 function getPayloadConfigFromPayload(
   config: ChartConfig,
   payload: unknown,
   key: string
 ) {
-  if (typeof payload !== "object" || payload === null) {
-    return undefined
-  }
+  const validPayload = validatePayload(payload)
+  if (!validPayload) return undefined
 
-  const payloadPayload =
-    "payload" in payload &&
-    typeof payload.payload === "object" &&
-    payload.payload !== null
-      ? payload.payload
-      : undefined
-
-  let configLabelKey: string = key
-
-  if (
-    key in payload &&
-    typeof payload[key as keyof typeof payload] === "string"
-  ) {
-    configLabelKey = payload[key as keyof typeof payload] as string
-  } else if (
-    payloadPayload &&
-    key in payloadPayload &&
-    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
-  ) {
-    configLabelKey = payloadPayload[
-      key as keyof typeof payloadPayload
-    ] as string
-  }
+  const payloadPayload = extractNestedPayload(validPayload)
+  const configLabelKey = determineConfigKey(validPayload, key, payloadPayload)
 
   return configLabelKey in config
     ? config[configLabelKey]

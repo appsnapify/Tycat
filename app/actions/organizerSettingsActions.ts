@@ -7,11 +7,12 @@ import { cookies } from 'next/headers';
 // Nota: A estrutura exata da tabela organizer_business_details (especialmente a FK para users)
 // precisa ser confirmada. Assumindo uma coluna 'user_id' ou 'organizer_id' por agora.
 
-export async function getOrganizerBusinessDetails() {
+// ✅ FUNÇÃO AUXILIAR: Inicializar action
+async function initializeAction() {
   console.log("[Action:getOrganizerBusinessDetails] Iniciando action.");
   noStore();
-
-  // Logar cookies recebidos pela Server Action
+  
+  // Logar cookies
   try {
     const cookieStore = cookies();
     const allCookies = cookieStore.getAll();
@@ -19,56 +20,71 @@ export async function getOrganizerBusinessDetails() {
   } catch (e) {
     console.error("[Action:getOrganizerBusinessDetails] Erro ao tentar ler cookies:", e);
   }
+}
 
-  let supabase;
-  try {
-    supabase = await createClient();
-    console.log("[Action:getOrganizerBusinessDetails] Cliente Supabase criado:", supabase ? 'Objeto Cliente OK' : 'Cliente UNDEFINED');
-    if (!supabase) {
-      return { success: false, error: 'Falha ao criar cliente Supabase na action.', data: null };
-    }
-  } catch (error: any) {
-    console.error("[Action:getOrganizerBusinessDetails] Erro ao criar cliente Supabase:", error);
-    return { success: false, error: `Falha ao criar cliente Supabase na action: ${error.message}`, data: null };
+// ✅ FUNÇÃO AUXILIAR: Criar cliente Supabase
+async function createSupabaseClient() {
+  const supabase = await createClient();
+  console.log("[Action:getOrganizerBusinessDetails] Cliente Supabase criado:", supabase ? 'Objeto Cliente OK' : 'Cliente UNDEFINED');
+  
+  if (!supabase) {
+    throw new Error('Falha ao criar cliente Supabase na action.');
+  }
+  
+  return supabase;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Obter usuário autenticado
+async function getAuthenticatedUser(supabase: any) {
+  console.log("[Action:getOrganizerBusinessDetails] Tentando obter usuário...");
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw new Error(`Erro ao obter usuário: ${userError.message}`);
+  }
+  
+  if (!user) {
+    throw new Error('Nenhum usuário autenticado.');
+  }
+  
+  console.log("[Action:getOrganizerBusinessDetails] Usuário obtido:", user.id);
+  return user;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Buscar detalhes do negócio
+async function fetchBusinessDetails(supabase: any, userId: string) {
+  console.log(`[Action:getOrganizerBusinessDetails] Buscando detalhes para o usuário: ${userId}`);
+  const { data, error } = await supabase
+    .from('organizer_business_details')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(`Erro ao buscar detalhes: ${error.message}`);
   }
 
+  if (!data) {
+    console.log("[Action:getOrganizerBusinessDetails] Nenhum detalhe da empresa encontrado (normal).");
+    return null;
+  }
+
+  console.log("[Action:getOrganizerBusinessDetails] Detalhes da empresa encontrados:", data);
+  return data;
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 10 → <8)
+export async function getOrganizerBusinessDetails() {
   try {
-    console.log("[Action:getOrganizerBusinessDetails] Tentando obter usuário...");
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError) {
-      console.error("[Action:getOrganizerBusinessDetails] Erro ao obter usuário:", userError);
-      return { success: false, error: `Erro ao obter usuário: ${userError.message}`, data: null };
-    }
-    if (!user) {
-      console.log("[Action:getOrganizerBusinessDetails] Nenhum usuário autenticado encontrado.");
-      return { success: false, error: 'Nenhum usuário autenticado.', data: null };
-    }
-    console.log("[Action:getOrganizerBusinessDetails] Usuário obtido:", user.id);
-
-    console.log(`[Action:getOrganizerBusinessDetails] Buscando detalhes para o usuário: ${user.id}`);
-    const { data, error } = await supabase
-      .from('organizer_business_details')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116: single row not found (normal if no details yet)
-      console.error("[Action:getOrganizerBusinessDetails] Erro ao buscar detalhes da empresa:", error);
-      return { success: false, error: `Erro ao buscar detalhes: ${error.message}`, data: null };
-    }
-
-    if (!data) {
-      console.log("[Action:getOrganizerBusinessDetails] Nenhum detalhe da empresa encontrado para o usuário (isso pode ser normal).");
-      return { success: true, data: null }; // Retorna sucesso com dados nulos se não encontrado
-    }
-
-    console.log("[Action:getOrganizerBusinessDetails] Detalhes da empresa encontrados:", data);
+    await initializeAction();
+    const supabase = await createSupabaseClient();
+    const user = await getAuthenticatedUser(supabase);
+    const data = await fetchBusinessDetails(supabase, user.id);
+    
     return { success: true, data };
-
-  } catch (e: any) {
-    console.error("[Action:getOrganizerBusinessDetails] Erro inesperado na action:", e);
-    return { success: false, error: `Erro inesperado na action: ${e.message}`, data: null };
+  } catch (error: any) {
+    console.error("[Action:getOrganizerBusinessDetails] Erro:", error);
+    return { success: false, error: error.message, data: null };
   }
 }
 

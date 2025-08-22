@@ -78,11 +78,16 @@ function addCountryCode(cleanedPhone: string, countryCode: string): string {
   return '+' + countryCode + cleanedPhone;
 }
 
-export function normalizePhoneNumber(phone: string, defaultCountryCode: string = ''): string {
+// ✅ FUNÇÃO AUXILIAR: Validar entrada
+function validatePhoneInput(phone: string): string {
   if (!phone || phone.trim() === '') {
     return '';
   }
-  
+  return phone.trim();
+}
+
+// ✅ FUNÇÃO AUXILIAR: Processar formato internacional
+function processInternationalFormat(phone: string): string {
   // Telefone já no formato internacional
   if (phone.startsWith('+')) {
     return normalizeInternationalPhone(phone);
@@ -93,8 +98,11 @@ export function normalizePhoneNumber(phone: string, defaultCountryCode: string =
     return '+' + phone.substring(2).replace(/[^\d]/g, '');
   }
   
-  const cleanedPhone = phone.replace(/[^\d]/g, '');
-  
+  return phone;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Aplicar código do país
+function applyCountryCode(cleanedPhone: string, defaultCountryCode: string): string {
   // Número já contém código do país
   if (defaultCountryCode && cleanedPhone.startsWith(defaultCountryCode)) {
     return '+' + cleanedPhone;
@@ -106,6 +114,21 @@ export function normalizePhoneNumber(phone: string, defaultCountryCode: string =
   }
   
   return addCountryCode(cleanedPhone, defaultCountryCode);
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 11 → <8)
+export function normalizePhoneNumber(phone: string, defaultCountryCode: string = ''): string {
+  // 1. Validar entrada
+  const validPhone = validatePhoneInput(phone);
+  if (!validPhone) return '';
+  
+  // 2. Processar formato internacional
+  const processedPhone = processInternationalFormat(validPhone);
+  if (processedPhone !== validPhone) return processedPhone;
+  
+  // 3. Aplicar código do país
+  const cleanedPhone = validPhone.replace(/[^\d]/g, '');
+  return applyCountryCode(cleanedPhone, defaultCountryCode);
 }
 
 /**
@@ -122,21 +145,37 @@ export function maskUserId(userId: string): string {
   return userId.substring(0, 8) + '...'
 }
 
-export function maskPhone(phone: string): string {
-  if (!phone) return '***'
-  if (phone.length <= 4) return '***'
-  
-  // +351919999998 → +351***998
+// ✅ FUNÇÃO AUXILIAR: Validar entrada de telefone para mascaramento
+function validatePhoneForMasking(phone: string): string | null {
+  if (!phone || phone.length <= 4) return null;
+  return phone;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Mascarar telefone português
+function maskPortuguesePhone(phone: string): string {
   if (phone.startsWith('+351')) {
-    return '+351***' + phone.slice(-3)
+    return '+351***' + phone.slice(-3);
   }
-  
-  // 919999998 → 919***998  
+  return phone;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Mascarar telefone genérico
+function maskGenericPhone(phone: string): string {
   if (phone.length >= 7) {
-    return phone.substring(0, 3) + '***' + phone.slice(-3)
+    return phone.substring(0, 3) + '***' + phone.slice(-3);
   }
+  return phone.substring(0, 3) + '***';
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 9 → <8)
+export function maskPhone(phone: string): string {
+  const validPhone = validatePhoneForMasking(phone);
+  if (!validPhone) return '***';
   
-  return phone.substring(0, 3) + '***'
+  const portugueseMasked = maskPortuguesePhone(validPhone);
+  if (portugueseMasked !== validPhone) return portugueseMasked;
+  
+  return maskGenericPhone(validPhone);
 }
 
 export function safeLog(message: string, data?: any): void {

@@ -1,56 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// ✅ FUNÇÃO AUXILIAR: Validar autenticação
+function validateAuthentication(request: NextRequest) {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) {
+    throw new Error('Token de autorização necessário')
+  }
+  return token
+}
+
+// ✅ FUNÇÃO AUXILIAR: Validar sessão do scanner
+async function validateScannerSession(supabase: any, token: string) {
+  const { data: session, error: sessionError } = await supabase
+    .from('scanner_sessions')
+    .select(`
+      *,
+      event_scanners(event_id, scanner_name)
+    `)
+    .eq('session_token', token)
+    .eq('status', 'active')
+    .single()
+
+  if (sessionError || !session) {
+    console.log('❌ Sessão inválida:', sessionError)
+    throw new Error('Sessão inválida')
+  }
+
+  return session
+}
+
+// ✅ FUNÇÃO AUXILIAR: Validar query de pesquisa
+function validateSearchQuery(query: string) {
+  if (!query || query.trim().length < 1) {
+    throw new Error('Termo de pesquisa é obrigatório')
+  }
+  return query.trim().toLowerCase()
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 10 → <8)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
     const body = await request.json()
     const { query } = body
 
     console.log('🔍 SEARCH REQUEST:', { query })
 
-    // Verificar autenticação do scanner
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ 
-        error: 'Token de autorização necessário' 
-      }, { status: 401 })
-    }
-
-    // Buscar sessão ativa do scanner
-    const { data: session, error: sessionError } = await supabase
-      .from('scanner_sessions')
-      .select(`
-        *,
-        event_scanners(event_id, scanner_name)
-      `)
-      .eq('session_token', token)
-      .eq('status', 'active')
-      .single()
-
-    if (sessionError || !session) {
-      console.log('❌ Sessão inválida:', sessionError)
-      return NextResponse.json({ 
-        error: 'Sessão inválida' 
-      }, { status: 401 })
-    }
-
+    const token = validateAuthentication(request)
+    const session = await validateScannerSession(supabase, token)
+    
     const event_id = session.event_scanners?.event_id
     if (!event_id) {
-      return NextResponse.json({ 
-        error: 'Evento não encontrado' 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 400 })
     }
 
-    // Validar query
-    if (!query || query.trim().length < 1) {
-      return NextResponse.json({ 
-        error: 'Termo de pesquisa é obrigatório' 
-      }, { status: 400 })
-    }
-
-    const searchTerm = query.trim().toLowerCase()
+    const searchTerm = validateSearchQuery(query)
     console.log('🔍 Pesquisando:', { event_id, searchTerm })
 
     // Primeiro, verificar quantos guests existem neste evento
