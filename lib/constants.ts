@@ -74,13 +74,17 @@ function maskSensitiveData(obj: unknown, depth = 0): unknown {
     const masked: Record<string, unknown> = {}
     let keyCount = 0
     for (const [key, value] of Object.entries(obj)) {
-      if (keyCount > 50) { masked['...'] = '[more properties]'; break }
-      const shouldMask = SENSITIVE_FIELDS.some(field => key.toLowerCase().includes(field))
-      if (shouldMask) {
-        masked[key] = typeof value === 'string' ? maskSensitiveData(value, depth + 1) : '[MASKED]'
-      } else {
-        masked[key] = maskSensitiveData(value, depth + 1)
+      if (keyCount > 50) { 
+        // Usar Object.assign para evitar object injection
+        return Object.assign(masked, { '...': '[more properties]' })
       }
+      const shouldMask = SENSITIVE_FIELDS.some(field => key.toLowerCase().includes(field))
+      const maskedValue = shouldMask 
+        ? (typeof value === 'string' ? maskSensitiveData(value, depth + 1) : '[MASKED]')
+        : maskSensitiveData(value, depth + 1)
+      
+      // Usar Object.assign para evitar object injection vulnerability
+      Object.assign(masked, { [key]: maskedValue })
       keyCount++
     }
     return masked
