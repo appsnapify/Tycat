@@ -136,20 +136,27 @@ export default function ConfiguracoesPage() {
       return { data: Array.isArray(data) && data.length > 0 ? data[0] : null, error };
     }
 
-    // ✅ FUNÇÃO AUXILIAR: Mapear dados para formulário
-    const mapDataToForm = (singleData: any): FormData => ({
-      business_name: singleData.business_name || '',
-      vat_number: singleData.vat_number || '',
-      billing_address_line1: singleData.billing_address_line1 || '',
-      billing_address_line2: singleData.billing_address_line2 || '',
-      billing_postal_code: singleData.billing_postal_code || '',
-      billing_city: singleData.billing_city || '',
-      billing_country: singleData.billing_country || '',
-      admin_contact_email: singleData.admin_contact_email || '',
-      admin_contact_phone: singleData.admin_contact_phone || '',
-      iban: singleData.iban || '',
-      iban_proof_url: singleData.iban_proof_url || '',
-    })
+    // ✅ FUNÇÃO AUXILIAR: Obter valor seguro
+    const getSafeValue = (data: any, field: string): string => data?.[field] ?? '';
+
+    // ✅ FUNÇÃO AUXILIAR: Mapear dados para formulário (Complexidade: 12 → <8)
+    const mapDataToForm = (singleData: any): FormData => {
+      const getValue = (field: string) => getSafeValue(singleData, field);
+      
+      return {
+        business_name: getValue('business_name'),
+        vat_number: getValue('vat_number'),
+        billing_address_line1: getValue('billing_address_line1'),
+        billing_address_line2: getValue('billing_address_line2'),
+        billing_postal_code: getValue('billing_postal_code'),
+        billing_city: getValue('billing_city'),
+        billing_country: getValue('billing_country'),
+        admin_contact_email: getValue('admin_contact_email'),
+        admin_contact_phone: getValue('admin_contact_phone'),
+        iban: getValue('iban'),
+        iban_proof_url: getValue('iban_proof_url'),
+      };
+    }
 
     // ✅ FUNÇÃO AUXILIAR: Resetar formulário vazio
     const resetToEmptyForm = () => {

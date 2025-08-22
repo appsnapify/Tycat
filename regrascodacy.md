@@ -863,4 +863,193 @@ app.get('/api/csrf-token', csrfProtection, (req, res) => {
 const doubleSubmitCookie = (req, res, next) => {
     if (req.method === 'GET') return next();
     
-    const
+    const token = req.headers['x-csrf-token'] || req.body._csrf;
+    const cookieToken = req.cookies['csrf-token'];
+    
+    if (!token || token !== cookieToken) {
+        logger.security('CSRF token mismatch', { ip: req.ip });
+        return res.status(403).json({ error: 'CSRF token invalid' });
+    }
+    
+    next();
+};
+
+---
+
+## 🧹 **CÓDIGO LIMPO & ESTRUTURA**
+
+### **🚨 REGRA CRÍTICA: COMPLEXIDADE CICLOMÁTICA - ZERO TOLERÂNCIA**
+
+#### **⚡ NUNCA MAIS ERRAR COM REFATORAÇÃO DE COMPLEXIDADE:**
+
+**❌ ERROS MORTAIS QUE CRIAM NOVOS PROBLEMAS:**
+
+```javascript
+// ❌ ERRO FATAL: Função auxiliar com muitas operações ||
+const mapDataToForm = (data: any): FormData => ({
+  field1: data.field1 || '',     // +1
+  field2: data.field2 || '',     // +1  
+  field3: data.field3 || '',     // +1
+  field4: data.field4 || '',     // +1
+  // ... 11 campos com ||         // = 11 + 1 = 12 COMPLEXIDADE!
+})
+
+// ❌ ERRO FATAL: Função auxiliar com condições aninhadas
+function processData(input: string): string {
+  if (input.startsWith('+')) {           // +1
+    if (input.includes('351')) {         // +1
+      return processPortuguese(input);
+    } else if (input.length > 10) {     // +1
+      return processInternational(input);
+    }
+  }
+  return input; // TOTAL: 1 + 1 + 1 + 1 = 4 (OK, mas pode crescer!)
+}
+```
+
+**✅ SOLUÇÕES BULLETPROOF:**
+
+```javascript
+// ✅ SOLUÇÃO 1: Função utilitária simples para múltiplos campos
+const getSafeValue = (data: any, field: string): string => data?.[field] ?? '';
+
+const mapDataToForm = (data: any): FormData => {
+  const getValue = (field: string) => getSafeValue(data, field);
+  
+  return {
+    field1: getValue('field1'),
+    field2: getValue('field2'),
+    field3: getValue('field3'),
+    // ... sem operadores condicionais = COMPLEXIDADE 1!
+  };
+};
+
+// ✅ SOLUÇÃO 2: Mapa de configuração para eliminar condições
+const PHONE_PROCESSORS = {
+  '+351': processPortuguese,
+  'international': processInternational,
+  'default': processDefault
+};
+
+function processData(input: string): string {
+  const processor = input.startsWith('+351') ? PHONE_PROCESSORS['+351'] :
+                   input.length > 10 ? PHONE_PROCESSORS['international'] :
+                   PHONE_PROCESSORS['default'];
+  
+  return processor(input); // COMPLEXIDADE: 1 (operador ternário conta como 1 total)
+}
+```
+
+#### **🔍 CHECKLIST OBRIGATÓRIO ANTES DE CADA REFATORAÇÃO:**
+
+**ANTES DE REFATORAR:**
+1. ✅ **Contar operadores na função original**: `if`, `&&`, `||`, `?:`, `case`, `catch`
+2. ✅ **Identificar o número exato de condições**
+3. ✅ **Planejar divisão SEM criar novas condições**
+
+**DURANTE A REFATORAÇÃO:**
+4. ✅ **Cada função auxiliar = MÁXIMO 3 condições**
+5. ✅ **Preferir mapas/objetos a múltiplos `if/else`**
+6. ✅ **Evitar operadores `||` em massa**
+7. ✅ **Uma responsabilidade = uma função**
+
+**APÓS A REFATORAÇÃO:**
+8. ✅ **Contar complexidade de CADA função auxiliar criada**
+9. ✅ **Verificar se soma total < complexidade original**
+10. ✅ **Testar que funcionalidade não quebrou**
+
+#### **📊 FÓRMULA DE COMPLEXIDADE CICLOMÁTICA:**
+```
+COMPLEXIDADE = 1 (base) + número de:
+- if statements
+- else if statements  
+- while/for loops
+- && operators
+- || operators
+- ?: ternary operators
+- catch blocks
+- case statements
+- && em conditions
+- || em conditions
+```
+
+#### **🎯 ESTRATÉGIAS ANTI-COMPLEXIDADE:**
+
+**ESTRATÉGIA 1: Mapa de Funções**
+```javascript
+// ❌ Complexidade alta
+function handleAction(type: string) {
+  if (type === 'create') return createHandler();
+  if (type === 'update') return updateHandler();  
+  if (type === 'delete') return deleteHandler();
+  // ... +3 complexidade
+}
+
+// ✅ Complexidade 1
+const ACTION_HANDLERS = {
+  create: createHandler,
+  update: updateHandler,
+  delete: deleteHandler
+};
+
+function handleAction(type: string) {
+  return ACTION_HANDLERS[type]?.() || defaultHandler();
+}
+```
+
+**ESTRATÉGIA 2: Early Returns**
+```javascript
+// ❌ Condições aninhadas
+function validate(data: any) {
+  if (data) {
+    if (data.email) {
+      if (data.email.includes('@')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ✅ Early returns
+function validate(data: any) {
+  if (!data) return false;
+  if (!data.email) return false;
+  if (!data.email.includes('@')) return false;
+  return true;
+}
+```
+
+**ESTRATÉGIA 3: Função de Configuração**
+```javascript
+// ❌ Múltiplas condições
+function getConfig(env: string) {
+  return {
+    apiUrl: env === 'prod' ? 'prod-url' : env === 'staging' ? 'staging-url' : 'dev-url',
+    timeout: env === 'prod' ? 5000 : env === 'staging' ? 3000 : 1000,
+    // +6 operadores ternários
+  };
+}
+
+// ✅ Objeto de configuração
+const ENV_CONFIGS = {
+  prod: { apiUrl: 'prod-url', timeout: 5000 },
+  staging: { apiUrl: 'staging-url', timeout: 3000 },
+  dev: { apiUrl: 'dev-url', timeout: 1000 }
+};
+
+function getConfig(env: string) {
+  return ENV_CONFIGS[env] || ENV_CONFIGS.dev;
+}
+```
+
+#### **🚨 REGRA DE OURO FINAL:**
+**"NUNCA REFATORAR SEM MEDIR A COMPLEXIDADE DE CADA FUNÇÃO AUXILIAR CRIADA"**
+
+#### **💡 FERRAMENTAS PARA MEDIR COMPLEXIDADE:**
+- **Manual**: Contar cada `if`, `&&`, `||`, `?:`, `case`, `catch`
+- **ESLint**: `complexity` rule com limite 8
+- **SonarQube/Codacy**: Análise automática
+- **VS Code**: Extensões como "CodeMetrics"
+
+---
