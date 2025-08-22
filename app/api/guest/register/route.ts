@@ -4,46 +4,26 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { Database } from '@/lib/database.types';
 
-export async function POST(request: Request) {
-  try {
-    const { 
-      phone, 
-      firstName, 
-      lastName, 
-      email, 
-      birthDate, 
-      gender, 
-      postalCode,
-      city,
-      password, 
-      eventId, 
-      promoterId,
-      teamId
-    } = await request.json();
-
-    // 🔍 DEBUG: Log dos dados recebidos
+// ✅ FUNÇÃO AUXILIAR: Log de dados recebidos (Complexidade: 1)
+function logReceivedData(data: any): void {
     console.log('=== GUEST REGISTER DEBUG ===');
-    console.log('phone:', phone);
-    console.log('firstName:', firstName);
-    console.log('lastName:', lastName);
-    console.log('email:', email);
-    console.log('password length:', password?.length);
-    console.log('eventId:', eventId);
-    console.log('promoterId:', promoterId);
-    console.log('teamId:', teamId);
+  console.log('phone:', data.phone);
+  console.log('firstName:', data.firstName);
+  console.log('lastName:', data.lastName);
+  console.log('email:', data.email);
+  console.log('password length:', data.password?.length);
+  console.log('eventId:', data.eventId);
+  console.log('promoterId:', data.promoterId);
+  console.log('teamId:', data.teamId);
     console.log('===========================');
+}
 
-    // Validação de inputs obrigatórios (EMAIL OBRIGATÓRIO, promoterId opcional para organizações)
-    if (!phone || !firstName || !lastName || !email || !password || !eventId) {
-      const missing = [];
-      if (!phone) missing.push('phone');
-      if (!firstName) missing.push('firstName');
-      if (!lastName) missing.push('lastName');
-      if (!email) missing.push('email');
-      if (!password) missing.push('password');
-      if (!eventId) missing.push('eventId');
-      if (!promoterId) missing.push('promoterId');
-      
+// ✅ FUNÇÃO AUXILIAR: Validar campos obrigatórios (Complexidade: 2)
+function validateRequiredFields(data: any): NextResponse | null {
+  const required = ['phone', 'firstName', 'lastName', 'email', 'password', 'eventId'];
+  const missing = required.filter(field => !data[field]);
+  
+  if (missing.length > 0) {
       console.error('❌ Campos em falta:', missing);
       return NextResponse.json(
         { success: false, error: `Dados obrigatórios em falta: ${missing.join(', ')}` },
@@ -51,8 +31,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validação de email
+  return null;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Validar formato de email (Complexidade: 2)
+function validateEmailFormat(email: string): NextResponse | null {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
     if (!emailRegex.test(email)) {
       console.error('❌ Email inválido:', email);
       return NextResponse.json(
@@ -61,7 +46,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validação de password mais robusta
+  return null;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Validar complexidade da password (Complexidade: 4)
+function validatePasswordComplexity(password: string): NextResponse | null {
     if (password.length < 8) {
       console.error('❌ Password muito curta:', password.length);
       return NextResponse.json(
@@ -70,7 +59,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ VALIDAÇÃO DEFINITIVA DE PASSWORD
     const hasLower = /[a-z]/.test(password);
     const hasUpper = /[A-Z]/.test(password);
     const hasNumber = /\d/.test(password);
@@ -88,7 +76,33 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log('✅ Password validation OK');
+  return null;
+}
+
+export async function POST(request: Request) {
+  try {
+    const requestData = await request.json();
+    const { 
+      phone, firstName, lastName, email, birthDate, gender, 
+      postalCode, city, password, eventId, promoterId, teamId
+    } = requestData;
+
+    // 1. Log dos dados recebidos
+    logReceivedData(requestData);
+
+    // 2. Validação de campos obrigatórios (Early Return)
+    const requiredFieldsError = validateRequiredFields(requestData);
+    if (requiredFieldsError) return requiredFieldsError;
+
+    // 3. Validação de formato de email (Early Return)
+    const emailError = validateEmailFormat(email);
+    if (emailError) return emailError;
+
+    // 4. Validação de complexidade da password (Early Return)
+    const passwordError = validatePasswordComplexity(password);
+    if (passwordError) return passwordError;
+    
+    console.log('✅ All validations passed');
 
     const cookieStore = await cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });

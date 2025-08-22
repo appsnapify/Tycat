@@ -132,24 +132,42 @@ export default function OrganizationsPage() {
         
         console.log('OrganizationsPage: Dados recebidos do Supabase:', data)
         
+        // ✅ FUNÇÃO AUXILIAR: Validar estrutura básica (Complexidade: 3)
+        const isValidBasicStructure = (item: SupabaseResponse): boolean => {
+          if (!item?.organizations || !Array.isArray(item.organizations)) return false;
+          if (item.organizations.length === 0) return false;
+          return true;
+        };
+
+        // ✅ FUNÇÃO AUXILIAR: Validar tipos de campos obrigatórios (Complexidade: 4)
+        const hasValidRequiredFields = (item: RawSupabaseData, org: any): boolean => {
+          if (typeof item.organization_id !== 'string') return false;
+          if (typeof item.role !== 'string') return false;
+          if (typeof org?.id !== 'string') return false;
+          if (typeof org?.name !== 'string') return false;
+          if (typeof org?.slug !== 'string') return false;
+          return true;
+        };
+
+        // ✅ FUNÇÃO AUXILIAR: Validar campos opcionais (Complexidade: 3)
+        const hasValidOptionalFields = (org: any): boolean => {
+          if (org?.logotipo !== null && typeof org?.logotipo !== 'string') return false;
+          if (org?.banner_url !== null && typeof org?.banner_url !== 'string') return false;
+          if (org?.address !== null && typeof org?.address !== 'string') return false;
+          return true;
+        };
+
+        // ✅ FUNÇÃO DE FILTRO REFATORADA (Complexidade: 2)
+        const isValidOrganizationData = (item: SupabaseResponse): item is RawSupabaseData => {
+          if (!isValidBasicStructure(item)) return false;
+          
+          const org = item.organizations[0];
+          return hasValidRequiredFields(item as RawSupabaseData, org) && hasValidOptionalFields(org);
+        };
+
         // Formatar os dados com type safety
         const formattedData = (data || [] as SupabaseResponse[])
-          .filter((item): item is RawSupabaseData => {
-            if (!item?.organizations || !Array.isArray(item.organizations)) return false
-            if (item.organizations.length === 0) return false
-            
-            const org = item.organizations[0]
-            return (
-              typeof item.organization_id === 'string' &&
-              typeof item.role === 'string' &&
-              typeof org?.id === 'string' &&
-              typeof org?.name === 'string' &&
-              typeof org?.slug === 'string' &&
-              (org?.logotipo === null || typeof org?.logotipo === 'string') &&
-              (org?.banner_url === null || typeof org?.banner_url === 'string') &&
-              (org?.address === null || typeof org?.address === 'string')
-            )
-          })
+          .filter(isValidOrganizationData)
           .map(item => ({
             id: item.organizations[0].id,
             name: item.organizations[0].name,

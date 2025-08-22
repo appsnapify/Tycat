@@ -8,8 +8,8 @@ function validatePhoneInput(phone: string): string {
     return '';
   }
   return phone.trim();
-}
-
+  }
+  
 // ✅ FUNÇÃO AUXILIAR: Remover caracteres especiais
 function removeSpecialChars(phone: string): string {
   // Remover espaços, traços, parênteses e outros caracteres não numéricos

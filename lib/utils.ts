@@ -60,14 +60,14 @@ function cleanPhoneNumber(phone: string): string {
  */
 function normalizeInternationalPhone(phone: string): string {
   let normalized = cleanPhoneNumber(phone);
-  
-  // Garantir que não haja múltiplos sinais de +
-  if (normalized.indexOf('+', 1) > 0) {
-    normalized = '+' + normalized.substring(1).replace(/\+/g, '');
+    
+    // Garantir que não haja múltiplos sinais de +
+    if (normalized.indexOf('+', 1) > 0) {
+      normalized = '+' + normalized.substring(1).replace(/\+/g, '');
+    }
+    return normalized;
   }
-  return normalized;
-}
-
+  
 /**
  * Adiciona código do país ao telefone
  */
@@ -100,7 +100,7 @@ function processInternationalFormat(phone: string): string {
   
   return phone;
 }
-
+  
 // ✅ FUNÇÃO AUXILIAR: Aplicar código do país
 function applyCountryCode(cleanedPhone: string, defaultCountryCode: string): string {
   // Número já contém código do país
@@ -157,8 +157,8 @@ function maskPortuguesePhone(phone: string): string {
     return '+351***' + phone.slice(-3);
   }
   return phone;
-}
-
+  }
+  
 // ✅ FUNÇÃO AUXILIAR: Mascarar telefone genérico
 function maskGenericPhone(phone: string): string {
   if (phone.length >= 7) {

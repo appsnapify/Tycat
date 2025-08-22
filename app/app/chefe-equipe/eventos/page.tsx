@@ -197,37 +197,34 @@ function EventListContent({ orgId }: EventListContentProps) {
         // Ensure data is treated as Event[]
         const fetchedEvents: Event[] = data || [];
 
-        // Sort events client-side using the updated isEventPast
-        const sortedEvents = fetchedEvents.sort((a, b) => {
-          const isAPast = isEventPast(a);
-          const isBPast = isEventPast(b);
-
-          const dateA = parseDateTime(a.date, a.time)?.getTime() ?? 0; // Use start date for sorting active
-          const dateB = parseDateTime(b.date, b.time)?.getTime() ?? 0; // Use start date for sorting active
-          const endDateA = parseDateTime(a.end_date || a.date, a.end_time || '23:59:59')?.getTime() ?? 0; // Use end date for sorting past
-          const endDateB = parseDateTime(b.end_date || b.date, b.end_time || '23:59:59')?.getTime() ?? 0; // Use end date for sorting past
-
-
-          // Both upcoming/active
-          if (!isAPast && !isBPast) {
-            return dateA - dateB; // Sort upcoming by start date (closest first)
-          }
-          // A is upcoming/active, B is past
-          if (!isAPast && isBPast) {
-            return -1; // Upcoming/active events come first
-          }
-          // A is past, B is upcoming/active
-          if (isAPast && !isBPast) {
-            return 1; // Upcoming/active events come first
-          }
-          // Both past
-          if (isAPast && isBPast) {
-            // Sort past events by end date (most recent end date first)
-            return endDateB - endDateA;
-          }
-
-          return 0; // Default case
+        // ✅ FUNÇÃO AUXILIAR: Obter dados de ordenação (Complexidade: 2)
+        const getEventSortData = (event: Event) => ({
+          isPast: isEventPast(event),
+          startTime: parseDateTime(event.date, event.time)?.getTime() ?? 0,
+          endTime: parseDateTime(event.end_date || event.date, event.end_time || '23:59:59')?.getTime() ?? 0
         });
+
+        // ✅ MAPA DE ESTRATÉGIAS DE ORDENAÇÃO (Complexidade: 1)
+        const SORT_STRATEGIES = {
+          'upcoming-upcoming': (a: any, b: any) => a.startTime - b.startTime,
+          'upcoming-past': () => -1,
+          'past-upcoming': () => 1,
+          'past-past': (a: any, b: any) => b.endTime - a.endTime
+        };
+
+        // ✅ FUNÇÃO DE ORDENAÇÃO REFATORADA (Complexidade: 3)
+        const sortEvents = (a: Event, b: Event): number => {
+          const dataA = getEventSortData(a);
+          const dataB = getEventSortData(b);
+          
+          const strategyKey = `${dataA.isPast ? 'past' : 'upcoming'}-${dataB.isPast ? 'past' : 'upcoming'}`;
+          const strategy = SORT_STRATEGIES[strategyKey as keyof typeof SORT_STRATEGIES];
+          
+          return strategy ? strategy(dataA, dataB) : 0;
+        };
+
+        // Sort events client-side using the refactored strategy
+        const sortedEvents = fetchedEvents.sort(sortEvents);
 
         setEvents(sortedEvents)
 

@@ -128,25 +128,25 @@ export default function CheckInPage() {
     
     // Buscar dados da API
     const fetchStatsFromApi = async () => {
-      const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
-      
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${await response.text()}`);
-      }
-      
+        const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
+        
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}: ${await response.text()}`);
+        }
+        
       return await response.json();
     };
-    
+        
     // Processar dados da resposta
     const processStatsData = (data: any) => {
-      if (data.success) {
-        setFallbackStats({
-          total: data.count || 0,
-          checkedIn: data.checkedIn || 0
-        });
-      } else {
-        console.error("Erro ao buscar estatísticas (fallback):", data.error);
-      }
+        if (data.success) {
+          setFallbackStats({
+            total: data.count || 0,
+            checkedIn: data.checkedIn || 0
+          });
+        } else {
+          console.error("Erro ao buscar estatísticas (fallback):", data.error);
+        }
     };
 
     async function fetchFallbackStats() {
