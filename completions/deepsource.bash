@@ -135,7 +135,7 @@ __deepsource_process_completion_results() {
 
         # The prompt format is only available from bash 4.4.
         # We test if it is available before using it.
-        if (x=${PS1@P}) 2> /dev/null; then
+        if (PS1_EXPANDED=${PS1@P}) 2> /dev/null; then
             printf "%s" "${PS1@P}${COMP_LINE[@]}"
         else
             # Can't print the prompt.  Just print the
@@ -224,7 +224,7 @@ __deepsource_handle_standard_completion_case() {
         __deepsource_debug "Removed description from single completion, which is now: ${comp}"
         COMPREPLY[0]=$comp
     else # Format the descriptions
-        __deepsource_format_comp_descriptions $longest
+        __deepsource_format_comp_descriptions "$longest"
     fi
 }
 
