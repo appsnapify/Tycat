@@ -23,7 +23,7 @@ export const API_BASE_URL = (() => {
     return validateUrl(`https://${process.env.VERCEL_URL}`, 'https://example.invalid')
   }
   // Fallback local só em dev - SEMPRE HTTPS para compliance
-  return validateUrl(process.env.NEXT_PUBLIC_SITE_URL || 'https://localhost:3000', 'https://localhost:3000')
+  return validateUrl(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://localhost:3000', 'https://localhost:3000')
 })()
 
 // Outras constantes da aplicação
@@ -51,41 +51,49 @@ const safeClone = (value: any): any => {
   }
 }
 
+// 🔒 CAMPOS SENSÍVEIS PARA MASKING
+const SENSITIVE_FIELDS = [
+  'phone', 'telemóvel', 'telefone', 'userId', 'user_id', 'email', 'password', 'token', 'auth', 'authorization', 'bearer'
+] as const
+
+// 🔒 FUNÇÃO DE MASKING DE OBJETOS (escopo global para evitar inner-declarations)
+function maskSensitiveData(obj: unknown, depth = 0): unknown {
+  if (depth > LOGGING_CONFIG.MAX_DEPTH) return '[Object too deep]'
+  if (typeof obj === 'string') {
+    const noSpaces = obj.replace(/\s/g, '')
+    if (/^\+?351?\d{7,9}$/.test(noSpaces)) return obj.length > 6 ? obj.substring(0, 4) + '***' + obj.slice(-3) : '***'
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(obj)) return obj.substring(0, 8) + '...'
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(obj)) {
+      const [local, domain] = obj.split('@')
+      return `${local.substring(0, 2)}***@${domain}`
+    }
+    return obj
+  }
+  if (Array.isArray(obj)) return obj.map((item, i) => (i > 100 ? '[...more items]' : maskSensitiveData(item, depth + 1)))
+  if (obj && typeof obj === 'object') {
+    const masked: Record<string, unknown> = {}
+    let keyCount = 0
+    for (const [key, value] of Object.entries(obj)) {
+      if (keyCount > 50) { masked['...'] = '[more properties]'; break }
+      const shouldMask = SENSITIVE_FIELDS.some(field => key.toLowerCase().includes(field))
+      if (shouldMask) {
+        masked[key] = typeof value === 'string' ? maskSensitiveData(value, depth + 1) : '[MASKED]'
+      } else {
+        masked[key] = maskSensitiveData(value, depth + 1)
+      }
+      keyCount++
+    }
+    return masked
+  }
+  return obj
+}
+
 // 🔒 FUNÇÃO DE LOG SEGURO
 export function secureLog(message: string, data?: unknown): void {
   if (process.env.NODE_ENV === 'development') {
     if (data && LOGGING_CONFIG.MASK_SENSITIVE_DATA) {
       const safeData = safeClone(data)
-      const sensitiveFields = [
-        'phone', 'telemóvel', 'telefone', 'userId', 'user_id', 'email', 'password', 'token', 'auth', 'authorization', 'bearer'
-      ]
-      function maskObject(obj: unknown, depth = 0): unknown {
-        if (depth > LOGGING_CONFIG.MAX_DEPTH) return '[Object too deep]'
-        if (typeof obj === 'string') {
-          const noSpaces = obj.replace(/\s/g, '')
-          if (/^\+?351?\d{7,9}$/.test(noSpaces)) return obj.length > 6 ? obj.substring(0, 4) + '***' + obj.slice(-3) : '***'
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(obj)) return obj.substring(0, 8) + '...'
-          if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(obj)) {
-            const [local, domain] = obj.split('@')
-            return `${local.substring(0, 2)}***@${domain}`
-          }
-          return obj
-        }
-        if (Array.isArray(obj)) return obj.map((item, i) => (i > 100 ? '[...more items]' : maskObject(item, depth + 1)))
-        if (obj && typeof obj === 'object') {
-          const masked: Record<string, unknown> = {}
-          let keyCount = 0
-          for (const [key, value] of Object.entries(obj)) {
-            if (keyCount > 50) { masked['...'] = '[more properties]'; break }
-            if (sensitiveFields.some(field => key.toLowerCase().includes(field))) masked[key] = typeof value === 'string' ? maskObject(value, depth + 1) : '[MASKED]'
-            else masked[key] = maskObject(value, depth + 1)
-            keyCount++
-          }
-          return masked
-        }
-        return obj
-      }
-      console.log(message, maskObject(safeData))
+      console.log(message, maskSensitiveData(safeData))
     } else {
       console.log(message, data)
     }
@@ -99,7 +107,7 @@ export function conditionalLog(condition: boolean, message: string, data?: unkno
 }
 
 // 🔒 FUNÇÃO PARA LOG DE PERFORMANCE (apenas em dev)
-export function performanceLog(label: string, fn: () => any): any {
+export function performanceLog<T>(label: string, fn: () => T): T {
   if (process.env.NODE_ENV === 'development') {
     console.time(label)
     const result = fn()
