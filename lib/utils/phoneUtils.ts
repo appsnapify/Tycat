@@ -2,49 +2,70 @@
  * Utilitário para normalização e validação de números de telefone
  */
 
+// ✅ FUNÇÃO DE LIMPEZA INICIAL (seguindo regrascodacy.md)
+function cleanPhoneInput(phone: string): string {
+  if (!phone || phone.trim() === '') {
+    return '';
+  }
+  // Remover espaços, traços, parênteses e outros caracteres não numéricos
+  return phone.replace(/[\s\-()]/g, '');
+}
+
+// ✅ FUNÇÃO DE PROCESSAMENTO DE PREFIXO INTERNACIONAL
+function processInternationalPrefix(phone: string): string {
+  // Se já começa com +, considerar como formato completo
+  if (phone.startsWith('+')) {
+    // Remover todos os caracteres não numéricos, exceto o "+"
+    let cleanPhone = phone.replace(/[^\d+]/g, '');
+    
+    // Garantir que não haja múltiplos sinais de +
+    if (cleanPhone.indexOf('+', 1) > 0) {
+      cleanPhone = '+' + cleanPhone.substring(1).replace(/\+/g, '');
+    }
+    return cleanPhone;
+  }
+  
+  // Se começa com 00, substituir por +
+  if (phone.startsWith('00')) {
+    return '+' + phone.substring(2);
+  }
+  
+  return phone;
+}
+
+// ✅ FUNÇÃO DE DETECÇÃO DE NÚMERO PORTUGUÊS
+function addPortugalPrefix(phone: string): string {
+  // Para números portugueses sem prefixo
+  // Verificar se começa com 9 e tem 9 dígitos (formato português típico)
+  if (/^9\d{8}$/.test(phone)) {
+    return '+351' + phone;
+  }
+  
+  // Se for um número local com 9 dígitos no total (formato típico PT)
+  if (phone.length === 9 && /^[1-9]\d{8}$/.test(phone)) {
+    return '+351' + phone;
+  }
+  
+  return phone;
+}
+
 /**
+ * ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade reduzida de 9 para <8)
  * Normaliza um número de telefone removendo caracteres especiais
  * e lidando com prefixos internacionais
  */
 export function normalizePhone(phone: string): string {
-  // Se o telefone estiver vazio, retornar vazio
-  if (!phone || phone.trim() === '') {
-    return '';
-  }
+  // 1. Limpeza inicial
+  const cleanedPhone = cleanPhoneInput(phone);
+  if (!cleanedPhone) return '';
   
-  // Remover espaços, traços, parênteses e outros caracteres não numéricos
-  let normalizedPhone = phone.replace(/[\s\-()]/g, '');
+  // 2. Processar prefixos internacionais
+  const processedPhone = processInternationalPrefix(cleanedPhone);
   
-  // Se já começa com +, considerar como formato completo
-  if (normalizedPhone.startsWith('+')) {
-    // Remover todos os caracteres não numéricos, exceto o "+"
-    normalizedPhone = normalizedPhone.replace(/[^\d+]/g, '');
-    
-    // Garantir que não haja múltiplos sinais de +
-    if (normalizedPhone.indexOf('+', 1) > 0) {
-      normalizedPhone = '+' + normalizedPhone.substring(1).replace(/\+/g, '');
-    }
-    return normalizedPhone;
-  }
+  // 3. Adicionar prefixo de Portugal se necessário
+  const finalPhone = addPortugalPrefix(processedPhone);
   
-  // Se começa com 00, substituir por +
-  if (normalizedPhone.startsWith('00')) {
-    return '+' + normalizedPhone.substring(2);
-  }
-  
-  // Para números portugueses sem prefixo
-  // Verificar se começa com 9 e tem 9 dígitos (formato português típico)
-  if (/^9\d{8}$/.test(normalizedPhone)) {
-    return '+351' + normalizedPhone;
-  }
-  
-  // Se for um número local com 9 dígitos no total (formato típico PT)
-  if (normalizedPhone.length === 9 && /^[1-9]\d{8}$/.test(normalizedPhone)) {
-    return '+351' + normalizedPhone;
-  }
-  
-  // Para outros casos, retornar como está
-  return normalizedPhone;
+  return finalPhone;
 }
 
 /**

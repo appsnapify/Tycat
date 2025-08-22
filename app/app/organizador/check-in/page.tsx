@@ -121,27 +121,40 @@ export default function CheckInPage() {
 
   // Fallback: Buscar estatísticas se hook falhar
   useEffect(() => {
+    // Verificar se deve usar fallback
+    const shouldUseFallback = (): boolean => {
+      return Boolean(selectedEvent && !guestCountData && guestCountError);
+    };
+    
+    // Buscar dados da API
+    const fetchStatsFromApi = async () => {
+      const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${await response.text()}`);
+      }
+      
+      return await response.json();
+    };
+    
+    // Processar dados da resposta
+    const processStatsData = (data: any) => {
+      if (data.success) {
+        setFallbackStats({
+          total: data.count || 0,
+          checkedIn: data.checkedIn || 0
+        });
+      } else {
+        console.error("Erro ao buscar estatísticas (fallback):", data.error);
+      }
+    };
+
     async function fetchFallbackStats() {
-      // Só usar fallback se hook não tiver dados e houver erro
-      if (!selectedEvent || guestCountData || !guestCountError) return;
+      if (!shouldUseFallback()) return;
 
       try {
-        const response = await fetch(`/api/guest-count?eventId=${selectedEvent}`);
-        
-        if (!response.ok) {
-          throw new Error(`Erro ${response.status}: ${await response.text()}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setFallbackStats({
-            total: data.count || 0,
-            checkedIn: data.checkedIn || 0
-          });
-        } else {
-          console.error("Erro ao buscar estatísticas (fallback):", data.error);
-        }
+        const data = await fetchStatsFromApi();
+        processStatsData(data);
       } catch (err) {
         console.error('Erro ao buscar estatísticas (fallback):', err);
       }

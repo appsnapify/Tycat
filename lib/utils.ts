@@ -48,50 +48,64 @@ export function formatTime(dateString: string): string {
  * "+351 912 345 678" -> "+351912345678"
  * "00351912345678" -> "+351912345678"
  */
+/**
+ * Limpa caracteres especiais do telefone
+ */
+function cleanPhoneNumber(phone: string): string {
+  return phone.replace(/[^\d+]/g, '');
+}
+
+/**
+ * Normaliza telefone com prefixo +
+ */
+function normalizeInternationalPhone(phone: string): string {
+  let normalized = cleanPhoneNumber(phone);
+  
+  // Garantir que não haja múltiplos sinais de +
+  if (normalized.indexOf('+', 1) > 0) {
+    normalized = '+' + normalized.substring(1).replace(/\+/g, '');
+  }
+  return normalized;
+}
+
+/**
+ * Adiciona código do país ao telefone
+ */
+function addCountryCode(cleanedPhone: string, countryCode: string): string {
+  if (!countryCode) {
+    return '+' + cleanedPhone;
+  }
+  return '+' + countryCode + cleanedPhone;
+}
+
 export function normalizePhoneNumber(phone: string, defaultCountryCode: string = ''): string {
-  // Se o telefone estiver vazio, retornar vazio
   if (!phone || phone.trim() === '') {
     return '';
   }
   
-  // Verificar se o telefone já está no formato internacional com prefixo
+  // Telefone já no formato internacional
   if (phone.startsWith('+')) {
-    // Remover todos os caracteres não numéricos, exceto o "+"
-    let normalized = phone.replace(/[^\d+]/g, '');
-    
-    // Garantir que não haja múltiplos sinais de +
-    if (normalized.indexOf('+', 1) > 0) {
-      normalized = '+' + normalized.substring(1).replace(/\+/g, '');
-    }
-    return normalized;
+    return normalizeInternationalPhone(phone);
   }
   
-  // Se começa com 00 (formato internacional), substituir por +
+  // Formato internacional com 00
   if (phone.startsWith('00')) {
     return '+' + phone.substring(2).replace(/[^\d]/g, '');
   }
   
-  // Remover caracteres não numéricos para o restante da lógica
   const cleanedPhone = phone.replace(/[^\d]/g, '');
   
-  // Se o número já contém o código do país sem o +
-  // Ex: 351919999999 -> +351919999999
+  // Número já contém código do país
   if (defaultCountryCode && cleanedPhone.startsWith(defaultCountryCode)) {
     return '+' + cleanedPhone;
   }
   
-  // Caso especial para Portugal: números começando com 9 e tendo 9 dígitos
+  // Caso especial Portugal
   if (defaultCountryCode === '351' && /^9\d{8}$/.test(cleanedPhone)) {
     return '+351' + cleanedPhone;
   }
   
-  // Se não começa com +, adicionar o + e código do país
-  if (defaultCountryCode) {
-    return '+' + defaultCountryCode + cleanedPhone;
-  } else {
-    // Quando não temos código do país, apenas adicionar o +
-    return '+' + cleanedPhone;
-  }
+  return addCountryCode(cleanedPhone, defaultCountryCode);
 }
 
 /**

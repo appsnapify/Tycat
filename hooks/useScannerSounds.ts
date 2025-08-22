@@ -64,40 +64,53 @@ export function useScannerSounds() {
     }
   }, [])
 
+  // Tocar som de sucesso
+  const playSuccessSound = () => {
+    createTone(261.63, 0.1, 'sine'); // C4
+    setTimeout(() => createTone(523.25, 0.15, 'sine'), 100); // C5
+  };
+  
+  // Tocar som de erro
+  const playErrorSound = () => {
+    createTone(400, 0.2, 'sawtooth');
+    setTimeout(() => createTone(200, 0.3, 'sawtooth'), 150);
+  };
+  
+  // Tocar som de já verificado
+  const playAlreadyCheckedSound = () => {
+    createTone(440, 0.1, 'square'); // A4
+    setTimeout(() => createTone(440, 0.1, 'square'), 150);
+    setTimeout(() => createTone(440, 0.1, 'square'), 300);
+  };
+  
+  // Executar som baseado no tipo
+  const executeSoundByType = (type: SoundType) => {
+    const soundMap = {
+      'success': playSuccessSound,
+      'error': playErrorSound,
+      'already-checked': playAlreadyCheckedSound
+    };
+    
+    const soundFunction = soundMap[type];
+    if (soundFunction) {
+      soundFunction();
+    }
+  };
+
   const playSound = useCallback(async (type: SoundType) => {
-    if (!audioContextRef.current || !soundsEnabled.current) return
+    if (!audioContextRef.current || !soundsEnabled.current) return;
 
     try {
-      // Resume AudioContext se estiver suspended (autoplay policy)
+      // Resume AudioContext se estiver suspended
       if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume()
+        await audioContextRef.current.resume();
       }
 
-      // Gerar diferentes tons para cada tipo de feedback
-      switch (type) {
-        case 'success':
-          // Tom ascendente para sucesso (C4 -> C5)
-          createTone(261.63, 0.1, 'sine') // C4
-          setTimeout(() => createTone(523.25, 0.15, 'sine'), 100) // C5
-          break
-          
-        case 'error':
-          // Tom descendente para erro
-          createTone(400, 0.2, 'sawtooth')
-          setTimeout(() => createTone(200, 0.3, 'sawtooth'), 150)
-          break
-          
-        case 'already-checked':
-          // Triplo bip para "já check-in"
-          createTone(440, 0.1, 'square') // A4
-          setTimeout(() => createTone(440, 0.1, 'square'), 150)
-          setTimeout(() => createTone(440, 0.1, 'square'), 300)
-          break
-      }
+      executeSoundByType(type);
     } catch (error) {
-      // Silencioso para erros de autoplay - esperado em alguns navegadores
+      // Silencioso para erros de autoplay
       if (error instanceof Error && !error.message.includes('autoplay')) {
-        console.warn(`⚠️ Erro ao tocar som ${type}:`, error)
+        console.warn(`⚠️ Erro ao tocar som ${type}:`, error);
       }
     }
   }, [createTone])

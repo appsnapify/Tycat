@@ -223,17 +223,36 @@ export default function OrganizadorLayout({
   )
 }
 
+// Mapear caminhos para títulos
+const getPageTitleMap = (): Record<string, string> => ({
+  '/dashboard': 'Dashboard',
+  '/eventos': 'Gerir Eventos',
+  '/checkin': 'Check-in',
+  '/bilheteria': 'Bilheteria',
+  '/equipes': 'Equipas',
+  '/relatorios': 'Relatórios',
+  '/organizacao': 'Organização',
+  '/configuracoes': 'Configurações'
+});
+
+// Verificar se é página de eventos com check-in
+const isEventCheckinPage = (pathname: string): boolean => {
+  return pathname.includes('/eventos') && pathname.includes('/checkin');
+};
+
 // Função auxiliar para obter o título da página actual
 function getCurrentPageTitle(pathname: string): string {
-  if (pathname.includes('/dashboard')) return 'Dashboard'
-  if (pathname.includes('/eventos')) {
-    if (pathname.includes('/checkin')) return 'Check-in'
-    return 'Gerir Eventos'
+  if (isEventCheckinPage(pathname)) {
+    return 'Check-in';
   }
-  if (pathname.includes('/bilheteria')) return 'Bilheteria'
-  if (pathname.includes('/equipes')) return 'Equipas'
-  if (pathname.includes('/relatorios')) return 'Relatórios'
-  if (pathname.includes('/organizacao')) return 'Organização'
-  if (pathname.includes('/configuracoes')) return 'Configurações'
-  return 'Dashboard'
+  
+  const titleMap = getPageTitleMap();
+  
+  for (const [path, title] of Object.entries(titleMap)) {
+    if (pathname.includes(path)) {
+      return title;
+    }
+  }
+  
+  return 'Dashboard';
 } 

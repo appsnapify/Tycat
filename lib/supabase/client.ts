@@ -21,36 +21,40 @@ function cleanupCorruptedCookies() {
     if (typeof window === 'undefined') return // Proteção SSR
     
     let cookiesRemoved = 0
-    document.cookie.split(';').forEach(cookie => {
+    const processSupabaseCookie = (cookie: string) => {
       const [name, value] = cookie.trim().split('=')
       
-      // Verificar cookies Supabase que causam problemas
-      if (name?.includes('supabase')) {
-        try {
-          // Se começa com base64-, tentar decodificar
-          if (value?.startsWith('base64-')) {
-            const decoded = atob(value.substring(7))
-            const parsed = JSON.parse(decoded)
-            
-            // Verificar se é um token válido
-            if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
-              throw new Error('Token inválido')
-            }
-          }
-          // Se não começa com base64- mas contém "eyJ" (JWT malformado), também remover
-          else if (value?.includes('eyJ') && !value.startsWith('base64-')) {
-            throw new Error('Cookie JWT malformado')
-          }
-        } catch {
-          // Cookie corrupto - remover
-          console.log(`[Auth] 🧹 Removendo cookie corrupto: ${name}`)
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`
-          cookiesRemoved++
-        }
+      if (!name?.includes('supabase')) return
+      
+      try {
+        validateSupabaseCookie(value)
+      } catch {
+        removeCorruptedCookie(name)
+        cookiesRemoved++
       }
-    })
+    }
+    
+    const validateSupabaseCookie = (value: string) => {
+      if (value?.startsWith('base64-')) {
+        const decoded = atob(value.substring(7))
+        const parsed = JSON.parse(decoded)
+        
+        if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
+          throw new Error('Token inválido')
+        }
+      } else if (value?.includes('eyJ') && !value.startsWith('base64-')) {
+        throw new Error('Cookie JWT malformado')
+      }
+    }
+    
+    const removeCorruptedCookie = (name: string) => {
+      console.log(`[Auth] 🧹 Removendo cookie corrupto: ${name}`)
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`
+    }
+    
+    document.cookie.split(';').forEach(processSupabaseCookie)
     
     if (cookiesRemoved > 0) {
       console.log(`[Auth] ✅ Limpeza concluída: ${cookiesRemoved} cookies corrompidos removidos`)

@@ -68,32 +68,45 @@ export default function CriarEquipePage() {
   
   // Verificar a configuração do banco de dados
   useEffect(() => {
+    // Verificar tabela de equipes
+    const checkTeamsTable = async () => {
+      return await supabase
+        .from('teams')
+        .select('id')
+        .limit(1);
+    };
+    
+    // Verificar tabela de membros
+    const checkMembersTable = async () => {
+      return await supabase
+        .from('team_members')
+        .select('id')
+        .limit(1);
+    };
+    
+    // Processar status do banco
+    const processDbStatus = (teamsError: any, membersError: any) => {
+      setDbStatus({
+        uuidExtension: false,
+        teamsTable: !teamsError || teamsError.code !== '42P01',
+        teamMembersTable: !membersError || membersError.code !== '42P01',
+        teamsRLS: !teamsError || teamsError.code !== '42501',
+        teamMembersRLS: !membersError || membersError.code !== '42501',
+        teamsPolicies: !teamsError || teamsError.code !== '42501',
+        teamMembersPolicies: !membersError || membersError.code !== '42501',
+        createPromoterTeam: false
+      });
+    };
+
     const checkDatabaseSetup = async () => {
       if (!user) return;
       
       setDiagnosisLoading(true);
       try {
-        // Verificar tabelas
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select('id')
-          .limit(1);
+        const { error: teamsError } = await checkTeamsTable();
+        const { error: membersError } = await checkMembersTable();
         
-        const { data: membersData, error: membersError } = await supabase
-          .from('team_members')
-          .select('id')
-          .limit(1);
-        
-        setDbStatus({
-          uuidExtension: false, // Não temos como verificar facilmente
-          teamsTable: !teamsError || teamsError.code !== '42P01',
-          teamMembersTable: !membersError || membersError.code !== '42P01',
-          teamsRLS: !teamsError || teamsError.code !== '42501',
-          teamMembersRLS: !membersError || membersError.code !== '42501',
-          teamsPolicies: !teamsError || teamsError.code !== '42501',
-          teamMembersPolicies: !membersError || membersError.code !== '42501',
-          createPromoterTeam: false // Não verificamos isso agora
-        });
+        processDbStatus(teamsError, membersError);
       } catch (e) {
         console.error('Erro ao verificar configuração do banco de dados:', e);
       } finally {

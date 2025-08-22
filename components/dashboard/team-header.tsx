@@ -32,12 +32,19 @@ export function TeamHeader({ teamData, userData }: TeamHeaderProps) {
     return name.substring(0, 2).toUpperCase();
   };
 
+  // Extrair nome completo dos metadados
+  const extractFullName = (): string | null => {
+    return userData?.user?.user_metadata?.full_name || null;
+  };
+  
+  // Extrair nome do email
+  const extractEmailName = (): string => {
+    return userData?.user?.email?.split('@')[0] || 'Usuário';
+  };
+
   // Obter nome do usuário dos metadados
   const getUserName = (): string => {
-    if (userData?.user?.user_metadata?.full_name) {
-      return userData.user.user_metadata.full_name;
-    }
-    return userData?.user?.email?.split('@')[0] || 'Usuário';
+    return extractFullName() || extractEmailName();
   };
 
   const teamInitials = getTeamInitials(teamData.name);

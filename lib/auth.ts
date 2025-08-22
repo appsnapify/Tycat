@@ -35,274 +35,259 @@ export async function signUp(email: string, password: string, metadata: { [key: 
   }
 }
 
-// Função para fazer login com email e senha
-export async function signIn(email: string, password: string) {
-  const supabase = createClient()
-  
+// ✅ FUNÇÃO DE VALIDAÇÃO DE CREDENCIAIS (seguindo regrascodacy.md)
+function validateCredentials(email: string, password: string): void {
+  // Verificar se o email é válido usando regex básico
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    console.error('Formato de email inválido:', email);
+    throw new Error('Invalid email format');
+  }
+
+  // Validação de senha removida para compatibilidade
+  if (!password || password.length === 0) {
+    throw new Error('Password is required');
+  }
+}
+
+// ✅ FUNÇÃO DE VERIFICAÇÃO DE TOKENS EXISTENTES
+async function checkExistingTokens(): Promise<string | null> {
   try {
-    console.log('Iniciando processo de login para:', email)
-    
-    // Limpar completamente qualquer estado de autenticação anterior
-    // Comentar essa parte para evitar problemas com tokens
-    /*
-    await supabase.auth.signOut()
-    
-    // Limpar todos os itens de armazenamento relacionados ao Supabase
     if (typeof window !== 'undefined') {
-      // Limpar localStorage
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i)
-        if (key && (key.startsWith('supabase.') || key.startsWith('sb-'))) {
-          console.log(`Removendo item localStorage: ${key}`)
-          localStorage.removeItem(key)
+      const supabaseKey = Object.keys(localStorage).find(key => 
+        key.startsWith('sb-') && key.includes('-auth-token')
+      );
+      
+      if (supabaseKey) {
+        console.log('Token de autenticação existente encontrado');
+        const tokenData = JSON.parse(localStorage.getItem(supabaseKey) || '{}');
+        if (tokenData?.access_token) {
+          console.log('O usuário já tem um token de acesso');
+          return tokenData.access_token;
         }
       }
+    }
+  } catch (tokenErr) {
+    console.error('Erro ao verificar tokens existentes:', tokenErr);
+  }
+  return null;
+}
+
+// ✅ FUNÇÃO DE PROCESSAMENTO DE METADADOS DO USUÁRIO
+async function processUserMetadata(supabase: any, userData: any): Promise<void> {
+  if (!userData.user) {
+    console.error('⛔ Usuário não retornado após login bem-sucedido');
+    return;
+  }
+
+  console.log('Metadados do usuário carregados:', {
+    id: userData.user.id,
+    email: userData.user.email,
+    role: userData.user.user_metadata?.role || 'não definido',
+    first_name: userData.user.user_metadata?.first_name,
+    last_name: userData.user.user_metadata?.last_name
+  });
+  
+  await handleRoleValidation(userData.user);
+  await handleLegacyRoleCompatibility(supabase, userData);
+  await storeUserMetadata(userData.user);
+}
+
+// ✅ FUNÇÃO DE VALIDAÇÃO DE PAPEL DO USUÁRIO
+async function handleRoleValidation(user: any): Promise<void> {
+  if (!user.user_metadata?.role) {
+    console.warn('⚠️ Aviso: O papel do usuário não está definido nos metadados!');
+  } else if (!['organizador', 'promotor', 'chefe-equipe', 'team-leader'].includes(user.user_metadata.role)) {
+    console.warn(`⚠️ Aviso: Papel de usuário desconhecido: ${user.user_metadata.role}`);
+  } else {
+    console.log(`✅ Papel do usuário válido: ${user.user_metadata.role}`);
+    
+    if (['chefe-equipe', 'team-leader'].includes(user.user_metadata.role)) {
+      console.log(`🏆 Usuário é um chefe de equipe, definindo redirecionamento para dashboard de equipe`);
+      const redirectUrl = '/app/chefe-equipe/dashboard';
       
-      // Limpar cookies relacionados à autenticação
-      document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.trim().split('=')
-        if (name && (name.trim().startsWith('sb-') || name.trim().startsWith('supabase.'))) {
-          console.log(`Removendo cookie: ${name.trim()}`)
-          document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-        }
-      })
+      try {
+        localStorage.setItem('auth_redirect', redirectUrl);
+        console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
+      } catch (e) {
+        console.error('Erro ao salvar redirecionamento:', e);
+      }
     }
-    
-    // Aguardar um momento para garantir que a limpeza seja concluída
-    await new Promise(resolve => setTimeout(resolve, 200))
-    */
-    
-    // Verificar se o email é válido usando regex básico
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      console.error('Formato de email inválido:', email);
-      throw new Error('Invalid email format');
-    }
+  }
+}
 
-    // Verificar se a senha tem pelo menos 6 caracteres
-    /*
-    if (password.length < 6) {
-      console.error('Senha muito curta');
-      throw new Error('Password must be at least 6 characters long');
-    }
-    */
+// ✅ FUNÇÃO DE COMPATIBILIDADE COM VERSÕES ANTERIORES
+async function handleLegacyRoleCompatibility(supabase: any, userData: any): Promise<void> {
+  if (userData.user.user_metadata?.is_team_leader === true && 
+      !['chefe-equipe', 'team-leader'].includes(userData.user.user_metadata?.role)) {
+    console.log('⚠️ Compatibilidade: Usuário marcado como líder de equipe (formato antigo)');
+    console.log('⚙️ Atualizando para o formato atual...');
     
-    // Executar login com PKCE flow (mais seguro para aplicações SPA)
-    console.log('Executando login com email/senha')
-
-    // Verificar se o token de autenticação já existe no localStorage
-    let existingToken = null;
     try {
-      if (typeof window !== 'undefined') {
-        // Verificar se há algum token no localStorage
-        const supabaseKey = Object.keys(localStorage).find(key => 
-          key.startsWith('sb-') && key.includes('-auth-token')
-        );
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: {
+          role: 'chefe-equipe',
+          previous_role: userData.user.user_metadata?.role || 'promotor',
+          team_role: 'chefe',
+          ...userData.user.user_metadata,
+        }
+      });
+      
+      if (updateError) {
+        console.error('Erro ao atualizar metadados do usuário:', updateError);
+      } else {
+        console.log('✅ Metadados atualizados com sucesso para o formato atual');
+        userData.user.user_metadata.role = 'chefe-equipe';
         
-        if (supabaseKey) {
-          console.log('Token de autenticação existente encontrado');
-          const tokenData = JSON.parse(localStorage.getItem(supabaseKey) || '{}');
-          if (tokenData?.access_token) {
-            existingToken = tokenData.access_token;
-            console.log('O usuário já tem um token de acesso');
+        const redirectUrl = '/app/chefe-equipe/dashboard';
+        try {
+          localStorage.setItem('auth_redirect', redirectUrl);
+          console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
+        } catch (e) {
+          console.error('Erro ao salvar redirecionamento:', e);
+        }
+      }
+    } catch (updateErr) {
+      console.error('Exceção ao atualizar metadados:', updateErr);
+    }
+  }
+}
+
+// ✅ FUNÇÃO DE ARMAZENAMENTO DE METADADOS
+async function storeUserMetadata(user: any): Promise<void> {
+  if (user.user_metadata?.team_id) {
+    console.log(`👥 Usuário está associado à equipe: ${user.user_metadata.team_id}`);
+    console.log(`👤 Papel na equipe: ${user.user_metadata.team_role || 'não especificado'}`);
+  }
+  
+  try {
+    const authData = {
+      id: user.id,
+      email: user.email,
+      role: user.user_metadata?.role || 'unknown',
+      name: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim()
+    };
+    localStorage.setItem('auth', JSON.stringify(authData));
+    console.log('Metadados do usuário salvos no localStorage');
+  } catch (e) {
+    console.error('Erro ao salvar metadados no localStorage:', e);
+  }
+}
+
+// ✅ FUNÇÃO DE ESTABELECIMENTO DE SESSÃO
+async function establishSession(supabase: any, sessionData: any): Promise<void> {
+  try {
+    console.log('Definindo sessão manualmente');
+    await supabase.auth.setSession({
+      access_token: sessionData.access_token,
+      refresh_token: sessionData.refresh_token
+    });
+  } catch (sessionError) {
+    console.error('Erro ao definir sessão manualmente:', sessionError);
+  }
+  
+  await new Promise(resolve => setTimeout(resolve, 500));
+}
+
+// ✅ FUNÇÃO DE VERIFICAÇÃO DE SESSÃO
+async function verifySessionEstablishment(supabase: any, originalSessionData: any): Promise<void> {
+  let sessionEstablished = false;
+  let attempts = 0;
+  const maxAttempts = 3;
+  
+  while (!sessionEstablished && attempts < maxAttempts) {
+    attempts++;
+    console.log(`Verificando estabelecimento de sessão (tentativa ${attempts})`);
+    
+    try {
+      const { data: sessionCheck } = await supabase.auth.getSession();
+      
+      if (sessionCheck?.session?.access_token) {
+        console.log(`✅ Sessão verificada com sucesso na tentativa ${attempts}!`);
+        sessionEstablished = true;
+      } else {
+        console.warn(`⚠️ Verificação de sessão falhou na tentativa ${attempts}`);
+        
+        if (attempts < maxAttempts && originalSessionData) {
+          console.log('Tentando estabelecer sessão novamente...');
+          try {
+            await supabase.auth.setSession({
+              access_token: originalSessionData.access_token,
+              refresh_token: originalSessionData.refresh_token
+            });
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } catch (err) {
+            console.error(`Erro na tentativa ${attempts} de definir sessão:`, err);
           }
         }
       }
-    } catch (tokenErr) {
-      console.error('Erro ao verificar tokens existentes:', tokenErr);
+    } catch (checkError) {
+      console.error(`Erro ao verificar sessão (tentativa ${attempts}):`, checkError);
     }
+  }
+  
+  if (!sessionEstablished) {
+    console.error('⛔ Não foi possível estabelecer sessão após múltiplas tentativas');
+    throw new Error('Falha persistente ao estabelecer sessão após login');
+  }
+}
+
+// ✅ FUNÇÃO PRINCIPAL DE LOGIN REFATORADA (Complexidade reduzida de 32 para <8)
+export async function signIn(email: string, password: string) {
+  const supabase = createClient();
+  
+  try {
+    console.log('Iniciando processo de login para:', email);
+    
+    // 1. Validar credenciais
+    validateCredentials(email, password);
+    
+    // 2. Verificar tokens existentes
+    await checkExistingTokens();
+    
+    // 3. Executar login com PKCE flow (mais seguro para aplicações SPA)
+    console.log('Executando login com email/senha');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
-    })
+    });
     
     if (error) {
-      console.error('Erro retornado pela Supabase durante login:', error)
+      console.error('Erro retornado pela Supabase durante login:', error);
       
-      // Adicionar logs detalhados para diferentes tipos de erro
+      // Logs detalhados para diferentes tipos de erro
       if (error.message.includes('Invalid login credentials')) {
-        console.error('Credenciais inválidas. Verifique email e senha.')
+        console.error('Credenciais inválidas. Verifique email e senha.');
       } else if (error.message.includes('rate limit')) {
-        console.error('Limite de tentativas de login excedido.')
+        console.error('Limite de tentativas de login excedido.');
       } else if (error.message.includes('network')) {
-        console.error('Erro de rede durante a autenticação.')
+        console.error('Erro de rede durante a autenticação.');
       }
       
-      throw error
+      throw error;
     }
     
     if (!data.session) {
-      console.error('Nenhuma sessão retornada após login bem-sucedido')
-      throw new Error('Falha ao estabelecer sessão')
+      console.error('Nenhuma sessão retornada após login bem-sucedido');
+      throw new Error('Falha ao estabelecer sessão');
     }
     
-    console.log('Login bem-sucedido, estabelecendo sessão')
+    console.log('Login bem-sucedido, estabelecendo sessão');
     
-    // Verificar e registrar os metadados do usuário
-    if (data.user) {
-      console.log('Metadados do usuário carregados:', {
-        id: data.user.id,
-        email: data.user.email,
-        role: data.user.user_metadata?.role || 'não definido',
-        first_name: data.user.user_metadata?.first_name,
-        last_name: data.user.user_metadata?.last_name
-      })
-      
-      // Verificar se o papel está definido corretamente
-      if (!data.user.user_metadata?.role) {
-        console.warn('⚠️ Aviso: O papel do usuário não está definido nos metadados!')
-      } else if (data.user.user_metadata.role !== 'organizador' && 
-                data.user.user_metadata.role !== 'promotor' && 
-                data.user.user_metadata.role !== 'chefe-equipe' &&
-                data.user.user_metadata.role !== 'team-leader') {
-        console.warn(`⚠️ Aviso: Papel de usuário desconhecido: ${data.user.user_metadata.role}`)
-      } else {
-        console.log(`✅ Papel do usuário válido: ${data.user.user_metadata.role}`)
-        
-        // Se for líder de equipe, definir o redirecionamento automaticamente
-        if (data.user.user_metadata.role === 'chefe-equipe' || 
-            data.user.user_metadata.role === 'team-leader') {
-          console.log(`🏆 Usuário é um chefe de equipe, definindo redirecionamento para dashboard de equipe`)
-          let redirectUrl = '/app/chefe-equipe/dashboard'
-          
-          // Guardar no localStorage para referência e uso pelo middleware
-          try {
-            localStorage.setItem('auth_redirect', redirectUrl)
-            console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`)
-          } catch (e) {
-            console.error('Erro ao salvar redirecionamento:', e)
-          }
-        }
-      }
-      
-      // Verificar compatibilidade com versões anteriores que usavam is_team_leader
-      if (data.user.user_metadata?.is_team_leader === true && 
-          data.user.user_metadata?.role !== 'chefe-equipe' && 
-          data.user.user_metadata?.role !== 'team-leader') {
-        console.log('⚠️ Compatibilidade: Usuário marcado como líder de equipe (formato antigo)');
-        console.log('⚙️ Atualizando para o formato atual...');
-        
-        try {
-          // Atualizar metadados para usar o padrão atual
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: {
-              role: 'chefe-equipe',
-              previous_role: data.user.user_metadata?.role || 'promotor',
-              team_role: 'chefe',
-              // Manter outros metadados
-              ...data.user.user_metadata,
-            }
-          });
-          
-          if (updateError) {
-            console.error('Erro ao atualizar metadados do usuário:', updateError);
-          } else {
-            console.log('✅ Metadados atualizados com sucesso para o formato atual');
-            
-            // Atualizar o objeto de usuário local
-            data.user.user_metadata.role = 'chefe-equipe';
-            
-            // Definir redirecionamento
-            let redirectUrl = '/app/chefe-equipe/dashboard';
-            try {
-              localStorage.setItem('auth_redirect', redirectUrl);
-              console.log(`🔀 Redirecionamento definido para: ${redirectUrl}`);
-            } catch (e) {
-              console.error('Erro ao salvar redirecionamento:', e);
-            }
-          }
-        } catch (updateErr) {
-          console.error('Exceção ao atualizar metadados:', updateErr);
-        }
-      }
-      
-      // Verificar se há informações de equipe nos metadados
-      if (data.user.user_metadata?.team_id) {
-        console.log(`👥 Usuário está associado à equipe: ${data.user.user_metadata.team_id}`)
-        console.log(`👤 Papel na equipe: ${data.user.user_metadata.team_role || 'não especificado'}`)
-      }
-      
-      // Armazenar metadados no localStorage para acesso rápido
-      try {
-        const authData = {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.user_metadata?.role || 'unknown',
-          name: `${data.user.user_metadata?.first_name || ''} ${data.user.user_metadata?.last_name || ''}`.trim()
-        }
-        localStorage.setItem('auth', JSON.stringify(authData))
-        console.log('Metadados do usuário salvos no localStorage')
-      } catch (e) {
-        console.error('Erro ao salvar metadados no localStorage:', e)
-      }
-    } else {
-      console.error('⛔ Usuário não retornado após login bem-sucedido')
-    }
+    // 4. Processar metadados do usuário
+    await processUserMetadata(supabase, data);
     
-    // Definir a sessão explicitamente para garantir que está armazenada
-    try {
-      console.log('Definindo sessão manualmente')
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token
-      })
-    } catch (sessionError) {
-      console.error('Erro ao definir sessão manualmente:', sessionError)
-    }
+    // 5. Estabelecer sessão
+    await establishSession(supabase, data.session);
     
-    // Esperar tempo suficiente para que a sessão seja estabelecida
-    await new Promise(resolve => setTimeout(resolve, 500))
+    // 6. Verificar estabelecimento da sessão
+    await verifySessionEstablishment(supabase, data.session);
     
-    // Verificar se a sessão foi realmente estabelecida em várias tentativas
-    let sessionEstablished = false
-    let attempts = 0
-    const maxAttempts = 3
-    
-    while (!sessionEstablished && attempts < maxAttempts) {
-      attempts++
-      console.log(`Verificando estabelecimento de sessão (tentativa ${attempts})`)
-      
-      try {
-        const { data: sessionCheck } = await supabase.auth.getSession()
-        
-        if (sessionCheck?.session?.access_token) {
-          console.log(`✅ Sessão verificada com sucesso na tentativa ${attempts}!`)
-          sessionEstablished = true
-        } else {
-          console.warn(`⚠️ Verificação de sessão falhou na tentativa ${attempts}`)
-          
-          if (attempts < maxAttempts) {
-            // Tentar estabelecer a sessão novamente
-            if (data.session) {
-              console.log('Tentando estabelecer sessão novamente...')
-              try {
-                await supabase.auth.setSession({
-                  access_token: data.session.access_token,
-                  refresh_token: data.session.refresh_token
-                })
-                // Aguardar para a próxima verificação
-                await new Promise(resolve => setTimeout(resolve, 300))
-              } catch (err) {
-                console.error(`Erro na tentativa ${attempts} de definir sessão:`, err)
-              }
-            }
-          }
-        }
-      } catch (checkError) {
-        console.error(`Erro ao verificar sessão (tentativa ${attempts}):`, checkError)
-      }
-    }
-    
-    if (!sessionEstablished) {
-      console.error('⛔ Não foi possível estabelecer sessão após múltiplas tentativas')
-      throw new Error('Falha persistente ao estabelecer sessão após login')
-    }
-    
-    return data
+    return data;
   } catch (error) {
-    console.error('Erro ao fazer login:', error)
-    throw error
+    console.error('Erro ao fazer login:', error);
+    throw error;
   }
 }
 

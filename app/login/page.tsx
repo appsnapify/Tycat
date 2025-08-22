@@ -30,32 +30,44 @@ interface FormData {
   password: string
 }
 
+// Normalizar role do usuário
+const normalizeUserRole = (role: string): string => {
+  return role?.toLowerCase() || 'desconhecido';
+};
+
+// Determinar URL para promotor
+const getPromotorUrl = (userMetadata?: any): string => {
+  return userMetadata?.team_id 
+    ? '/app/promotor/dashboard' 
+    : '/app/promotor/equipes/escolha';
+};
+
+// Mapear role para URL
+const getRoleUrl = (normalizedRole: string, userMetadata?: any): string => {
+  const roleMap: Record<string, string> = {
+    'organizador': '/app/organizador/dashboard',
+    'organizer': '/app/organizador/dashboard',
+    'chefe-equipe': '/app/chefe-equipe/dashboard',
+    'team-leader': '/app/chefe-equipe/dashboard'
+  };
+  
+  if (roleMap[normalizedRole]) {
+    return roleMap[normalizedRole];
+  }
+  
+  if (normalizedRole === 'promotor' || normalizedRole === 'promoter') {
+    return getPromotorUrl(userMetadata);
+  }
+  
+  console.warn('[LOGIN] Role desconhecido:', normalizedRole, '- Redirecionando para página inicial');
+  return '/app';
+};
+
 // FUNÇÃO CRÍTICA: Redirecionamento baseado no role
 const getRedirectUrlByRole = (role: string, userMetadata?: any): string => {
-  const normalizedRole = role?.toLowerCase() || 'desconhecido'
-  
-  switch (normalizedRole) {
-    case 'organizador':
-    case 'organizer':
-      return '/app/organizador/dashboard'
-    
-    case 'chefe-equipe':
-    case 'team-leader':
-      return '/app/chefe-equipe/dashboard'
-    
-    case 'promotor':
-    case 'promoter':
-      // Se tem equipe, vai para dashboard, senão para escolha de equipes
-      if (userMetadata?.team_id) {
-        return '/app/promotor/dashboard'
-      }
-      return '/app/promotor/equipes/escolha'
-    
-    default:
-      console.warn('[LOGIN] Role desconhecido:', role, '- Redirecionando para página inicial')
-      return '/app'
-  }
-}
+  const normalizedRole = normalizeUserRole(role);
+  return getRoleUrl(normalizedRole, userMetadata);
+};
 
 export default function LoginPage() {
   const router = useRouter()

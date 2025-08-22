@@ -4,34 +4,43 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { Database } from '@/lib/database.types'
 
+// Validar código da equipe
+function validateTeamCode(teamCode: string) {
+  if (!teamCode?.trim()) {
+    return { success: false, error: 'Código da equipe é obrigatório' };
+  }
+  return { success: true };
+}
+
+// Validar usuário autenticado
+function validateUser(user: any, userError: any) {
+  if (userError) {
+    console.error('Erro ao obter usuário:', userError);
+    return { success: false, error: 'Erro ao verificar usuário: ' + userError.message };
+  }
+  if (!user?.id) {
+    return { success: false, error: 'Usuário não autenticado' };
+  }
+  return { success: true };
+}
+
 export async function joinTeamWithCode(teamCode: string) {
   try {
-    // 1. Validação inicial
-    if (!teamCode?.trim()) {
-      return {
-        success: false,
-        error: 'Código da equipe é obrigatório'
-      }
+    // Validação inicial
+    const teamCodeValidation = validateTeamCode(teamCode);
+    if (!teamCodeValidation.success) {
+      return teamCodeValidation;
     }
 
-    // 2. Setup do cliente Supabase
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
+    // Setup do cliente Supabase
+    const cookieStore = cookies();
+    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
 
-    // 3. Obter e validar usuário atual
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError) {
-      console.error('Erro ao obter usuário:', userError)
-      return {
-        success: false,
-        error: 'Erro ao verificar usuário: ' + userError.message
-      }
-    }
-    if (!user?.id) {
-      return {
-        success: false,
-        error: 'Usuário não autenticado'
-      }
+    // Obter e validar usuário atual
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const userValidation = validateUser(user, userError);
+    if (!userValidation.success) {
+      return userValidation;
     }
 
     // 4. Chamar função RPC

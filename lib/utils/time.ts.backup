@@ -7,53 +7,35 @@
  * @param timestamp - String ISO ou Date object
  * @returns String formatado como "HH:mm" ou "Horário não disponível" se inválido
  */
-/**
- * Verifica se o timestamp é uma mensagem de erro
- */
-function isErrorMessage(timestamp: string): boolean {
-  return timestamp.includes('Horário') || 
-         timestamp.includes('inválido') || 
-         timestamp.includes('Erro') ||
-         timestamp.length < 10;
-}
-
-/**
- * Converte timestamp para Date object
- */
-function parseTimestamp(timestamp: string | Date): Date {
-  return typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-}
-
-/**
- * Formata Date object para horário português
- */
-function formatToPortugueseTime(date: Date): string {
-  return date.toLocaleTimeString('pt-PT', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Lisbon'
-  });
-}
-
 export function formatPortugalTime(timestamp: string | Date | null | undefined): string {
-  if (!timestamp) return 'Horário não disponível';
+  if (!timestamp) return 'Horário não disponível'
   
-  // Verificar se já é mensagem de erro
-  if (typeof timestamp === 'string' && isErrorMessage(timestamp)) {
-    return timestamp;
+  // 🛡️ PROTEÇÃO: Se já é uma mensagem de erro, retornar sem processar
+  if (typeof timestamp === 'string' && (
+    timestamp.includes('Horário') || 
+    timestamp.includes('inválido') || 
+    timestamp.includes('Erro') ||
+    timestamp.length < 10 // Timestamps ISO têm pelo menos 10 caracteres
+  )) {
+    return timestamp
   }
   
   try {
-    const date = parseTimestamp(timestamp);
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
     
     if (isNaN(date.getTime())) {
-      return 'Horário inválido';
+      // 🔇 Não fazer log em desenvolvimento para evitar spam na consola
+      return 'Horário inválido'
     }
     
-    return formatToPortugueseTime(date);
+    return date.toLocaleTimeString('pt-PT', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Lisbon'
+    })
   } catch (error) {
-    console.error('Error formatting Portugal time:', error);
-    return 'Erro no horário';
+    console.error('Error formatting Portugal time:', error)
+    return 'Erro no horário'
   }
 }
 
