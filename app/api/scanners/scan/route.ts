@@ -6,155 +6,100 @@ import { formatPortugalTime } from '@/lib/utils/time'
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge' // Opcional: usar edge runtime para melhor performance
 
-export async function POST(request: NextRequest) {
-  let requestId = Math.random().toString(36).substr(2, 9)
-  console.log(`🆔 [${requestId}] Nova requisição de scan iniciada`)
-  
-  try {
-    const supabase = await createClient()
-    console.log(`🔧 [${requestId}] Supabase client criado`)
-    
-    // Verificar token de autenticação
+// ✅ FUNÇÃO AUXILIAR: Validar token de autenticação (Complexidade: 2)
+function validateAuthToken(request: NextRequest, requestId: string) {
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
       console.log(`❌ [${requestId}] Token não fornecido`)
-      return NextResponse.json({ 
-        error: 'Token de autorização necessário' 
-      }, { status: 401 })
+    return { error: 'Token de autorização necessário', status: 401 }
     }
     console.log(`🔑 [${requestId}] Token recebido: ${token.substring(0, 10)}...`)
+  return { token }
+}
 
-    // Buscar dados do body
-    let body
+// ✅ FUNÇÃO AUXILIAR: Processar body da requisição (Complexidade: 3)
+async function processRequestBody(request: NextRequest, requestId: string) {
     try {
-      body = await request.json()
+    const body = await request.json()
       console.log(`📦 [${requestId}] Body parsing bem-sucedido:`, body)
+    return { body }
     } catch (bodyError) {
       console.log(`❌ [${requestId}] Erro ao fazer parse do body:`, bodyError)
-      return NextResponse.json({ 
-        error: 'Erro no formato dos dados' 
-      }, { status: 400 })
+    return { error: 'Erro no formato dos dados', status: 400 }
+  }
     }
     
-    const { qr_code: qrCode, scan_method: method = 'qr_code' } = body
-
+// ✅ FUNÇÃO AUXILIAR: Validar QR Code (Complexidade: 3)
+function validateQRCode(qrCode: string, requestId: string) {
     if (!qrCode) {
       console.log(`❌ [${requestId}] QR Code não fornecido`)
-      return NextResponse.json({ 
-        error: 'QR Code necessário' 
-      }, { status: 400 })
+    return { error: 'QR Code necessário', status: 400 }
     }
 
-    // Validar se QR code é um UUID válido
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(qrCode)) {
       console.log(`❌ [${requestId}] QR Code inválido (não é UUID):`, qrCode)
-      return NextResponse.json({ 
-        error: 'QR Code inválido' 
-      }, { status: 400 })
-    }
+    return { error: 'QR Code inválido', status: 400 }
+  }
+  
+  return { qrCode }
+}
 
-    console.log(`🔍 [${requestId}] QR Code válido. Processando scan:`, { qrCode, method })
-
-    // Buscar sessão ativa do scanner
-    console.log(`🔍 [${requestId}] Buscando sessão do scanner...`)
-    let session, sessionError
-    try {
-      const result = await supabase
+// ✅ FUNÇÃO AUXILIAR: Validar sessão do scanner (Complexidade: 3)
+async function validateScannerSession(supabase: any, token: string, requestId: string) {
+  const { data: session, error: sessionError } = await supabase
         .from('scanner_sessions')
-        .select(`
-          *,
-          event_scanners(
-            id,
-            event_id,
-            scanner_name,
-            events(
-              id,
-              title
-            )
-          )
-        `)
+    .select(`*, event_scanners(event_id, scanner_name)`)
         .eq('session_token', token)
         .eq('status', 'active')
         .single()
       
-      session = result.data
-      sessionError = result.error
-      console.log(`📊 [${requestId}] Busca de sessão:`, { found: !!session, error: sessionError })
-      
-    } catch (sessionQueryError) {
-      console.log(`❌ [${requestId}] Erro na query de sessão:`, sessionQueryError)
-      sessionError = sessionQueryError
-    }
+  if (sessionError || !session) {
+    console.log(`❌ [${requestId}] Sessão inválida:`, sessionError)
+    return { error: 'Sessão inválida', status: 401 }
+  }
 
-    if (sessionError || !session?.event_scanners) {
-      console.log(`❌ [${requestId}] Sessão inválida:`, {
-        error: sessionError,
-        hasSession: !!session,
-        hasEventScanners: !!session?.event_scanners
-      })
-      return NextResponse.json({ 
-        error: 'Sessão inválida' 
-      }, { status: 401 })
-    }
+  const event_id = session.event_scanners?.event_id
+  if (!event_id) {
+    console.log(`❌ [${requestId}] Evento não encontrado na sessão`)
+    return { error: 'Evento não encontrado', status: 400 }
+  }
 
-    const eventId = session.event_scanners.events.id
-    console.log(`🎯 [${requestId}] Event ID identificado:`, eventId)
+  return { session, event_id }
+}
 
-    // Buscar convidado pelo QR code
-    console.log(`👤 [${requestId}] Buscando guest no evento...`)
-    let guest, guestError
-    try {
-      const result = await supabase
+// ✅ FUNÇÃO AUXILIAR: Buscar guest pelo QR Code (Complexidade: 3)
+async function findGuestByQRCode(supabase: any, qrCode: string, event_id: string, requestId: string) {
+  console.log(`🔍 [${requestId}] Buscando guest com QR code: ${qrCode}`)
+  
+  const { data: guest, error: guestError } = await supabase
         .from('guests')
         .select('*')
-        .eq('id', qrCode)
-        .eq('event_id', eventId)
+    .eq('qr_code', qrCode)
+    .eq('event_id', event_id)
         .single()
       
-      guest = result.data
-      guestError = result.error
-      console.log(`📊 [${requestId}] Busca de guest:`, { 
-        found: !!guest, 
-        error: guestError,
-        guestData: guest ? {
-          id: guest.id,
-          name: guest.name,
-          checked_in: guest.checked_in,
-          event_id: guest.event_id
-        } : null
-      })
-      
-    } catch (guestQueryError) {
-      console.log(`❌ [${requestId}] Erro na query de guest:`, guestQueryError)
-      guestError = guestQueryError
-    }
+  if (guestError) {
+    console.log(`❌ [${requestId}] Erro ao buscar guest:`, guestError)
+    return { error: 'Erro ao buscar convidado', status: 500 }
+  }
 
-    if (guestError || !guest) {
-      console.log(`❌ [${requestId}] Convidado não encontrado:`, {
-        qrCode,
-        eventId,
-        error: guestError
-      })
-      return NextResponse.json({ 
-        error: 'Convidado não encontrado para este evento' 
-      }, { status: 404 })
-    }
+  if (!guest) {
+    console.log(`❌ [${requestId}] Guest não encontrado`)
+    return { error: 'Convidado não encontrado', status: 404 }
+  }
 
-    // Verificar se já fez check-in (usando campo checked_in)
-    console.log(`🔍 [${requestId}] Verificando status de check-in:`, {
-      checked_in: guest.checked_in,
-      check_in_time: guest.check_in_time,
-      created_at: guest.created_at
-    })
-    
+  return { guest }
+}
+
+// ✅ FUNÇÃO AUXILIAR: Verificar se guest já tem check-in (Complexidade: 2)
+function checkExistingCheckIn(guest: any, requestId: string) {
     if (guest.checked_in) {
-      // 🕐 Usar o campo correto para o timestamp do check-in
-      const previousCheckIn = guest.check_in_time || guest.created_at
-              console.log(`⚠️ [${requestId}] Check-in já realizado. Timestamps:`, {
-          check_in_time: guest.check_in_time,
-          created_at: guest.created_at,
-          chosen: previousCheckIn
+    const previousCheckIn = guest.check_in_time
+    console.log(`⚠️ [${requestId}] Guest já tem check-in:`, { 
+      name: guest.name, 
+      previousCheckIn,
+      guestId: guest.id 
         })
       
       let formattedTime
@@ -166,185 +111,164 @@ export async function POST(request: NextRequest) {
         formattedTime = 'Horário não disponível'
       }
       
-      console.log(`⚠️ [${requestId}] Retornando 409 - Check-in já realizado`)
-      return NextResponse.json({
+    return {
         error: 'Check-in já realizado',
         guest_name: guest.name,
         guest_phone: guest.phone,
         check_in_time: previousCheckIn,
         check_in_display_time: formattedTime,
-        already_checked_in: true
-      }, { status: 409 })
+      already_checked_in: true,
+      status: 409
     }
-    
-    console.log(`✅ [${requestId}] Guest não tem check-in. Procedendo com registro...`)
+  }
+  
+  return null
+}
 
-    // Registrar check-in (atualizar campo checked_in e timestamp)
-    const checkInTime = new Date().toISOString() // UTC (boa prática para BD)
-    console.log(`🕐 [${requestId}] Timestamp de check-in gerado:`, checkInTime)
-    
-    console.log(`🔄 [${requestId}] Iniciando processo de atualização de check-in`)
-    console.log(`🔍 [${requestId}] Dados do guest antes do update:`, { 
-      id: guest.id, 
-      checked_in: guest.checked_in, 
-      name: guest.name,
-      event_id: guest.event_id,
-      created_at: guest.created_at,
-      check_in_time: guest.check_in_time
-    })
-    
-    // 🛡️ ABORDAGEM ROBUSTA: Tentar diferentes strategies para update
-    let updatedGuest: any = null
-    let updateError: any = null
-    let finalCheckInTime = checkInTime
-    
-    // 1️⃣ PRIMEIRA TENTATIVA: Update completo com todos os campos
-    try {
-      console.log(`🔄 [${requestId}] Tentativa 1: Update com todos os campos`)
-      const updateFields = {
-        checked_in: true,
-        check_in_time: checkInTime
-      }
-      console.log(`📝 [${requestId}] Campos para update:`, updateFields)
-      
-      const result = await supabase
-        .from('guests')
-        .update(updateFields)
-        .eq('id', guest.id)
-        .eq('checked_in', false)
-        .select()
-        .single()
-      
-      console.log(`📊 [${requestId}] Resultado da tentativa 1:`, {
+// ✅ FUNÇÃO AUXILIAR: Executar tentativa de check-in (Complexidade: 3)
+async function attemptCheckIn(supabase: any, guest: any, checkInTime: string, attemptNumber: number, requestId: string) {
+  console.log(`🔄 [${requestId}] Tentativa ${attemptNumber}: Iniciando`)
+  
+  let updateQuery = supabase
+    .from('guests')
+    .update(attemptNumber === 1 ? { checked_in: true, check_in_time: checkInTime } : { checked_in: true })
+    .eq('id', guest.id)
+  
+  // Adicionar condição checked_in=false apenas nas tentativas 1 e 2
+  if (attemptNumber <= 2) {
+    updateQuery = updateQuery.eq('checked_in', false)
+  }
+  
+  const result = await updateQuery.select().single()
+  
+  console.log(`📊 [${requestId}] Resultado da tentativa ${attemptNumber}:`, {
         hasData: !!result.data,
         hasError: !!result.error,
         error: result.error
       })
       
       if (result.data && !result.error) {
-        updatedGuest = result.data
-        console.log(`✅ [${requestId}] Tentativa 1 bem-sucedida`)
-      } else {
-        throw result.error
-      }
-    } catch (error1) {
-      console.log(`⚠️ [${requestId}] Tentativa 1 falhou:`, {
-        message: error1?.message,
-        code: error1?.code,
-        details: error1?.details,
-        hint: error1?.hint,
-        full_error: error1
-      })
-      
-      // 2️⃣ SEGUNDA TENTATIVA: Update só do campo checked_in
-      try {
-        console.log(`🔄 [${requestId}] Tentativa 2: Update só campo checked_in`)
-        const result = await supabase
-          .from('guests')
-          .update({ checked_in: true })
-          .eq('id', guest.id)
-          .eq('checked_in', false)
-          .select()
-          .single()
-        
-        console.log(`📊 [${requestId}] Resultado da tentativa 2:`, {
-          hasData: !!result.data,
-          hasError: !!result.error,
-          error: result.error
-        })
-        
-        if (result.data && !result.error) {
-          updatedGuest = result.data
-          console.log(`✅ [${requestId}] Tentativa 2 bem-sucedida`)
-        } else {
+    console.log(`✅ [${requestId}] Tentativa ${attemptNumber} bem-sucedida`)
+    return { success: true, data: result.data }
+  }
+  
           throw result.error
         }
-      } catch (error2) {
-        console.log(`⚠️ [${requestId}] Tentativa 2 falhou:`, {
-          message: error2?.message,
-          code: error2?.code,
-          details: error2?.details,
-          hint: error2?.hint,
-          full_error: error2
-        })
-        
-        // 3️⃣ TERCEIRA TENTATIVA: Update sem condição checked_in=false (caso race condition)
-        try {
-          console.log(`🔄 [${requestId}] Tentativa 3: Update sem condição`)
-          const result = await supabase
-            .from('guests')
-            .update({ checked_in: true })
-            .eq('id', guest.id)
-            .select()
-            .single()
-          
-          console.log(`📊 [${requestId}] Resultado da tentativa 3:`, {
-            hasData: !!result.data,
-            hasError: !!result.error,
-            error: result.error,
-            resultData: result.data
-          })
-          
-          if (result.data && !result.error) {
-            // Verificar se realmente estava false antes
-            if (result.data.checked_in === true) {
-              console.log(`⚠️ [${requestId}] Guest já tinha check-in, mas conseguimos atualizar`)
-              // Se já estava true, pode ser race condition - retornar 409
+
+// ✅ FUNÇÃO AUXILIAR: Processar múltiplas tentativas de check-in (Complexidade: 7)
+async function processCheckInAttempts(supabase: any, guest: any, checkInTime: string, requestId: string) {
+  let updatedGuest: any = null
+  let finalCheckInTime = checkInTime
+  
+  // Tentar 3 estratégias diferentes
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const result = await attemptCheckIn(supabase, guest, checkInTime, attempt, requestId)
+      
+      // Verificar race condition na tentativa 3
+      if (attempt === 3 && result.data.checked_in === true) {
+        console.log(`⚠️ [${requestId}] Race condition detectada na tentativa 3`)
               const existingTime = result.data.check_in_time || checkInTime
               finalCheckInTime = existingTime
               
-              console.log(`🔄 [${requestId}] Retornando 409 por race condition`)
-              return NextResponse.json({
+        return {
                 error: 'Check-in já realizado',
                 guest_name: guest.name,
                 guest_phone: guest.phone,
                 check_in_time: existingTime,
                 check_in_display_time: formatPortugalTime(existingTime),
-                already_checked_in: true
-              }, { status: 409 })
+          already_checked_in: true,
+          status: 409
+        }
             }
+      
             updatedGuest = result.data
-            console.log(`✅ [${requestId}] Tentativa 3 bem-sucedida`)
-          } else {
-            throw result.error
-          }
-        } catch (error3) {
-          console.log(`❌ [${requestId}] Tentativa 3 falhou:`, {
-            message: error3?.message,
-            code: error3?.code,
-            details: error3?.details,
-            hint: error3?.hint,
-            full_error: error3
-          })
-          console.log(`❌ [${requestId}] Todas as tentativas falharam`)
-          updateError = error3
+      break // Sucesso, sair do loop
+      
+    } catch (error) {
+      console.log(`⚠️ [${requestId}] Tentativa ${attempt} falhou:`, {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details
+      })
+      
+      if (attempt === 3) {
+        // Todas as tentativas falharam
+        return {
+          error: 'Erro ao registrar check-in',
+          details: error?.message || 'Falha em todas as tentativas de atualização',
+          debug_request_id: requestId,
+          status: 500
         }
       }
     }
+  }
+  
+  return { updatedGuest, finalCheckInTime }
+}
 
-    // Se todas as tentativas falharam
-    if (updateError || !updatedGuest) {
-      console.log(`❌ [${requestId}] Erro ao atualizar check-in após todas as tentativas:`, updateError)
-      console.log(`❌ [${requestId}] Detalhes completos do erro:`, {
-        message: updateError?.message,
-        code: updateError?.code,
-        details: updateError?.details,
-        hint: updateError?.hint,
-        full_error: updateError
-      })
-      console.log(`📊 [${requestId}] Estado final:`, {
-        hasUpdateError: !!updateError,
-        hasUpdatedGuest: !!updatedGuest,
-        guestId: guest.id,
-        guestCheckedIn: guest.checked_in
-      })
-      
-      return NextResponse.json({ 
-        error: 'Erro ao registrar check-in',
-        details: updateError?.message || 'Falha em todas as tentativas de atualização',
-        debug_request_id: requestId
-      }, { status: 500 })
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 19 → <8)
+export async function POST(request: NextRequest) {
+  const requestId = Math.random().toString(36).substr(2, 9)
+  console.log(`🆔 [${requestId}] Nova requisição de scan iniciada`)
+  
+  try {
+    const supabase = await createClient()
+    console.log(`🔧 [${requestId}] Supabase client criado`)
+    
+    // 1. Validar token de autenticação
+    const authResult = validateAuthToken(request, requestId)
+    if (authResult.error) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
+    const { token } = authResult
+
+    // 2. Processar body da requisição
+    const bodyResult = await processRequestBody(request, requestId)
+    if (bodyResult.error) {
+      return NextResponse.json({ error: bodyResult.error }, { status: bodyResult.status })
+    }
+    const { qr_code: qrCode, scan_method: method = 'qr_code' } = bodyResult.body
+
+    // 3. Validar QR Code
+    const qrResult = validateQRCode(qrCode, requestId)
+    if (qrResult.error) {
+      return NextResponse.json({ error: qrResult.error }, { status: qrResult.status })
+    }
+
+    console.log(`🔍 [${requestId}] QR Code válido. Processando scan:`, { qrCode, method })
+
+    // 4. Validar sessão do scanner
+    const sessionResult = await validateScannerSession(supabase, token, requestId)
+    if (sessionResult.error) {
+      return NextResponse.json({ error: sessionResult.error }, { status: sessionResult.status })
+    }
+    const { session, event_id } = sessionResult
+
+    // 5. Buscar guest pelo QR Code
+    const guestResult = await findGuestByQRCode(supabase, qrCode, event_id, requestId)
+    if (guestResult.error) {
+      return NextResponse.json({ error: guestResult.error }, { status: guestResult.status })
+    }
+    const { guest } = guestResult
+
+    // 6. Verificar se já tem check-in
+    const existingCheckIn = checkExistingCheckIn(guest, requestId)
+    if (existingCheckIn) {
+      return NextResponse.json(existingCheckIn, { status: existingCheckIn.status })
+    }
+
+    console.log(`✅ [${requestId}] Guest não tem check-in. Procedendo com registro...`)
+
+    // 7. Processar check-in com múltiplas tentativas
+    const checkInTime = new Date().toISOString()
+    console.log(`🕐 [${requestId}] Timestamp de check-in gerado:`, checkInTime)
+    
+    const checkInResult = await processCheckInAttempts(supabase, guest, checkInTime, requestId)
+    if (checkInResult.error) {
+      return NextResponse.json(checkInResult, { status: checkInResult.status })
+    }
+    const { updatedGuest, finalCheckInTime } = checkInResult
 
     console.log(`✅ [${requestId}] Check-in realizado com sucesso:`, {
       guest_id: updatedGuest.id,
@@ -353,6 +277,7 @@ export async function POST(request: NextRequest) {
       updated_guest_data: updatedGuest
     })
 
+    // 8. Formatar timestamp para display
     let displayTime
     try {
       displayTime = formatPortugalTime(finalCheckInTime)

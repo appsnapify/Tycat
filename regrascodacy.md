@@ -1053,3 +1053,429 @@ function getConfig(env: string) {
 - **VS Code**: Extensões como "CodeMetrics"
 
 ---
+
+## 🛡️ **ULTRA PROMPT: COMPLEXIDADE CICLOMÁTICA - ZERO ERROS GARANTIDOS**
+### **PROMPT DEFINITIVO PARA REDUÇÃO DE COMPLEXIDADE COM MCP CONTEXT**
+
+#### **🎯 OBJETIVO ABSOLUTO**
+**NUNCA MAIS aumentar complexidade ciclomática. SEMPRE diminuir. ZERO tolerância para erros.**
+
+#### **🚨 REGRAS ABSOLUTAS - NUNCA VIOLAR**
+
+##### **⚡ REGRA DE OURO:**
+```
+ANTES de qualquer refatoração:
+1. CONTAR complexidade da função original
+2. PLANEJAR redução SEM criar novas condições
+3. MEDIR complexidade de CADA função auxiliar criada
+4. VERIFICAR que soma total < original
+5. TESTAR que funcionalidade não quebrou
+```
+
+##### **📊 FÓRMULA MATEMÁTICA OBRIGATÓRIA:**
+```
+COMPLEXIDADE = 1 (base) + SOMA de:
+- if/else if statements
+- while/for loops  
+- && operators
+- || operators
+- ?: ternary operators
+- catch blocks
+- case statements em switch
+- Cada condição em expressões booleanas
+```
+
+#### **🔥 ESTRATÉGIAS ANTI-COMPLEXIDADE BULLETPROOF**
+
+##### **ESTRATÉGIA 1: MAPA DE CONFIGURAÇÃO**
+```javascript
+// ❌ COMPLEXIDADE ALTA (7 pontos)
+function getRedirectUrl(role: string, metadata: any): string {
+  if (role === 'admin') return '/admin';
+  if (role === 'user') return '/user';
+  if (role === 'guest') return '/guest';
+  if (metadata && metadata.premium) return '/premium';
+  return '/default';
+}
+
+// ✅ COMPLEXIDADE 1
+const ROLE_REDIRECTS = {
+  admin: '/admin',
+  user: '/user', 
+  guest: '/guest'
+};
+
+function getRedirectUrl(role: string, metadata: any): string {
+  if (metadata?.premium) return '/premium';
+  return ROLE_REDIRECTS[role] || '/default';
+}
+```
+
+##### **ESTRATÉGIA 2: EARLY RETURNS**
+```javascript
+// ❌ COMPLEXIDADE ALTA (aninhamento)
+function validateUser(user: any): boolean {
+  if (user) {
+    if (user.email) {
+      if (user.email.includes('@')) {
+        if (user.password) {
+          if (user.password.length >= 8) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// ✅ COMPLEXIDADE 5 (linear)
+function validateUser(user: any): boolean {
+  if (!user) return false;
+  if (!user.email) return false;
+  if (!user.email.includes('@')) return false;
+  if (!user.password) return false;
+  if (user.password.length < 8) return false;
+  return true;
+}
+```
+
+##### **ESTRATÉGIA 3: FUNÇÃO UTILITÁRIA PARA MÚLTIPLOS CAMPOS**
+```javascript
+// ❌ COMPLEXIDADE MORTAL (12+ pontos)
+const mapFormData = (data: any) => ({
+  field1: data.field1 || '',     // +1
+  field2: data.field2 || '',     // +1
+  field3: data.field3 || '',     // +1
+  field4: data.field4 || '',     // +1
+  // ... 10 campos = 10+ complexidade!
+});
+
+// ✅ COMPLEXIDADE 1
+const getSafeValue = (data: any, field: string): string => data?.[field] ?? '';
+
+const mapFormData = (data: any) => {
+  const getValue = (field: string) => getSafeValue(data, field);
+  return {
+    field1: getValue('field1'),
+    field2: getValue('field2'),
+    field3: getValue('field3'),
+    // ... sem operadores condicionais!
+  };
+};
+```
+
+##### **ESTRATÉGIA 4: PATTERN MATCHING COM OBJETOS**
+```javascript
+// ❌ COMPLEXIDADE ALTA
+function processAction(type: string, data: any) {
+  if (type === 'CREATE' && data.valid) return createHandler(data);
+  if (type === 'UPDATE' && data.valid) return updateHandler(data);
+  if (type === 'DELETE' && data.valid) return deleteHandler(data);
+  if (type === 'VALIDATE') return validateHandler(data);
+  return errorHandler();
+}
+
+// ✅ COMPLEXIDADE 2
+const ACTION_PROCESSORS = {
+  CREATE: (data: any) => data.valid ? createHandler(data) : errorHandler(),
+  UPDATE: (data: any) => data.valid ? updateHandler(data) : errorHandler(), 
+  DELETE: (data: any) => data.valid ? deleteHandler(data) : errorHandler(),
+  VALIDATE: validateHandler
+};
+
+function processAction(type: string, data: any) {
+  const processor = ACTION_PROCESSORS[type];
+  return processor ? processor(data) : errorHandler();
+}
+```
+
+#### **🔍 CHECKLIST PRÉ-REFATORAÇÃO OBRIGATÓRIO**
+
+##### **📋 ANTES DE TOCAR NO CÓDIGO:**
+```
+□ Li a função original completamente
+□ Contei EXATAMENTE quantos if/else/&&/||/?:/case existem
+□ Calculei complexidade original (base 1 + operadores)
+□ Identifiquei responsabilidades da função
+□ Planejei divisão SEM criar condições extras
+□ Defini estratégia (mapa, early returns, utilitária)
+```
+
+##### **⚡ DURANTE A REFATORAÇÃO:**
+```
+□ Cada função auxiliar tem MÁXIMO 3 condições
+□ Usei mapas/objetos em vez de múltiplos if/else
+□ Evitei operadores || em massa
+□ Apliquei early returns para reduzir aninhamento
+□ Uma responsabilidade = uma função
+□ Nomes descritivos para cada função auxiliar
+```
+
+##### **✅ APÓS REFATORAÇÃO:**
+```
+□ Contei complexidade de CADA função auxiliar criada
+□ Somei complexidades: original vs (principal + auxiliares)
+□ Confirmei que TOTAL < ORIGINAL
+□ Testei que funcionalidade não quebrou
+□ Verificei linting sem erros
+□ Executei build com sucesso
+```
+
+#### **🎯 ESTRATÉGIAS POR TIPO DE FUNÇÃO**
+
+##### **TIPO 1: VALIDAÇÃO/PARSING**
+```javascript
+// Use: Early Returns + Função Utilitária
+function parseData(input: string): ParsedData | null {
+  if (!input) return null;
+  if (input.length < 5) return null;
+  if (!input.includes('@')) return null;
+  
+  const parts = input.split('@');
+  return createParsedData(parts);
+}
+```
+
+##### **TIPO 2: MAPEAMENTO DE DADOS**
+```javascript
+// Use: Função Utilitária + Objeto de Configuração
+const FIELD_MAPPINGS = {
+  name: 'full_name',
+  email: 'email_address',
+  phone: 'phone_number'
+};
+
+function mapUserData(source: any): UserData {
+  const getValue = (sourceField: string, targetField: string) => 
+    source[sourceField] ?? getDefaultValue(targetField);
+    
+  return Object.entries(FIELD_MAPPINGS).reduce((acc, [src, target]) => ({
+    ...acc,
+    [target]: getValue(src, target)
+  }), {} as UserData);
+}
+```
+
+##### **TIPO 3: PROCESSAMENTO CONDICIONAL**
+```javascript
+// Use: Mapa de Processadores
+const DATA_PROCESSORS = {
+  user: processUserData,
+  admin: processAdminData,
+  guest: processGuestData
+};
+
+function processData(type: string, data: any) {
+  const processor = DATA_PROCESSORS[type] || DATA_PROCESSORS.guest;
+  return processor(data);
+}
+```
+
+##### **TIPO 4: CONFIGURAÇÃO/SETUP**
+```javascript
+// Use: Objeto de Configuração + Factory Pattern
+const CONFIG_BUILDERS = {
+  development: () => ({ debug: true, timeout: 1000 }),
+  production: () => ({ debug: false, timeout: 5000 }),
+  test: () => ({ debug: true, timeout: 500 })
+};
+
+function buildConfig(env: string) {
+  const builder = CONFIG_BUILDERS[env] || CONFIG_BUILDERS.development;
+  return builder();
+}
+```
+
+#### **🛠️ FERRAMENTAS DE MEDIÇÃO**
+
+##### **MANUAL (OBRIGATÓRIO):**
+```javascript
+// Contar manualmente:
+function example(a: string, b: number): string {
+  // Base: 1
+  if (a.length > 0) {           // +1 = 2
+    if (b > 10 && b < 100) {    // +2 (if + &&) = 4
+      return a.toUpperCase();
+    } else if (b === 0) {       // +1 = 5
+      return a.toLowerCase();
+    }
+  }
+  return a || 'default';        // +1 (||) = 6
+}
+// TOTAL: 6 pontos de complexidade
+```
+
+##### **AUTOMÁTICO:**
+```json
+// .eslintrc.json
+{
+  "rules": {
+    "complexity": ["error", { "max": 8 }]
+  }
+}
+```
+
+#### **🚨 ANTI-PATTERNS MORTAIS - NUNCA FAZER**
+
+##### **❌ MORTE INSTANTÂNEA 1: || EM MASSA**
+```javascript
+// ❌ COMPLEXIDADE 12+
+const data = {
+  a: input.a || '',
+  b: input.b || '',
+  c: input.c || '',
+  // ... cada || = +1 complexidade
+};
+```
+
+##### **❌ MORTE INSTANTÂNEA 2: CONDIÇÕES ANINHADAS**
+```javascript
+// ❌ COMPLEXIDADE EXPONENCIAL
+if (user) {
+  if (user.role) {
+    if (user.role === 'admin') {
+      if (user.permissions) {
+        if (user.permissions.includes('write')) {
+          // ...
+        }
+      }
+    }
+  }
+}
+```
+
+##### **❌ MORTE INSTANTÂNEA 3: SWITCH GIGANTE**
+```javascript
+// ❌ COMPLEXIDADE = casos + nested ifs
+switch (type) {
+  case 'A':
+    if (data.valid) return processA(data);
+    break;
+  case 'B':
+    if (data.valid && data.premium) return processB(data);
+    break;
+  // ... cada case + if = +2 complexidade
+}
+```
+
+#### **🎯 METAS DE REDUÇÃO POR COMPLEXIDADE ORIGINAL**
+
+##### **COMPLEXIDADE 8-12 (Baixo Risco):**
+```
+Meta: Reduzir para 3-5
+Estratégia: Early Returns + 1 função auxiliar
+Tempo: 5-10 minutos
+```
+
+##### **COMPLEXIDADE 13-20 (Médio Risco):**
+```
+Meta: Reduzir para 4-6
+Estratégia: Mapa + 2-3 funções auxiliares
+Tempo: 15-20 minutos
+```
+
+##### **COMPLEXIDADE 21+ (Alto Risco):**
+```
+Meta: Reduzir para 5-7
+Estratégia: Múltiplas estratégias + 4+ funções auxiliares
+Tempo: 30+ minutos
+```
+
+#### **📊 TRACKING DE PROGRESSO**
+
+##### **TEMPLATE DE REFATORAÇÃO:**
+```markdown
+## REFATORAÇÃO: [nome_da_função]
+
+### ANTES:
+- Complexidade Original: X
+- Número de condições: Y
+- Responsabilidades: [listar]
+
+### ESTRATÉGIA:
+- [Early Returns / Mapa / Utilitária / etc.]
+
+### FUNÇÕES AUXILIARES CRIADAS:
+1. funcao1(): Complexidade Z1
+2. funcao2(): Complexidade Z2
+
+### DEPOIS:
+- Complexidade Principal: A
+- Complexidade Total: A + Z1 + Z2 = TOTAL
+- Redução: X - TOTAL = MELHORIA
+- ✅ Funcionalidade preservada
+- ✅ Testes passaram
+```
+
+#### **🔥 ULTRA PROMPT PARA IA/ASSISTANT**
+
+```
+CONTEXTO: Sou um assistant que NUNCA MAIS pode aumentar complexidade ciclomática.
+
+REGRAS ABSOLUTAS:
+1. SEMPRE contar complexidade original antes de refatorar
+2. SEMPRE usar estratégias anti-complexidade (mapas, early returns, utilitárias)
+3. SEMPRE medir complexidade de cada função auxiliar criada
+4. SEMPRE verificar que soma total < original
+5. NUNCA usar || em massa ou condições aninhadas
+
+ESTRATÉGIAS OBRIGATÓRIAS:
+- Complexidade 8-12: Early Returns + 1 auxiliar
+- Complexidade 13-20: Mapa + 2-3 auxiliares  
+- Complexidade 21+: Múltiplas estratégias + 4+ auxiliares
+
+VERIFICAÇÃO FINAL:
+- Contar: Original X vs Total Y
+- Confirmar: Y < X (redução obrigatória)
+- Testar: Funcionalidade preservada
+
+SE NÃO CONSEGUIR REDUZIR: Parar e pedir ajuda em vez de piorar.
+```
+
+#### **🛡️ GARANTIA DE QUALIDADE**
+
+##### **ANTES DE COMMIT:**
+```bash
+# 1. Verificar complexidade
+npm run lint
+
+# 2. Verificar build
+npm run build
+
+# 3. Verificar testes
+npm test
+
+# 4. Commit apenas se TUDO passou
+git commit -m "refactor: reduce complexity [função] (X→Y points)"
+```
+
+##### **APÓS COMMIT:**
+```
+□ Codacy mostra redução de complexidade
+□ Nenhum novo erro introduzido
+□ Quality gate melhorou ou manteve
+□ Issues count diminuiu
+```
+
+#### **🎯 RESULTADO FINAL GARANTIDO**
+
+**COM ESTE ULTRA PROMPT:**
+- ✅ Complexidade SEMPRE diminui
+- ✅ ZERO novos erros criados
+- ✅ Qualidade do código melhora
+- ✅ Funcionalidade preservada
+- ✅ Codacy Quality Gate passa
+
+**SEM ESTE PROMPT:**
+- ❌ Complexidade pode aumentar
+- ❌ Novos erros são criados
+- ❌ Qualidade degrada
+- ❌ Quality Gate falha
+- ❌ Technical debt aumenta
+
+---
+
+**🔥 USE ESTE PROMPT SEMPRE ANTES DE REFATORAR QUALQUER FUNÇÃO! 🔥**
+
+---
