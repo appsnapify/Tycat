@@ -34,23 +34,35 @@ import { v4 as uuidv4 } from 'uuid'
 import { createClient } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// Função para sanitizar nomes de arquivos
-function sanitizeFileName(fileName: string): string {
-  // Extrair nome e extensão
+// 🔄 FUNÇÃO AUXILIAR: Extrair nome e extensão do arquivo
+function extractFileNameParts(fileName: string): { name: string; extension: string } {
   const lastDot = fileName.lastIndexOf('.');
-  const name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
-  const extension = lastDot > 0 ? fileName.substring(lastDot) : '';
+  return {
+    name: lastDot > 0 ? fileName.substring(0, lastDot) : fileName,
+    extension: lastDot > 0 ? fileName.substring(lastDot) : ''
+  };
+}
+
+// 🔄 FUNÇÃO AUXILIAR: Normalizar texto removendo acentos
+function normalizeText(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// 🔄 FUNÇÃO AUXILIAR: Limpar caracteres especiais
+function cleanSpecialChars(text: string): string {
+  return text
+    .replace(/[^a-zA-Z0-9.-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 19 → 3)
+function sanitizeFileName(fileName: string): string {
+  const { name, extension } = extractFileNameParts(fileName);
+  const normalizedName = normalizeText(name);
+  const cleanedName = cleanSpecialChars(normalizedName).toLowerCase();
   
-  // Sanitizar apenas o nome, preservando a extensão
-  const sanitizedName = name
-    .normalize('NFD') // Decomposição Unicode
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-zA-Z0-9.-]/g, '-') // Substitui caracteres especiais
-    .replace(/-+/g, '-') // Remove hífens duplos
-    .replace(/^-|-$/g, '') // Remove hífens no início/fim
-    .toLowerCase();
-    
-  return sanitizedName + extension;
+  return cleanedName + extension;
 }
 
 // --- Funções Auxiliares para Data/Hora ---
@@ -769,7 +781,7 @@ export default function GuestListPage() {
 
     try {
       // 2. Processar upload de flyer
-      const flyerUrl = await processFlyerUpload(data, isEditMode, existingFlyerUrl, currentOrganization);
+      const flyerUrl = await processFlyerUpload(data);
 
       // 3. Preparar e validar dados de data/hora
       const dateTimeValidation = prepareDateTimesAndValidate(data);
@@ -789,123 +801,145 @@ export default function GuestListPage() {
       }
 
       // 6. Processar materiais promocionais
-      try {
-        await processPromotionalMaterials(savedEventId, promotionalFiles, currentOrganization, validation.authData);
-      } catch (promoError: any) {
-        console.error("Erro nos materiais promocionais:", promoError);
-        toast({ 
-          title: "Erro nos Materiais Promocionais", 
-          description: `Evento salvo, mas houve erro no upload de materiais: ${promoError.message}`, 
-          variant: "destructive" 
-        });
-        // Não interromper - evento foi salvo com sucesso
-      }
+      await processPromotionalMaterials(savedEventId);
 
-      // 7. Finalizar com sucesso
-      handleSubmissionSuccess(data.title, isEditMode, router);
+      // 7. Sucesso!
+      handleSubmissionSuccess(data.title);
 
     } catch (error: any) {
       handleSubmissionError(error);
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
+
+  // 🔄 FUNÇÃO AUXILIAR 1: Validar requisitos de submissão
+  const validateSubmissionRequirements = async (organization: any) => {
+    if (!organization) {
+      toast({ title: "Erro", description: "Organização não encontrada. Por favor, selecione uma organização válida.", variant: "destructive" });
+      return { isValid: false };
+    }
+
+    if (!authData?.session?.user) {
+      toast({ title: "Erro", description: "Utilizador não autenticado.", variant: "destructive" });
+      return { isValid: false };
+    }
+
+    return { isValid: true, authData };
+  };
 
   // FUNÇÃO ORIGINAL REMOVIDA - REFATORAÇÃO COMPLETA // Variável para URL final do flyer
 
-    // --- Lógica Refinada para Upload/Manutenção do Flyer --- 
-    try { // Envolver a lógica do flyer num try para capturar erros de upload
-      if (isEditMode) {
-        // Cenário 1 (Edição): User selecionou um NOVO flyer
+  // 🔄 FUNÇÃO AUXILIAR 2: Processar flyer em modo edição
+  const handleEditModeFlyer = async (data: any): Promise<string | null> => {
         if (data.flyer && data.flyer.length > 0 && data.flyer[0].name !== 'flyer-placeholder.png') {
           console.log("Modo Edição: Novo flyer selecionado. Iniciando upload...");
           const file = data.flyer[0];
           const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
-          const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
+      const filePath = `${currentOrganization.id}/${fileName}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('event-flyers')
             .upload(filePath, file, { upsert: true });
           if (uploadError) throw uploadError;
           const { data: urlData } = supabase.storage.from('event-flyers').getPublicUrl(uploadData.path);
-          finalFlyerUrl = urlData?.publicUrl;
-          console.log("Modo Edição: Novo flyer carregado. URL:", finalFlyerUrl);
+      console.log("Modo Edição: Novo flyer carregado. URL:", urlData?.publicUrl);
+      return urlData?.publicUrl;
         }
-        // Cenário 2 (Edição): User NÃO mexeu no flyer (placeholder presente)
-        else if (data.flyer && data.flyer.length > 0 && data.flyer[0].name === 'flyer-placeholder.png') {
+    
+    if (data.flyer && data.flyer.length > 0 && data.flyer[0].name === 'flyer-placeholder.png') {
           console.log("Modo Edição: Placeholder detetado. Mantendo flyer URL existente:", existingFlyerUrl);
-          finalFlyerUrl = existingFlyerUrl; // Usar a URL guardada no estado
+      return existingFlyerUrl;
         }
-        // Cenário 3 (Edição): User REMOVEU o flyer explicitamente (FileList vazio)
-        else if (!data.flyer || data.flyer.length === 0) {
+    
+    if (!data.flyer || data.flyer.length === 0) {
           console.log("Modo Edição: Flyer removido explicitamente.");
-          finalFlyerUrl = null;
+      return null;
         }
-        // Cenário Fallback (não deve acontecer)
-        else {
+    
           console.warn("Modo Edição: Estado inesperado do flyer. Definindo URL do flyer como null.");
-          finalFlyerUrl = null;
-        }
-      } else { // Modo Criação
-        // Cenário 4 (Criação): User selecionou um flyer
+    return null;
+  };
+
+  // 🔄 FUNÇÃO AUXILIAR 3: Processar flyer em modo criação
+  const handleCreationModeFlyer = async (data: any): Promise<string | null> => {
         if (data.flyer && data.flyer.length > 0) {
           console.log("Modo Criação: Flyer selecionado. Iniciando upload...");
           const file = data.flyer[0];
           const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
-          const filePath = `${currentOrganization.id}/${fileName}`; // Usar ID da organização
+      const filePath = `${currentOrganization.id}/${fileName}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('event-flyers')
             .upload(filePath, file, { upsert: true });
           if (uploadError) throw uploadError;
           const { data: urlData } = supabase.storage.from('event-flyers').getPublicUrl(uploadData.path);
-          finalFlyerUrl = urlData?.publicUrl;
-          console.log("Modo Criação: Flyer carregado. URL:", finalFlyerUrl);
+      console.log("Modo Criação: Flyer carregado. URL:", urlData?.publicUrl);
+      return urlData?.publicUrl;
         }
-        // Cenário 5 (Criação): User não selecionou flyer
-        else {
+    
           console.log("Modo Criação: Nenhum flyer selecionado.");
-          finalFlyerUrl = null;
-        }
+    return null;
+  };
+
+  // 🔄 FUNÇÃO AUXILIAR 4: Processar upload do flyer
+  const processFlyerUpload = async (data: any): Promise<string | null> => {
+    try {
+      if (isEditMode) {
+        return await handleEditModeFlyer(data);
+      } else {
+        return await handleCreationModeFlyer(data);
       }
     } catch (uploadCatchError: any) {
-        // Log detalhado do erro de upload
         console.error("Erro detalhado no upload do flyer:", JSON.stringify(uploadCatchError, null, 2));
         let uploadUserMessage = "Falha no upload do flyer.";
         if (uploadCatchError?.message) {
             uploadUserMessage += ` (${uploadCatchError.message})`;
         }
-        toast({ title: "Erro de Upload", description: uploadUserMessage, variant: "destructive" })
-        setIsSubmitting(false)
-        return // Interrompe a execução
+        toast({ title: "Erro de Upload", description: uploadUserMessage, variant: "destructive" });
+        throw uploadCatchError; // Re-throw para ser capturado pela função principal
     }
-    // --- Fim da Lógica Refinada do Flyer ---
+  };
 
-    // 2. Preparar Dados para o Banco de Dados (usar finalFlyerUrl)
+  // 🔄 FUNÇÃO AUXILIAR 5: Preparar e validar dados de data/hora
+  const prepareDateTimesAndValidate = (data: any) => {
     const startDateTime = combineDateTime(data.startDate, data.startTime);
     const endDateTime = combineDateTime(data.endDate, data.endTime);
     const guestListOpenDateTime = combineDateTime(data.guestListOpenDate, data.guestListOpenTime);
     const guestListCloseDateTime = combineDateTime(data.guestListCloseDate, data.guestListCloseTime);
 
-    // Validação extra das datas combinadas
     if (!startDateTime || !endDateTime || !guestListOpenDateTime || !guestListCloseDateTime) {
-        console.error("Erro crítico ao combinar datas/horas, verifique os inputs e a lógica:", { startDateTime, endDateTime, guestListOpenDateTime, guestListCloseDateTime });
+      console.error("Erro crítico ao combinar datas/horas:", { startDateTime, endDateTime, guestListOpenDateTime, guestListCloseDateTime });
         toast({ title: "Erro de Data/Hora", description: "Ocorreu um erro ao processar as datas e horas. Verifique os valores inseridos.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+      return { isValid: false };
     }
-    // Re-validar regras de negócio complexas aqui (Zod já o fez, mas como segurança extra)
-     if (startDateTime > endDateTime) {
-         toast({ title: "Erro de Data", description: "A data/hora de início não pode ser depois da data/hora de fim.", variant: "destructive" }); setIsSubmitting(false); return;
-     }
-     if (guestListOpenDateTime >= guestListCloseDateTime) {
-         toast({ title: "Erro de Data", description: "A abertura da lista deve ser antes do fecho.", variant: "destructive" }); setIsSubmitting(false); return;
-     }
-      if (guestListCloseDateTime > endDateTime) {
-          toast({ title: "Erro de Data", description: "A lista deve fechar antes ou ao mesmo tempo que o evento termina.", variant: "destructive" }); setIsSubmitting(false); return;
-      }
 
-      const eventData = {
-      ...(isEditMode && eventId ? { id: eventId } : {}),
-      organization_id: currentOrganization.id,
+     if (startDateTime > endDateTime) {
+      toast({ title: "Erro de Data", description: "A data/hora de início não pode ser depois da data/hora de fim.", variant: "destructive" });
+      return { isValid: false };
+     }
+    
+     if (guestListOpenDateTime >= guestListCloseDateTime) {
+      toast({ title: "Erro de Data", description: "A abertura da lista deve ser antes do fecho.", variant: "destructive" });
+      return { isValid: false };
+     }
+    
+      if (guestListCloseDateTime > endDateTime) {
+      toast({ title: "Erro de Data", description: "A lista deve fechar antes ou ao mesmo tempo que o evento termina.", variant: "destructive" });
+      return { isValid: false };
+    }
+
+    return {
+      isValid: true,
+      dateTimes: { startDateTime, endDateTime, guestListOpenDateTime, guestListCloseDateTime }
+    };
+  };
+
+  // 🔄 FUNÇÃO AUXILIAR 6: Construir dados do evento
+  const buildEventDataObject = (data: any, flyerUrl: string | null, organization: any, dateTimes: any, isEdit: boolean, editEventId?: string) => {
+    const { startDateTime, endDateTime, guestListOpenDateTime, guestListCloseDateTime } = dateTimes;
+    
+    return {
+      ...(isEdit && editEventId ? { id: editEventId } : {}),
+      organization_id: organization.id,
         title: data.title,
         description: data.description,
       date: format(startDateTime, 'yyyy-MM-dd'),
@@ -913,7 +947,7 @@ export default function GuestListPage() {
       end_date: format(endDateTime, 'yyyy-MM-dd'),
       end_time: format(endDateTime, 'HH:mm:ss'),
         location: data.location,
-      flyer_url: finalFlyerUrl, // <<< Usar a URL final determinada pela lógica acima
+      flyer_url: flyerUrl,
       type: 'guest-list' as const,
       is_published: data.isEventActive,
       guest_list_open_datetime: guestListOpenDateTime.toISOString(),
@@ -922,10 +956,12 @@ export default function GuestListPage() {
         max_guests: data.maxGuests ?? 1000,
       },
     };
+    };
 
+  // 🔄 FUNÇÃO AUXILIAR 7: Salvar evento no database
+  const saveEventToDatabase = async (eventData: any): Promise<string | null> => {
     console.log("Dados a serem enviados para upsert:", eventData);
 
-    // 3. Fazer Upsert no Supabase
     try {
       const { data: upsertResult, error: upsertError } = await supabase
         .from('events')
@@ -948,15 +984,29 @@ export default function GuestListPage() {
         } else if (upsertError.code === '22007' || upsertError.code === '22008') {
             userMessage = "Erro: Formato inválido de data ou hora fornecido.";
         }
-        toast({ title: "Erro ao Salvar Evento", description: userMessage, variant: "destructive" })
-      } else {
+        toast({ title: "Erro ao Salvar Evento", description: userMessage, variant: "destructive" });
+        return null;
+      }
+      
          const savedEventId = upsertResult?.id;
          console.log("Upsert do evento bem-sucedido. Evento ID:", savedEventId);
+      return savedEventId;
+      
+    } catch (error: any) {
+      console.error("Erro no saveEventToDatabase:", error);
+      toast({ title: "Erro", description: "Erro inesperado ao salvar evento.", variant: "destructive" });
+      return null;
+    }
+  };
 
-         // --- Lógica para upload de materiais promocionais (EXISTENTE E CORRETA) --- 
-         if (savedEventId && promotionalFiles.length > 0) {
+  // 🔄 FUNÇÃO AUXILIAR 8: Processar materiais promocionais
+  const processPromotionalMaterials = async (savedEventId: string): Promise<boolean> => {
+    if (!savedEventId || promotionalFiles.length === 0) {
+      return true; // Sem materiais para processar
+    }
+
             console.log(`Iniciando upload de ${promotionalFiles.length} materiais promocionais para o evento ${savedEventId}`);
-            const userId = authData.session.user.id; // ID do usuário autenticado
+    const userId = authData.session.user.id;
             const BUCKET_NAME = 'promotional-materials-images';
 
             const uploadPromises = promotionalFiles.map(async (file, index) => {
@@ -969,10 +1019,8 @@ export default function GuestListPage() {
                         .upload(filePath, file, { upsert: true });
 
                     if (promoUploadError) {
-                        // Log detalhado do erro ANTES de tentar aceder a .message
-                        console.error(`Erro BRUTO recebido do storage.upload (${filePath}):`, promoUploadError);
                         console.error(`Erro no upload para storage (${filePath}):`, promoUploadError);
-                        throw new Error(`Falha no upload de ${file.name}: ${promoUploadError.message || 'Detalhe indisponível'}`); // Adicionar fallback
+          throw new Error(`Falha no upload de ${file.name}: ${promoUploadError.message || 'Detalhe indisponível'}`);
                     }
 
                     const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(promoUploadData.path);
@@ -982,7 +1030,6 @@ export default function GuestListPage() {
                         console.error(`Não foi possível obter URL pública para ${filePath}`);
                         throw new Error(`Não foi possível obter URL pública para ${file.name}`);
                     }
-                    console.log(`URL pública obtida (${filePath}): ${imageUrl}`);
 
                     console.log(`Inserindo registo na tabela promotional_materials para ${filePath}`);
                     const { error: insertMaterialError } = await supabase
@@ -1023,37 +1070,35 @@ export default function GuestListPage() {
                     variant: "destructive",
                     duration: 7000
                 });
+      return false;
             } else {
                 console.log("Todos os materiais promocionais foram processados com sucesso.");
-            }
             // Limpar os ficheiros do estado após a tentativa de upload
             setPromotionalFiles([]);
             setPromotionalPreviews([]);
             form.setValue('promotionalImages', undefined);
-         } else {
-            console.log("Nenhum material promocional novo para processar.");
+      return true;
          }
-         // --- FIM Lógica Materiais Promocionais ---
+  };
 
-         // Toast de sucesso principal e redirecionamento
+  // 🔄 FUNÇÃO AUXILIAR 9: Lidar com sucesso da submissão
+  const handleSubmissionSuccess = (eventTitle: string) => {
       toast({
             title: `Evento ${isEditMode ? 'Atualizado' : 'Criado'}!`,
-            description: `O evento "${data.title}" foi salvo com sucesso.`,
-         })
-         router.push('/app/organizador/eventos')
-      }
-    } catch (catchError: any) {
-       console.error("Erro inesperado durante o upsert:", catchError);
-       // Melhorar mensagem do catch externo também
-       let catchUserMessage = "Ocorreu um erro inesperado ao processar a operação.";
-       if (catchError instanceof Error && catchError.message) {
-           catchUserMessage = catchError.message;
-       }
-       toast({ title: "Erro Inesperado", description: catchUserMessage, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false)
+      description: `O evento "${eventTitle}" foi salvo com sucesso.`,
+    });
+    router.push('/app/organizador/eventos');
+  };
+
+  // 🔄 FUNÇÃO AUXILIAR 10: Lidar com erro da submissão
+  const handleSubmissionError = (error: any) => {
+    console.error("Erro inesperado durante o processamento:", error);
+    let errorMessage = "Ocorreu um erro inesperado ao processar a operação.";
+    if (error instanceof Error && error.message) {
+      errorMessage = error.message;
     }
-  }
+    toast({ title: "Erro Inesperado", description: errorMessage, variant: "destructive" });
+  };
 
   // Render Loading State
   if (isLoading) {
