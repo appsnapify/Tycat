@@ -1476,6 +1476,122 @@ git commit -m "refactor: reduce complexity [função] (X→Y points)"
 
 ---
 
+## 🚨 **REGRAS ABSOLUTAS PARA AGENTS/IA - NUNCA VIOLAR**
+
+### **⚡ REGRA DE OURO PARA AGENTS:**
+```
+ANTES de qualquer refatoração de complexidade:
+1. LER completamente o @regrascodacy.md
+2. APLICAR a fórmula matemática em CADA função auxiliar
+3. CONTAR manualmente cada if, &&, ||, ?:, case, catch
+4. VERIFICAR que SOMA TOTAL < ORIGINAL
+5. SE não conseguir reduzir: PARAR e pedir ajuda
+```
+
+### **🔢 FÓRMULA OBRIGATÓRIA PARA AGENTS:**
+```
+PARA CADA FUNÇÃO AUXILIAR CRIADA:
+COMPLEXIDADE = 1 (base) + CONTAR:
+- if statements (cada if = +1)
+- else if statements (cada else if = +1)
+- && operators (cada && = +1)
+- || operators (cada || = +1)
+- ?: ternary operators (cada ternário = +1)
+- typeof checks (cada typeof = +1)
+- !== comparisons (cada !== = +1)
+- === comparisons (cada === = +1)
+- > < >= <= comparisons (cada = +1)
+- case statements (cada case = +1)
+- catch blocks (cada catch = +1)
+- early returns com condição (cada return com if = +1)
+```
+
+### **❌ ERROS MORTAIS QUE AGENTS COMETEM:**
+```
+❌ ERRO FATAL 1: "Early returns são sempre simples"
+   REALIDADE: if + return = 2 pontos CADA UM!
+   
+❌ ERRO FATAL 2: "Dividir função = reduzir complexidade"  
+   REALIDADE: 1 função (20 pontos) → 4 funções (8+7+6+5 = 26 pontos) = PIOR!
+   
+❌ ERRO FATAL 3: "Validações são simples"
+   REALIDADE: typeof + !== + && = 3+ pontos CADA validação!
+   
+❌ ERRO FATAL 4: "Não preciso medir funções auxiliares"
+   REALIDADE: CADA função auxiliar DEVE ser medida!
+```
+
+### **✅ ESTRATÉGIAS CORRETAS PARA AGENTS:**
+```
+✅ ESTRATÉGIA 1: MAPA DE CONFIGURAÇÃO (Complexidade: 1)
+const VALIDATORS = {
+  string: (val) => typeof val === 'string',
+  number: (val) => typeof val === 'number',
+  email: (val) => /\S+@\S+\.\S+/.test(val)
+};
+
+✅ ESTRATÉGIA 2: ARRAY.EVERY/SOME (Complexidade: 1-2)
+const isValid = REQUIRED_FIELDS.every(field => data[field]);
+
+✅ ESTRATÉGIA 3: FUNÇÃO UTILITÁRIA REUTILIZÁVEL (Complexidade: 1)
+const getSafeValue = (obj, key) => obj?.[key] ?? '';
+```
+
+### **🔍 CHECKLIST OBRIGATÓRIO PARA AGENTS:**
+```
+ANTES DE CRIAR FUNÇÃO AUXILIAR:
+□ Contei quantos if/else/&&/||/?:/case vou usar?
+□ Apliquei a fórmula matemática?
+□ Complexidade vai ser ≤ 3 pontos?
+□ Posso usar mapa/configuração em vez de condições?
+
+DEPOIS DE CRIAR FUNÇÃO AUXILIAR:
+□ Contei a complexidade real da função criada?
+□ Somei: Original vs (Principal + Todas Auxiliares)?
+□ Confirmei que TOTAL < ORIGINAL?
+□ Se não consegui reduzir: PAREI e pedi ajuda?
+```
+
+### **📊 TEMPLATE DE VERIFICAÇÃO PARA AGENTS:**
+```markdown
+## REFATORAÇÃO: [nome_da_função]
+
+### ANTES:
+- Complexidade Original: X pontos
+- Número de condições: Y
+
+### FUNÇÕES AUXILIARES CRIADAS:
+1. funcao1(): CONTEI X pontos (if=?, &&=?, ||=?, etc.)
+2. funcao2(): CONTEI Y pontos (if=?, &&=?, ||=?, etc.)
+3. funcao3(): CONTEI Z pontos (if=?, &&=?, ||=?, etc.)
+
+### VERIFICAÇÃO MATEMÁTICA:
+- Complexidade Original: X
+- Complexidade Nova: A + Y + Z = TOTAL
+- Redução: X - TOTAL = ? (DEVE SER POSITIVO!)
+
+### RESULTADO:
+□ TOTAL < ORIGINAL? (SIM/NÃO)
+□ Se NÃO: PARAR e usar estratégia diferente
+□ Se SIM: Prosseguir com confiança
+```
+
+### **🚨 REGRA FINAL PARA AGENTS:**
+```
+SE APÓS REFATORAÇÃO:
+- Codacy mostrar NOVOS erros de complexidade
+- Issues count AUMENTAR em vez de diminuir
+- Aparecerem erros em funções que criei
+
+ENTÃO:
+- EU VIOLEI as regras do @regrascodacy.md
+- DEVO admitir o erro imediatamente
+- DEVO aprender com o erro
+- DEVO aplicar as estratégias corretas
+```
+
+---
+
 **🔥 USE ESTE PROMPT SEMPRE ANTES DE REFATORAR QUALQUER FUNÇÃO! 🔥**
 
 ---
