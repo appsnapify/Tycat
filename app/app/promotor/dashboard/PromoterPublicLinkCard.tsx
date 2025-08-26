@@ -16,9 +16,30 @@ export default function PromoterPublicLinkCard({ userId }: PromoterPublicLinkCar
         generatePublicLink();
     }, []);
 
-    const generatePublicLink = () => {
-        const link = `${window.location.origin}/promotor/${userId}`;
-        setPublicLink(link);
+    const generatePublicLink = async () => {
+        try {
+            // Buscar slug do promotor
+            const response = await fetch('/api/promotor/slug', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const slug = data.slug || userId; // Fallback para UUID se não houver slug
+                const link = `${window.location.origin}/promotor/${slug}`;
+                setPublicLink(link);
+            } else {
+                // Fallback para UUID se API falhar
+                const link = `${window.location.origin}/promotor/${userId}`;
+                setPublicLink(link);
+            }
+        } catch (error) {
+            // Fallback para UUID em caso de erro
+            const link = `${window.location.origin}/promotor/${userId}`;
+            setPublicLink(link);
+        }
         setLoading(false);
     };
 

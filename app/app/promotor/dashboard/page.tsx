@@ -24,8 +24,9 @@ interface Team {
   name: string;
   team_code?: string | null;
   organizations: OrganizationInfo[];
-  role?: string;
+  role: string;
 }
+
 
 export default function PromotorDashboardPage() {
   const { user, initialAuthCheckCompleted, supabase } = useAuth()
@@ -34,6 +35,27 @@ export default function PromotorDashboardPage() {
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [error, setError] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([])
+  const [promoterName, setPromoterName] = useState<string>('')
+  
+  // --- Buscar nome do promotor ---
+  const loadPromoterName = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+        
+      if (data) {
+        const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+        setPromoterName(fullName || user.email || 'Promotor');
+      }
+    } catch (error) {
+      setPromoterName(user.email || 'Promotor');
+    }
+  };
   
   // --- Lógica de Busca de Equipas (Simplificada) ---
   const loadTeams = async () => {
@@ -54,44 +76,52 @@ export default function PromotorDashboardPage() {
         .select('team_id, role')
         .eq('user_id', user.id);
 
-      if (memberError) throw new Error("Erro ao buscar suas associações de equipa.");
-      if (!memberData || memberData.length === 0) {
-        setTeams([]);
-        setLoadingTeams(false);
+      if (memberError) {
+        console.error("DashboardPromotor: Erro ao buscar team_members:", memberError);
+        setError("Erro ao buscar associações de equipa.");
         return;
       }
 
-      const teamIds = memberData.map(member => member.team_id);
-      
-      // Buscar detalhes das equipas e da organização associada
-      const { data: teamsData, error: teamsError } = await supabase
-        .from('teams')
-        .select(`
-          id,
-          name,
-          team_code,
-          organizations ( id, name, logo_url )
-        `)
-        .in('id', teamIds);
+      if (!memberData || memberData.length === 0) {
+        console.log("DashboardPromotor: Utilizador não tem equipas associadas.");
+        setTeams([]);
+        return;
+      }
 
-      if (teamsError) throw new Error(`Erro ao carregar detalhes das equipas: ${teamsError.message}`);
+      // Buscar detalhes das equipas e organizações
+      const teamsWithOrgs = await Promise.all(
+        memberData.map(async (membership) => {
+          const { data: teamData, error: teamError } = await supabase
+            .from('teams')
+            .select('id, name, team_code')
+            .eq('id', membership.team_id)
+            .single();
 
-      if (teamsData && teamsData.length > 0) {
-        const formattedTeams = teamsData.map(team => {
-          const membership = memberData.find(m => m.team_id === team.id);
-          
-          // Garantir que organizations é sempre um array
-          let orgList: OrganizationInfo[] = [];
-          if (Array.isArray(team.organizations)) {
-             orgList = team.organizations as OrganizationInfo[];
-          } else if (team.organizations) { // Caso retorne objeto único
-             orgList = [team.organizations as OrganizationInfo];
+          if (teamError || !teamData) {
+            console.error("DashboardPromotor: Erro ao buscar detalhes da equipa:", teamError);
+            return null;
           }
 
+          // Buscar organizações associadas
+          const { data: orgTeamData, error: orgTeamError } = await supabase
+            .from('organization_teams')
+        .select(`
+              organization_id,
+              organizations!inner(
+          id,
+          name,
+                logo_url
+              )
+            `)
+            .eq('team_id', teamData.id)
+            .eq('is_active', true);
+
+          const orgList = orgTeamData?.map(ot => ot.organizations).filter(Boolean) || [];
+
           return {
-            id: team.id,
-            name: team.name || 'Equipe sem nome',
-            team_code: team.team_code,
+            id: teamData.id,
+            name: teamData.name || 'Equipe sem nome',
+            team_code: teamData.team_code,
             organizations: orgList.map(org => ({
                  id: org.id,
                  name: org.name || null,
@@ -99,12 +129,11 @@ export default function PromotorDashboardPage() {
              })),
             role: membership?.role || 'member'
           };
-        });
+        })
+      );
 
+      const formattedTeams = teamsWithOrgs.filter(Boolean);
         setTeams(formattedTeams);
-      } else {
-        setTeams([]);
-      }
 
     } catch (err: any) {
       console.error('DashboardPromotor: Erro geral ao carregar equipes:', err);
@@ -116,9 +145,10 @@ export default function PromotorDashboardPage() {
   };
 
   // --- Use Effects --- 
-  // 1. Carrega as equipas
+  // 1. Carrega nome do promotor e equipas
   useEffect(() => {
     if (initialAuthCheckCompleted && user?.id) {
+      loadPromoterName();
       loadTeams();
     } else if (initialAuthCheckCompleted && !user?.id) {
       setLoadingTeams(false);
@@ -128,10 +158,6 @@ export default function PromotorDashboardPage() {
   }, [user?.id, initialAuthCheckCompleted]);
 
   // --- Render Logic ---
-  const nomePromotor =
-    `${user?.user_metadata?.first_name || user?.profile?.first_name || ''} ${user?.user_metadata?.last_name || user?.profile?.last_name || ''}`.trim() ||
-    user?.email ||
-    'Promotor';
 
   if (!initialAuthCheckCompleted && loadingTeams) { // Mostra loader enquanto o authProvider não completou a verificação inicial
     return (
@@ -169,7 +195,7 @@ export default function PromotorDashboardPage() {
       <div className="mb-6">
          <h1 className="text-2xl md:text-3xl font-bold">Dashboard Promotor</h1>
          <p className="text-muted-foreground mt-1">
-             Bem-vindo <strong className="font-medium text-foreground">{nomePromotor}</strong>!
+             Bem-vindo <strong className="font-medium text-foreground">{promoterName}</strong>!
          </p>
       </div>
       
@@ -177,8 +203,8 @@ export default function PromotorDashboardPage() {
       <div className="space-y-6">
         <h2 className="text-xl font-semibold tracking-tight">Dashboard</h2>
         
-                 {/* Container para os cards */}
-         <div className="flex flex-wrap gap-6 justify-center md:justify-start">
+        {/* Cards Container */}
+        <div className="flex flex-wrap gap-6">
            {/* Card de Links Públicos - PRIMEIRO */}
            <PromoterPublicLinkCard userId={user.id} />
            
@@ -225,7 +251,7 @@ export default function PromotorDashboardPage() {
               </div>
             </DialogTrigger>
             
-            <DialogContent className="sm:max-w-[425px] p-6">
+           <DialogContent className="mx-4 max-w-[90vw] sm:max-w-[425px] p-4 sm:p-6">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-lg">Organizações Associadas</DialogTitle>
                 <DialogDescription>
@@ -241,9 +267,9 @@ export default function PromotorDashboardPage() {
                        href={`/app/promotor/eventos?orgId=${org.id}`}
                        passHref
                        legacyBehavior={false} // Recomendado para App Router
-                       className="block p-3 rounded-md hover:bg-muted transition-colors cursor-pointer" // Estilo do link clicável
+                      className="block p-2 sm:p-3 rounded-md hover:bg-muted transition-colors cursor-pointer" // Estilo do link clicável
                      >
-                       <div className="flex items-center gap-3"> {/* Layout interno do item */} 
+                      <div className="flex items-center gap-2 sm:gap-3"> {/* Layout interno do item */} 
                          {/* Logo Condicional */} 
                          {org.logo_url ? (
                            <Image
@@ -259,7 +285,7 @@ export default function PromotorDashboardPage() {
                            </div>
                          )}
                          {/* Nome da Organização */} 
-                         <p className="text-base font-medium leading-tight flex-grow truncate"> {/* Tamanho base, truncado */} 
+                        <p className="text-sm sm:text-base font-medium leading-tight flex-grow truncate"> {/* Tamanho responsivo, truncado */} 
                            {org.name || 'Organização Sem Nome'}
                          </p>
                        </div>

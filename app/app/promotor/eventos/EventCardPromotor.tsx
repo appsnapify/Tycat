@@ -54,7 +54,6 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
     const [modalError, setModalError] = useState<string | null>(null);
 
     // State for promotion link
-    const [teamId, setTeamId] = useState<string | null>(null);
     const [promoLink, setPromoLink] = useState<string>('');
     const [loadingPromoLink, setLoadingPromoLink] = useState(true);
 
@@ -68,7 +67,7 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
     // Fetch promotion link data
     useEffect(() => {
         if (user && event.id) {
-            fetchPromoterTeamId();
+            fetchPromoterAndEventSlugs();
         }
     }, [user, event.id]);
 
@@ -96,28 +95,41 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
         }
     };
 
-    // Fetch team_id for promotion link
-    const fetchPromoterTeamId = async () => {
+    // Fetch promoter and event slugs for promotion link
+    const fetchPromoterAndEventSlugs = async () => {
         try {
-            const { data, error } = await supabase
-                .from('event_promoters')
-                .select('team_id')
-                .eq('event_id', event.id)
-                .eq('promoter_id', user?.id)
-                .maybeSingle();
+            // Buscar slugs em paralelo para melhor performance
+            const [promoterSlugResult, eventSlugResult] = await Promise.all([
+                supabase
+                    .from('profile_slugs')
+                    .select('slug')
+                    .eq('profile_id', user?.id)
+                    .eq('is_active', true)
+                    .maybeSingle(),
+                supabase
+                    .from('event_slugs')
+                    .select('slug')
+                    .eq('event_id', event.id)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: true })
+                    .limit(1)
+                    .maybeSingle()
+            ]);
 
-            if (error) {
-                console.error('Error fetching team_id:', error);
-                return;
-            }
+            // Usar slugs se disponíveis, senão fallback para IDs
+            const promoterSlug = promoterSlugResult.data?.slug || user?.id;
+            const eventSlug = eventSlugResult.data?.slug || event.id;
 
-            if (data?.team_id) {
-                setTeamId(data.team_id);
-                const link = `${window.location.origin}/promo/${event.id}/${user?.id}/${data.team_id}`;
-                setPromoLink(link);
-            }
+            // Construir link amigável
+            const link = `${window.location.origin}/promotor/${promoterSlug}/${eventSlug}`;
+            setPromoLink(link);
+
+            console.log(`[EventCard] Link gerado para ${event.title}: ${link}`);
         } catch (error) {
-            console.error('Error fetching promotion data:', error);
+            console.error('Error fetching promotion slugs:', error);
+            // Fallback para IDs se houver erro
+            const fallbackLink = `${window.location.origin}/promotor/${user?.id}/${event.id}`;
+            setPromoLink(fallbackLink);
         } finally {
             setLoadingPromoLink(false);
         }

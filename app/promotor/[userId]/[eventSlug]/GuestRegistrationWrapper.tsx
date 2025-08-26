@@ -7,9 +7,10 @@ interface GuestRegistrationWrapperProps {
   eventId: string
   promoterId: string
   eventTitle: string
+  teamId?: string | null
 }
 
-export default function GuestRegistrationWrapper({ eventId, promoterId, eventTitle }: GuestRegistrationWrapperProps) {
+export default function GuestRegistrationWrapper({ eventId, promoterId, eventTitle, teamId }: GuestRegistrationWrapperProps) {
   const [showingQRCode, setShowingQRCode] = useState(false)
 
   return (
@@ -31,6 +32,7 @@ export default function GuestRegistrationWrapper({ eventId, promoterId, eventTit
         eventId={eventId}
         promoterId={promoterId}
         eventTitle={eventTitle}
+        teamId={teamId}
         onShowQRCode={setShowingQRCode}
       />
     </div>

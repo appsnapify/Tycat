@@ -61,12 +61,19 @@ export default async function EventGuestPage({ params }: PageProps) {
       .eq('id', (eventSlugData as any).event_id)
       .single();
 
+    // 4. Buscar team_id do promotor
+    const { data: teamData } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', promoterData.id)
+      .single();
+
     if (eventError || !eventData) {
       console.error('Event data fetch failed:', eventError);
       notFound();
     }
 
-    // 4. Verificar se a guest list está aberta
+    // 5. Verificar se a guest list está aberta
     const now = new Date();
     const guestListOpen = new Date(eventData.guest_list_open_datetime);
     const guestListClose = new Date(eventData.guest_list_close_datetime);
@@ -205,6 +212,7 @@ export default async function EventGuestPage({ params }: PageProps) {
                     eventId={eventData.id}
                     promoterId={promoterData.id}
                     eventTitle={eventData.title}
+                    teamId={teamData?.team_id || null}
                   />
                 )}
               </div>

@@ -20,7 +20,7 @@ function logReceivedData(data: any): void {
 
 // ✅ FUNÇÃO AUXILIAR: Validar campos obrigatórios (Complexidade: 2)
 function validateRequiredFields(data: any): NextResponse | null {
-  const required = ['phone', 'firstName', 'lastName', 'email', 'password', 'eventId'];
+  const required = ['phone', 'firstName', 'lastName', 'email', 'password', 'eventId', 'city'];
   const missing = required.filter(field => !data[field]);
   
   if (missing.length > 0) {
@@ -49,29 +49,55 @@ function validateEmailFormat(email: string): NextResponse | null {
   return null;
 }
 
-// ✅ FUNÇÃO AUXILIAR: Validar complexidade da password (Complexidade: 4)
-function validatePasswordComplexity(password: string): NextResponse | null {
-    if (password.length < 8) {
-      console.error('❌ Password muito curta:', password.length);
-      return NextResponse.json(
-        { success: false, error: 'Password deve ter pelo menos 8 caracteres' },
-        { status: 400 }
-      );
-    }
+// ✅ FUNÇÃO OTIMIZADA: Validar cidade (Complexidade: 1)
+function validateCity(city: string): NextResponse | null {
+  const trimmedCity = city?.trim() || '';
+  const validationError = 
+    !trimmedCity || trimmedCity.length < 2 ? 'Cidade é obrigatória' :
+    trimmedCity.length > 50 ? 'Nome da cidade muito longo' :
+    null;
 
-    const hasLower = /[a-z]/.test(password);
-    const hasUpper = /[A-Z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    
-    if (!hasLower || !hasUpper || !hasNumber) {
-      const missing = [];
-      if (!hasLower) missing.push('minúscula');
-      if (!hasUpper) missing.push('MAIÚSCULA');
-      if (!hasNumber) missing.push('número');
-      
-      console.error('❌ Password falta:', missing, 'password:', password);
+  if (validationError) {
+    console.error('❌ Cidade inválida:', city);
+    return NextResponse.json(
+      { success: false, error: validationError },
+      { status: 400 }
+    );
+  }
+  
+  return null;
+}
+
+// ✅ MAPA DE CONFIGURAÇÃO: Validadores de password (Complexidade: 1)
+const PASSWORD_VALIDATORS = {
+  length: (pwd: string) => pwd.length >= 8,
+  lower: (pwd: string) => /[a-z]/.test(pwd),
+  upper: (pwd: string) => /[A-Z]/.test(pwd),
+  number: (pwd: string) => /\d/.test(pwd)
+};
+
+const PASSWORD_ERROR_MESSAGES = {
+  length: 'pelo menos 8 caracteres',
+  lower: 'minúscula',
+  upper: 'MAIÚSCULA',
+  number: 'número'
+};
+
+// ✅ FUNÇÃO OTIMIZADA: Validar password (Complexidade: 3)
+function validatePasswordComplexity(password: string): NextResponse | null {
+    // Usar array.filter para reduzir complexidade
+    const failedValidations = Object.entries(PASSWORD_VALIDATORS)
+      .filter(([key, validator]) => !validator(password))
+      .map(([key]) => PASSWORD_ERROR_MESSAGES[key as keyof typeof PASSWORD_ERROR_MESSAGES]);
+
+    if (failedValidations.length > 0) {
+      const errorMsg = failedValidations.length === 1 && failedValidations[0] === 'pelo menos 8 caracteres'
+        ? 'Password deve ter pelo menos 8 caracteres'
+        : `Password deve ter: ${failedValidations.join(', ')}`;
+        
+      console.error('❌ Password inválida:', failedValidations);
       return NextResponse.json(
-        { success: false, error: `Password deve ter: ${missing.join(', ')}` },
+        { success: false, error: errorMsg },
         { status: 400 }
       );
     }
@@ -84,7 +110,7 @@ export async function POST(request: Request) {
     const requestData = await request.json();
     const { 
       phone, firstName, lastName, email, birthDate, gender, 
-      postalCode, city, password, eventId, promoterId, teamId
+      city, password, eventId, promoterId, teamId
     } = requestData;
 
     // 1. Log dos dados recebidos
@@ -102,6 +128,10 @@ export async function POST(request: Request) {
     const passwordError = validatePasswordComplexity(password);
     if (passwordError) return passwordError;
     
+    // 5. Validação da cidade (Early Return)
+    const cityError = validateCity(city);
+    if (cityError) return cityError;
+    
     console.log('✅ All validations passed');
 
     const cookieStore = await cookies();
@@ -118,8 +148,8 @@ export async function POST(request: Request) {
         p_email: email || null,
         p_birth_date: birthDate || null,
         p_gender: gender || 'M',
-        p_postal_code: postalCode || null,
-        p_city: city || null
+        p_postal_code: null,
+        p_city: city
       });
 
     if (registerError) {

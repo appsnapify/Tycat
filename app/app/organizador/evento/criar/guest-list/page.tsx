@@ -876,48 +876,48 @@ export default function GuestListPage() {
     savedEventId: string, 
     userId: string
   ): Promise<{status: string; value?: string; reason?: string}> => {
-    const BUCKET_NAME = 'promotional-materials-images';
-    const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
-    const filePath = `${currentOrganization.id}/${savedEventId}/${fileName}`;
+            const BUCKET_NAME = 'promotional-materials-images';
+                const fileName = `${uuidv4()}-${sanitizeFileName(file.name)}`;
+                const filePath = `${currentOrganization.id}/${savedEventId}/${fileName}`;
     
-    try {
+                try {
       console.log(`Uploading ${index + 1}/${promotionalFiles.length}: ${filePath}`);
       
-      const { data: promoUploadData, error: promoUploadError } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(filePath, file, { upsert: true });
+                    const { data: promoUploadData, error: promoUploadError } = await supabase.storage
+                        .from(BUCKET_NAME)
+                        .upload(filePath, file, { upsert: true });
 
-      if (promoUploadError) {
-        throw new Error(`Falha no upload de ${file.name}: ${promoUploadError.message || 'Detalhe indisponível'}`);
-      }
+                    if (promoUploadError) {
+          throw new Error(`Falha no upload de ${file.name}: ${promoUploadError.message || 'Detalhe indisponível'}`);
+                    }
 
-      const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(promoUploadData.path);
-      const imageUrl = urlData?.publicUrl;
+                    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(promoUploadData.path);
+                    const imageUrl = urlData?.publicUrl;
 
-      if (!imageUrl) {
-        throw new Error(`Não foi possível obter URL pública para ${file.name}`);
-      }
+                    if (!imageUrl) {
+                        throw new Error(`Não foi possível obter URL pública para ${file.name}`);
+                    }
 
-      const { error: insertMaterialError } = await supabase
-        .from('promotional_materials')
-        .insert({
-          event_id: savedEventId,
-          organization_id: currentOrganization.id,
-          image_url: imageUrl,
-          uploaded_by: userId,
-        });
+                    const { error: insertMaterialError } = await supabase
+                        .from('promotional_materials')
+                        .insert({
+                            event_id: savedEventId,
+                            organization_id: currentOrganization.id,
+                            image_url: imageUrl,
+                            uploaded_by: userId,
+                        });
 
-      if (insertMaterialError) {
-        throw new Error(`Falha ao salvar ${file.name} na base de dados: ${insertMaterialError.message}`);
-      }
+                    if (insertMaterialError) {
+                        throw new Error(`Falha ao salvar ${file.name} na base de dados: ${insertMaterialError.message}`);
+                    }
 
-      console.log(`Material ${filePath} salvo com sucesso.`);
-      return { status: 'fulfilled', value: filePath };
+                    console.log(`Material ${filePath} salvo com sucesso.`);
+                    return { status: 'fulfilled', value: filePath };
 
-    } catch (individualError: any) {
-      console.error(`Erro completo ao processar imagem ${file.name}:`, individualError);
-      return { status: 'rejected', reason: `Erro com ${file.name}: ${individualError.message || 'Erro desconhecido'}` };
-    }
+                } catch (individualError: any) {
+                    console.error(`Erro completo ao processar imagem ${file.name}:`, individualError);
+                    return { status: 'rejected', reason: `Erro com ${file.name}: ${individualError.message || 'Erro desconhecido'}` };
+                }
   };
 
   // ✅ FUNÇÃO AUXILIAR 8B: Processar materiais promocionais (Complexidade: 3)
@@ -939,30 +939,30 @@ export default function GuestListPage() {
       uploadSinglePromotionalMaterial(file, index, savedEventId, userId)
     );
 
-    console.log("Aguardando conclusão dos uploads/inserts...");
-    const results = await Promise.allSettled(uploadPromises);
-    console.log("Resultados de Promise.allSettled:", results);
+            console.log("Aguardando conclusão dos uploads/inserts...");
+            const results = await Promise.allSettled(uploadPromises);
+            console.log("Resultados de Promise.allSettled:", results);
 
-    const failedUploads = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[];
+            const failedUploads = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[];
 
-    if (failedUploads.length > 0) {
-      console.warn("Alguns uploads/inserts de materiais promocionais falharam:", failedUploads);
-      const errorMessages = failedUploads.map(f => f.reason).join('; ');
-      toast({
-        title: "Aviso: Falha no Upload de Materiais",
-        description: `Alguns materiais promocionais não puderam ser salvos: ${errorMessages}`,
-        variant: "destructive",
-        duration: 7000
-      });
+            if (failedUploads.length > 0) {
+                console.warn("Alguns uploads/inserts de materiais promocionais falharam:", failedUploads);
+                const errorMessages = failedUploads.map(f => f.reason).join('; ');
+        toast({
+                    title: "Aviso: Falha no Upload de Materiais",
+                    description: `Alguns materiais promocionais não puderam ser salvos: ${errorMessages}`,
+                    variant: "destructive",
+                    duration: 7000
+                });
       return false;
     }
 
-    console.log("Todos os materiais promocionais foram processados com sucesso.");
-    // Limpar os ficheiros do estado após a tentativa de upload
-    setPromotionalFiles([]);
-    setPromotionalPreviews([]);
-    form.setValue('promotionalImages', undefined);
-    return true;
+                console.log("Todos os materiais promocionais foram processados com sucesso.");
+            // Limpar os ficheiros do estado após a tentativa de upload
+            setPromotionalFiles([]);
+            setPromotionalPreviews([]);
+            form.setValue('promotionalImages', undefined);
+      return true;
   };
 
   // 🔄 FUNÇÃO AUXILIAR 9: Lidar com sucesso da submissão

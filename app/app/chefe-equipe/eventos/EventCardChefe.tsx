@@ -51,6 +51,9 @@ export default function EventCardChefe({ event, isPastEvent, teamId }: EventCard
     total: 0,
     validated: 0
   });
+  
+  // FORCE RE-RENDER: Add timestamp to force component updates
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   const [loadingStats, setLoadingStats] = useState(true);
 
   // State for promotional material modal
@@ -74,6 +77,7 @@ export default function EventCardChefe({ event, isPastEvent, teamId }: EventCard
   // Fetch team statistics for this event
   useEffect(() => {
     if (teamId && event.id) {
+      console.log('🔄 USEEFFECT EXECUTADO para evento:', event.title || event.id);
       fetchTeamStats();
     }
   }, [event.id, teamId]);
@@ -81,11 +85,38 @@ export default function EventCardChefe({ event, isPastEvent, teamId }: EventCard
   const fetchTeamStats = async () => {
     try {
       const supabase = createClient();
+      
+      // 1. Buscar TODOS os membros da equipa (incluindo o chefe)
+      const { data: teamMembers, error: teamError } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('team_id', teamId);
+
+      if (teamError) {
+        console.error('Erro ao buscar membros da equipa:', teamError);
+        setTeamStats({ total: 0, validated: 0 });
+        return;
+      }
+
+      if (!teamMembers || teamMembers.length === 0) {
+        console.log('Nenhum membro encontrado na equipa:', teamId);
+        setTeamStats({ total: 0, validated: 0 });
+        return;
+      }
+
+      const promoterIds = teamMembers.map(m => m.user_id);
+      console.log('Buscando guests para promotores:', promoterIds);
+      console.log('Event ID:', event.id);
+      console.log('Team ID:', teamId);
+
+      // 2. Buscar guests de TODOS os promotores da equipa
+      // CORREÇÃO: Usar filter em vez de .in() que tem bug com UUIDs
       const { data, error } = await supabase
         .from('guests')
-        .select('id, check_in_time')
+        .select('id, check_in_time, promoter_id')
         .eq('event_id', event.id)
-        .eq('team_id', teamId);
+        .or(promoterIds.map(id => `promoter_id.eq.${id}`).join(','))
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Erro ao buscar estatísticas da equipa:', error);
@@ -95,7 +126,12 @@ export default function EventCardChefe({ event, isPastEvent, teamId }: EventCard
       const total = data?.length || 0;
       const validated = data?.filter(guest => guest.check_in_time).length || 0;
 
+      console.log(`🔍 EVENTO ${event.title || event.id}: ${total} guests, ${validated} validados`);
+      console.log('RAW DATA from query:', data);
+      console.log('FILTERED promoter IDs used:', promoterIds);
+      console.log('🚨 QUERY USADA:', `.or(${promoterIds.map(id => `promoter_id.eq.${id}`).join(',')})`);
       setTeamStats({ total, validated });
+      setLastUpdate(Date.now()); // Force component update
     } catch (error) {
       console.error('Erro ao carregar estatísticas da equipa:', error);
     } finally {

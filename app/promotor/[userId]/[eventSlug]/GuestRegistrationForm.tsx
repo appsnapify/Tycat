@@ -10,6 +10,8 @@ import { Database } from '@/lib/database.types';
 import QRCodeDisplay from './QRCodeDisplay';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import CityAutocomplete from '@/components/CityAutocomplete';
+import { detectCountryFromPhone } from '@/utils/phoneCountry';
 
 // Estilos para forçar fundo branco no PhoneInput
 const phoneInputStyles = `
@@ -78,35 +80,18 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<'M' | 'F'>('M');
-  const [postalCode, setPostalCode] = useState('');
   const [city, setCity] = useState('');
-  const [postalCodeLoading, setPostalCodeLoading] = useState(false);
+  const [phoneCountry, setPhoneCountry] = useState('PT');
   
   // Results
   const [clientUser, setClientUser] = useState<ClientUser | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
 
-  // 🇵🇹 Auto-detect city from postal code
-  const handlePostalCodeChange = async (value: string) => {
-    setPostalCode(value);
-    
-    // Só buscar se tiver pelo menos 4 caracteres
-    if (value.length >= 4) {
-      setPostalCodeLoading(true);
-      try {
-        const response = await fetch(`/api/postal-code?code=${encodeURIComponent(value)}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.city) {
-            setCity(data.city);
-          }
-        }
-      } catch (error) {
-        console.error('Postal code lookup error:', error);
-      } finally {
-        setPostalCodeLoading(false);
-      }
-    }
+  // 🌍 Detectar país baseado no telefone
+  const handlePhoneChange = (value: string) => {
+    setPhone(value || '');
+    const country = detectCountryFromPhone(value || '');
+    setPhoneCountry(country);
   };
 
   const supabase = createClientComponentClient<Database>();
@@ -288,7 +273,6 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
           email: email.trim(), // Email sempre string (obrigatório)
           birthDate: birthDate || null,
           gender,
-          postalCode: postalCode.trim() || null,
           city: city.trim() || null,
           password,
           eventId,
@@ -326,6 +310,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
     setEmail('');
     setBirthDate('');
     setGender('M');
+    setCity('');
+    setPhoneCountry('PT');
     setClientUser(null);
     setQrCode(null);
     setError(null);
@@ -439,10 +425,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                   countryCallingCodeEditable={false}
                   defaultCountry="PT"
                   value={phone}
-                  onChange={(value) => {
-                    // console.log('🌍 PhoneInput onChange:', value);
-                    setPhone(value || '');
-                  }}
+                  onChange={handlePhoneChange}
                   disabled={loading}
                   placeholder="93 588 6310"
                   className="phone-input-white"
@@ -639,39 +622,14 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
                 </select>
               </div>
 
-              {/* Código Postal */}
-              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-emerald-500" />
-                  <Input
-                    id="postalCode"
-                    type="text"
-                    placeholder="Código Postal (ex: 4750-850)"
-                    value={postalCode}
-                    onChange={(e) => handlePostalCodeChange(e.target.value)}
-                    className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm pl-10"
-                    disabled={loading || postalCodeLoading}
-                  />
-                  {postalCodeLoading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Cidade */}
-              <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
-                <Input
-                  id="city"
-                  type="text"
-                  placeholder="Cidade"
+              {/* Cidade Inteligente */}
+              <CityAutocomplete
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="border-none bg-transparent focus:ring-0 focus:border-none text-slate-800 placeholder-slate-400 text-sm"
+                onChange={setCity}
+                countryCode={phoneCountry}
+                required={true}
                   disabled={loading}
                 />
-              </div>
 
               {/* Palavra-passe */}
               <div className="bg-transparent border-2 border-emerald-500 rounded-xl p-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-200">
