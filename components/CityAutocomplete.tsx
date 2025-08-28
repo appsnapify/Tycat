@@ -161,37 +161,36 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
     inputRef.current?.focus();
   };
   
+  // ✅ MAPA DE CONFIGURAÇÃO: Ações do teclado (Complexidade: 1)
+  const KEYBOARD_ACTIONS = {
+    ArrowDown: () => {
+      setSelectedIndex(prev => prev < suggestions.length - 1 ? prev + 1 : 0);
+    },
+    ArrowUp: () => {
+      setSelectedIndex(prev => prev > 0 ? prev - 1 : suggestions.length - 1);
+    },
+    Enter: () => {
+      const isValidSelection = selectedIndex >= 0 && selectedIndex < suggestions.length;
+      if (isValidSelection) {
+        selectSuggestion(suggestions[selectedIndex]);
+      }
+    },
+    Escape: () => {
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    }
+  };
+
   // ✅ FUNÇÃO: Handle keyboard navigation (Complexidade: 3)
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showSuggestions || suggestions.length === 0) return;
+    const shouldPreventDefault = ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key);
+    const hasValidSuggestions = showSuggestions && suggestions.length > 0;
     
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex(prev => 
-          prev < suggestions.length - 1 ? prev + 1 : 0
-        );
-        break;
-        
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex(prev => 
-          prev > 0 ? prev - 1 : suggestions.length - 1
-        );
-        break;
-        
-      case 'Enter':
-        e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-          selectSuggestion(suggestions[selectedIndex]);
-        }
-        break;
-        
-      case 'Escape':
-        setShowSuggestions(false);
-        setSelectedIndex(-1);
-        break;
-    }
+    if (!hasValidSuggestions) return;
+    if (shouldPreventDefault) e.preventDefault();
+    
+    const action = KEYBOARD_ACTIONS[e.key as keyof typeof KEYBOARD_ACTIONS];
+    if (action) action();
   };
   
   // ✅ EFFECT: Fechar sugestões ao clicar fora (Complexidade: 1)

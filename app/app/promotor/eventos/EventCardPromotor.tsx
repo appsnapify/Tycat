@@ -95,40 +95,37 @@ export default function EventCardPromotor({ event, isPastEvent }: EventCardPromo
         }
     };
 
-    // Fetch promoter and event slugs for promotion link
+    // ✅ FUNÇÃO UTILITÁRIA: Extrair slug com fallback (Complexidade: 1)
+    const extractSlugWithFallback = (result: any, fallback: string): string => {
+        return result?.data?.slug ?? fallback;
+    };
+
+    // ✅ FUNÇÃO UTILITÁRIA: Construir link promocional (Complexidade: 1)
+    const buildPromoLink = (promoterSlug: string, eventSlug: string): string => {
+        return `${window.location.origin}/promotor/${promoterSlug}/${eventSlug}`;
+    };
+
+    // ✅ FUNÇÃO UTILITÁRIA: Processar resultado dos slugs (Complexidade: 2)
+    const processSlugResults = (promoterResult: any, eventResult: any) => {
+        const promoterSlug = extractSlugWithFallback(promoterResult, user?.id || '');
+        const eventSlug = extractSlugWithFallback(eventResult, event.id);
+        const link = buildPromoLink(promoterSlug, eventSlug);
+        
+        setPromoLink(link);
+        console.log(`[EventCard] Link gerado para ${event.title}: ${link}`);
+    };
+
+    // ✅ FUNÇÃO PRINCIPAL: Buscar slugs (Complexidade: 3)
     const fetchPromoterAndEventSlugs = async () => {
         try {
-            // Buscar slugs em paralelo para melhor performance
-            const [promoterSlugResult, eventSlugResult] = await Promise.all([
-                supabase
-                    .from('profile_slugs')
-                    .select('slug')
-                    .eq('profile_id', user?.id)
-                    .eq('is_active', true)
-                    .maybeSingle(),
-                supabase
-                    .from('event_slugs')
-                    .select('slug')
-                    .eq('event_id', event.id)
-                    .eq('is_active', true)
-                    .order('created_at', { ascending: true })
-                    .limit(1)
-                    .maybeSingle()
+            const [promoterResult, eventResult] = await Promise.all([
+                supabase.from('profile_slugs').select('slug').eq('profile_id', user?.id).eq('is_active', true).maybeSingle(),
+                supabase.from('event_slugs').select('slug').eq('event_id', event.id).eq('is_active', true).order('created_at', { ascending: true }).limit(1).maybeSingle()
             ]);
-
-            // Usar slugs se disponíveis, senão fallback para IDs
-            const promoterSlug = promoterSlugResult.data?.slug || user?.id;
-            const eventSlug = eventSlugResult.data?.slug || event.id;
-
-            // Construir link amigável
-            const link = `${window.location.origin}/promotor/${promoterSlug}/${eventSlug}`;
-            setPromoLink(link);
-
-            console.log(`[EventCard] Link gerado para ${event.title}: ${link}`);
+            processSlugResults(promoterResult, eventResult);
         } catch (error) {
             console.error('Error fetching promotion slugs:', error);
-            // Fallback para IDs se houver erro
-            const fallbackLink = `${window.location.origin}/promotor/${user?.id}/${event.id}`;
+            const fallbackLink = buildPromoLink(user?.id || '', event.id);
             setPromoLink(fallbackLink);
         } finally {
             setLoadingPromoLink(false);

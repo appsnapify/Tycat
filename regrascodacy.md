@@ -1592,6 +1592,232 @@ ENTÃO:
 
 ---
 
-**🔥 USE ESTE PROMPT SEMPRE ANTES DE REFATORAR QUALQUER FUNÇÃO! 🔥**
+## 🚨 **SISTEMA ANTI-FALHA DEFINITIVO - ZERO ERROS GARANTIDOS**
+### **CHECKLIST OBRIGATÓRIO PARA AGENTS/IA - NUNCA PULAR**
+
+#### **⚡ ANTES DE QUALQUER REFATORAÇÃO:**
+
+```markdown
+## ✅ PASSO 1: INVENTÁRIO COMPLETO
+□ Listo TODOS os arquivos que vou modificar
+□ Listo TODOS os arquivos novos que vou criar  
+□ Leio COMPLETAMENTE cada arquivo
+□ Identifico TODAS as funções que serão alteradas
+
+## ✅ PASSO 2: CONTAGEM MANUAL OBRIGATÓRIA
+Para CADA função (nova ou modificada):
+□ Conto MANUALMENTE: if, else if, &&, ||, ?:, catch, case, typeof
+□ Escrevo a fórmula: 1 + X + Y + Z = TOTAL
+□ Verifico se TOTAL ≤ 8
+□ Se > 8: PARO e aplico estratégias anti-complexidade
+
+## ✅ PASSO 3: ESTRATÉGIA POR COMPLEXIDADE
+□ Se 1-8: OK, prosseguir
+□ Se 9-15: Aplicar 1 estratégia (mapa OU early returns)  
+□ Se 16+: Aplicar múltiplas estratégias obrigatoriamente
+
+## ✅ PASSO 4: VERIFICAÇÃO MATEMÁTICA
+□ Complexidade Original: X pontos
+□ Complexidade Nova: A + B + C = TOTAL
+□ Confirmo que TOTAL < X (OBRIGATÓRIO)
+□ Se TOTAL ≥ X: PARO e uso estratégia diferente
+
+## ✅ PASSO 5: TESTE ANTES DE COMMIT
+□ npm run build (sem erros)
+□ Verifico se há novos erros no linter
+□ Se há NOVOS erros: PARO e corrijo IMEDIATAMENTE
+□ Testo funcionalidade não quebrou
+```
+
+#### **📊 TEMPLATE DE ANÁLISE OBRIGATÓRIO:**
+
+```markdown
+## ANÁLISE DE COMPLEXIDADE: [nome_função]
+
+### CONTAGEM MANUAL:
+```javascript
+function exemplo() {
+  if (a?.b) {           // +2 (if + ?.)
+    return b || c;      // +1 (||)
+  }
+  try {                 // +1 (try/catch)
+    // code
+  } catch (e) {         // +1 (catch explícito)
+    // error
+  }
+}
+// BASE: 1
+// TOTAL: 1 + 2 + 1 + 1 + 1 = 6 pontos
+```
+
+### ESTRATÉGIA APLICADA:
+- [x] Mapa de configuração
+- [ ] Early returns
+- [ ] Função utilitária
+- [ ] Divisão por responsabilidade
+
+### VERIFICAÇÃO FINAL:
+- Complexidade Original: X
+- Complexidade Nova: Y  
+- Redução: X - Y = Z (DEVE SER POSITIVO)
+- ✅ Build sem erros
+- ✅ Funcionalidade preservada
+```
+
+#### **🔥 FÓRMULA EXPANDIDA DE COMPLEXIDADE:**
+
+```
+COMPLEXIDADE = 1 (base) + SOMA de:
+- if statements (+1 cada)
+- else if statements (+1 cada)  
+- while/for loops (+1 cada)
+- && operators (+1 cada)
+- || operators (+1 cada)
+- ?. optional chaining (+1 cada)
+- ?: ternary operators (+1 cada)
+- catch blocks (+1 cada)
+- case statements (+1 cada)
+- typeof checks (+1 cada)
+- !== comparisons (+1 cada)
+- === comparisons (+1 cada)
+- > < >= <= comparisons (+1 cada)
+- early returns com condição (+1 cada)
+```
+
+#### **🛡️ ESTRATÉGIAS ANTI-COMPLEXIDADE AVANÇADAS:**
+
+##### **ESTRATÉGIA 1: MAPA DE VALIDADORES**
+```javascript
+// ❌ Complexidade 8+
+function validate(data) {
+  if (!data.email) return false;
+  if (!data.email.includes('@')) return false;
+  if (!data.password) return false;
+  if (data.password.length < 8) return false;
+  if (!/[A-Z]/.test(data.password)) return false;
+  return true;
+}
+
+// ✅ Complexidade 2
+const VALIDATORS = {
+  email: (val) => val && val.includes('@'),
+  password: (val) => val && val.length >= 8 && /[A-Z]/.test(val)
+};
+
+function validate(data) {
+  const failures = Object.entries(VALIDATORS)
+    .filter(([key, validator]) => !validator(data[key]));
+  return failures.length === 0;
+}
+```
+
+##### **ESTRATÉGIA 2: CONFIGURATION-DRIVEN LOGIC**
+```javascript
+// ❌ Complexidade 10+
+function processUser(user, type) {
+  if (type === 'admin') {
+    if (user.permissions.includes('write')) {
+      return processAdminWrite(user);
+    } else if (user.permissions.includes('read')) {
+      return processAdminRead(user);
+    }
+  } else if (type === 'user') {
+    if (user.verified) {
+      return processVerifiedUser(user);
+    } else {
+      return processUnverifiedUser(user);
+    }
+  }
+  return processGuest(user);
+}
+
+// ✅ Complexidade 3
+const USER_PROCESSORS = {
+  admin: {
+    write: processAdminWrite,
+    read: processAdminRead,
+    default: processAdminRead
+  },
+  user: {
+    verified: processVerifiedUser,
+    unverified: processUnverifiedUser,
+    default: (user) => user.verified ? processVerifiedUser(user) : processUnverifiedUser(user)
+  },
+  default: processGuest
+};
+
+function processUser(user, type) {
+  const typeProcessors = USER_PROCESSORS[type] || USER_PROCESSORS.default;
+  if (typeof typeProcessors === 'function') return typeProcessors(user);
+  
+  const permission = user.permissions?.[0] || 'default';
+  const processor = typeProcessors[permission] || typeProcessors.default;
+  return processor(user);
+}
+```
+
+##### **ESTRATÉGIA 3: PIPELINE PATTERN**
+```javascript
+// ❌ Complexidade 12+
+function processData(input) {
+  if (!input) throw new Error('No input');
+  if (typeof input !== 'string') throw new Error('Invalid type');
+  if (input.length < 5) throw new Error('Too short');
+  if (!input.includes('@')) throw new Error('No @');
+  
+  const cleaned = input.trim().toLowerCase();
+  const parts = cleaned.split('@');
+  if (parts.length !== 2) throw new Error('Invalid format');
+  if (parts[0].length < 3) throw new Error('Username too short');
+  if (!parts[1].includes('.')) throw new Error('Invalid domain');
+  
+  return { username: parts[0], domain: parts[1] };
+}
+
+// ✅ Complexidade 2
+const VALIDATION_PIPELINE = [
+  (input) => input || (() => { throw new Error('No input'); })(),
+  (input) => typeof input === 'string' || (() => { throw new Error('Invalid type'); })(),
+  (input) => input.length >= 5 || (() => { throw new Error('Too short'); })(),
+  (input) => input.includes('@') || (() => { throw new Error('No @'); })()
+];
+
+const PROCESSING_PIPELINE = [
+  (input) => input.trim().toLowerCase(),
+  (input) => input.split('@'),
+  (parts) => parts.length === 2 ? parts : (() => { throw new Error('Invalid format'); })(),
+  (parts) => parts[0].length >= 3 ? parts : (() => { throw new Error('Username too short'); })(),
+  (parts) => parts[1].includes('.') ? parts : (() => { throw new Error('Invalid domain'); })(),
+  (parts) => ({ username: parts[0], domain: parts[1] })
+];
+
+function processData(input) {
+  VALIDATION_PIPELINE.forEach(validator => validator(input));
+  return PROCESSING_PIPELINE.reduce((acc, processor) => processor(acc), input);
+}
+```
+
+#### **🚨 REGRAS DE OURO FINAIS:**
+
+1. **NUNCA assumir que "early returns são simples"** - CADA if + return = +2 pontos
+2. **NUNCA criar função auxiliar sem medir sua complexidade primeiro**
+3. **SEMPRE somar complexidade total (principal + todas auxiliares)**
+4. **SE não conseguir reduzir: PARAR e pedir ajuda**
+5. **SEMPRE testar que funcionalidade não quebrou**
+
+#### **🔧 COMPROMISSO DO AGENT:**
+```
+PROMETO que daqui para frente:
+1. ✅ SEMPRE usar este checklist obrigatório
+2. ✅ SEMPRE contar manualmente cada operador
+3. ✅ SEMPRE verificar TODOS os arquivos (novos e modificados)
+4. ✅ SEMPRE testar antes de commit
+5. ✅ SE violar: admitir imediatamente e corrigir
+6. ✅ NUNCA fazer push se houver novos erros no Codacy
+```
+
+---
+
+**🔥 USE ESTE SISTEMA SEMPRE ANTES DE REFATORAR QUALQUER FUNÇÃO! 🔥**
 
 ---
