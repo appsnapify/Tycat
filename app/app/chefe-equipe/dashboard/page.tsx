@@ -305,31 +305,42 @@ export default function TeamLeaderDashboard() {
           return;
         }
 
-        // Verificar se os dados são válidos
+        // Verificar se os dados são válidos - Early Returns
         if (!rpcData) {
              console.warn("Dashboard Chefe: RPC retornou dados nulos ou indefinidos.");
-             // Manter dashboardInfo como null ou definir um estado de erro mais específico?
-             // Por agora, vamos manter null para que o !dashboardInfo check funcione.
-             setError("Não foram recebidos dados do dashboard."); // Definir erro
-             setDashboardInfo(null); 
-        } else if (!Array.isArray(rpcData)) {
+             setError("Não foram recebidos dados do dashboard.");
+             setDashboardInfo(null);
+             setLoading(false);
+             return;
+        }
+        
+        if (!Array.isArray(rpcData)) {
              console.error("Dashboard Chefe: Resposta da RPC não é um array:", rpcData);
              setError("Formato de dados inesperado recebido.");
              setDashboardInfo(null);
-        } else if (rpcData.length === 0) {
+             setLoading(false);
+             return;
+        }
+        
+        if (rpcData.length === 0) {
              console.warn("Dashboard Chefe: RPC retornou um array vazio.");
-             // Isso pode significar que a equipa não foi encontrada pela RPC?
              setError("Dados da equipa não encontrados.");
              setDashboardInfo(null);
-        } else if (rpcData[0].error) { // Verificar erro *dentro* do primeiro objeto, se aplicável
+             setLoading(false);
+             return;
+        }
+        
+        if (rpcData[0].error) {
              console.error("Dashboard Chefe: Erro retornado dentro da resposta RPC:", rpcData[0].error);
              setError(`Erro ao processar dados: ${rpcData[0].error}`);
              setDashboardInfo(null);
-        } else {
-            // Definir o estado com o PRIMEIRO objeto do array
-            setDashboardInfo(rpcData[0] as LeaderDashboardData); 
-            setError(null); // Limpar erro se dados foram carregados com sucesso
+             setLoading(false);
+             return;
         }
+
+        // Sucesso - definir dados
+        setDashboardInfo(rpcData[0] as LeaderDashboardData); 
+        setError(null);
 
       } catch (err: any) {
         console.error("Dashboard Chefe: Erro GERAL no carregamento:", err);

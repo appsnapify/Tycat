@@ -115,7 +115,7 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
           .order('date', { ascending: true })
 
         if (upcomingError) throw upcomingError
-        setUpcomingEvents(upcoming || [])
+        setUpcomingEvents(upcoming ?? [])
 
         const { data: past, error: pastError } = await supabase
           .from('events')
@@ -131,7 +131,7 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
           .order('date', { ascending: false })
 
         if (pastError) throw pastError
-        setPastEvents(past || [])
+        setPastEvents(past ?? [])
       } catch (error) {
         console.error('Erro ao carregar organização:', error)
       } finally {
