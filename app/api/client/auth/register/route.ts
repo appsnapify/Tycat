@@ -11,50 +11,34 @@ const supabase = createClient(
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-change-in-production';
 
-// ✅ FUNÇÃO: Validar entrada (Complexidade: 6)
-function validateInput(data: any): NextResponse | null {
-  if (!data.phone?.trim()) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Número de telemóvel é obrigatório', code: 'MISSING_PHONE' },
-      { status: 400 }
-    );
+// ✅ FUNÇÃO AUXILIAR: Criar resposta de erro (Complexidade: 1)
+function createValidationError(message: string, code: string): NextResponse {
+  return NextResponse.json(
+    { success: false, error: message, code },
+    { status: 400 }
+  );
+}
+
+// ✅ FUNÇÃO: Validar campos obrigatórios (Complexidade: 5)
+function validateRequiredFields(data: any): NextResponse | null {
+  const validations = [
+    { field: data.phone?.trim(), message: 'Número de telemóvel é obrigatório', code: 'MISSING_PHONE' },
+    { field: data.first_name?.trim(), message: 'Nome é obrigatório', code: 'MISSING_FIRST_NAME' },
+    { field: data.last_name?.trim(), message: 'Apelido é obrigatório', code: 'MISSING_LAST_NAME' },
+    { field: data.city?.trim(), message: 'Cidade é obrigatória', code: 'MISSING_CITY' },
+    { field: data.password?.trim(), message: 'Password é obrigatória', code: 'MISSING_PASSWORD' }
+  ];
+
+  for (const validation of validations) { // +1
+    if (!validation.field) { // +1
+      return createValidationError(validation.message, validation.code);
+    }
   }
-  
-  if (!data.first_name?.trim()) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Nome é obrigatório', code: 'MISSING_FIRST_NAME' },
-      { status: 400 }
-    );
-  }
-  
-  if (!data.last_name?.trim()) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Apelido é obrigatório', code: 'MISSING_LAST_NAME' },
-      { status: 400 }
-    );
-  }
-  
-  if (!data.city?.trim()) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Cidade é obrigatória', code: 'MISSING_CITY' },
-      { status: 400 }
-    );
-  }
-  
-  if (!data.password?.trim()) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Password é obrigatória', code: 'MISSING_PASSWORD' },
-      { status: 400 }
-    );
-  }
-  
+
   if (data.password.length < 8) { // +1
-    return NextResponse.json(
-      { success: false, error: 'Password deve ter pelo menos 8 caracteres', code: 'WEAK_PASSWORD' },
-      { status: 400 }
-    );
+    return createValidationError('Password deve ter pelo menos 8 caracteres', 'WEAK_PASSWORD');
   }
-  
+
   return null;
 }
 
@@ -83,7 +67,7 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     
     // Validar entrada
-    const validationError = validateInput(data);
+    const validationError = validateRequiredFields(data);
     if (validationError) return validationError; // +1
     
     // Verificar se telefone já existe

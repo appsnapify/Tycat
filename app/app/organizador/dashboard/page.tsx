@@ -7,10 +7,11 @@ import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useOrganization } from '@/app/contexts/organization-context'
 import Link from 'next/link'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
+import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs'
+import { DashboardTeams } from '@/components/dashboard/DashboardTeams'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatCard } from '@/components/dashboard/stat-card'
 import { 
   ArrowRight, 
   Users, 

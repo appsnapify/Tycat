@@ -3,7 +3,8 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs'
+import { DashboardTeams } from '@/components/dashboard/DashboardTeams'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -103,36 +104,10 @@ export function DashboardContent({
   return (
     <div className="space-y-6">
       {/* KPIs / Métricas principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard
-          title="Eventos Completos"
-          value={loadingKpis ? "..." : kpis.totalEvents}
-          icon={<CalendarDays size={18} />}
-          color="primary"
-          loading={loadingKpis}
-        />
-        <StatCard
-          title="Eventos Próximos"
-          value={loadingKpis ? "..." : kpis.upcomingEvents} 
-          icon={<TicketCheck size={18} />}
-          color="accent"
-          loading={loadingKpis}
-        />
-        <StatCard
-          title="Equipas"
-          value={loadingKpis ? "..." : kpis.teamsCount}
-          icon={<Users size={18} />}
-          color="secondary"
-          loading={loadingKpis}
-        />
-        <StatCard
-          title="Promotores"
-          value={loadingKpis ? "..." : kpis.promotersCount}
-          icon={<Users size={18} />}
-          color="neutral"
-          loading={loadingKpis}
-        />
-      </div>
+      <DashboardKPIs kpis={kpis} isLoading={loadingKpis} />
+      
+      {/* Equipas */}
+      <DashboardTeams teams={teams} isLoading={loadingTeams} organizationCode={null} />
       
       {/* Ações rápidas */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">

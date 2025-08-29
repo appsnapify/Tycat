@@ -136,6 +136,81 @@ const callRPCWithRetry = async (supabase: any, funcName: string, params: any, re
     }
 };
 
+// ✅ COMPONENTE: Event Info Section (Complexidade: 1)
+function EventInfoSection({ event }: { event: EventData }) {
+    return (
+        <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg font-semibold">Informações do Evento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <h3 className="font-medium text-sm text-gray-500 mb-1">Nome</h3>
+                        <p className="text-sm text-gray-700">{event.title}</p>
+                    </div>
+                    {event.description && (
+                        <div>
+                            <h3 className="font-medium text-sm text-gray-500 mb-1">Descrição</h3>
+                            <p className="text-sm text-gray-700">{event.description}</p>
+                        </div>
+                    )}
+                    <div>
+                        <h3 className="font-medium text-sm text-gray-500 mb-1">Data e Hora</h3>
+                        <p className="text-sm text-gray-700 flex items-center">
+                            <CalendarIcon className="w-4 h-4 mr-2" />
+                            {new Date(event.date).toLocaleDateString('pt-BR')}
+                            {event.time && (
+                                <>
+                                    <Clock className="w-4 h-4 ml-4 mr-2" />
+                                    {event.time}
+                                </>
+                            )}
+                        </p>
+                    </div>
+                    {event.location && (
+                        <div>
+                            <h3 className="font-medium text-sm text-gray-500 mb-1">Local</h3>
+                            <p className="text-sm text-gray-700 flex items-center">
+                                <MapPin className="w-4 h-4 mr-2" />
+                                {event.location}
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+            
+            {(event.guest_list_open_datetime || event.guest_list_close_datetime) && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg font-semibold">Configurações de Inscrição</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <h3 className="font-medium text-sm text-gray-500 mb-1">Abertura das Inscrições</h3>
+                            <p className="text-sm text-gray-700">
+                                {event.guest_list_open_datetime 
+                                    ? new Date(event.guest_list_open_datetime).toLocaleString('pt-BR') 
+                                    : 'Não definido'
+                                }
+                            </p>
+                        </div>
+                        <div>
+                            <h3 className="font-medium text-sm text-gray-500 mb-1">Fechamento das Inscrições</h3>
+                            <p className="text-sm text-gray-700">
+                                {event.guest_list_close_datetime 
+                                    ? new Date(event.guest_list_close_datetime).toLocaleString('pt-BR')
+                                    : 'Não definido'
+                                }
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}
+
 export default function EventDetailsClient({ 
     event, 
     totalGuests, 
@@ -144,8 +219,9 @@ export default function EventDetailsClient({
     topPromotersStats,
     genderStats
 }: EventDetailsClientProps) {
-    const { supabase } = useAuth(); // ✅ Usar cliente unificado do AuthProvider
-    // Estados
+    const { supabase } = useAuth();
+    
+    // Estados para estatísticas avançadas
     const [peakHour, setPeakHour] = useState<{
         hour: string;
         count: number;
@@ -156,8 +232,6 @@ export default function EventDetailsClient({
     const [loading, setLoading] = useState(false);
     const [topLocations, setTopLocations] = useState<{code: string, name: string, count: number}[]>([]);
     const [loadingLocations, setLoadingLocations] = useState(false);
-    
-    // Dados para o gráfico de localizações (formato Recharts)
     const [locationChartData, setLocationChartData] = useState<{name: string, value: number, fill: string}[]>([]);
     
     // Preparando dados do gráfico de gênero (cores azuis consistentes)

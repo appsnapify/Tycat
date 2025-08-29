@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import Image from 'next/image';
+import { PastEventCard } from './PastEventCard';
 
 interface ClientEvent {
   id: string;
@@ -29,7 +28,29 @@ interface ClientPastEventsCollapsibleProps {
   clientUserId: string;
 }
 
-// ✅ COMPLEXIDADE: 6 pontos (1 base + 5 condições)
+// ✅ FUNÇÃO AUXILIAR: Fetch past events (Complexidade: 3)
+async function fetchPastEvents(clientUserId: string): Promise<{ events: ClientEvent[]; error: string | null }> {
+  try {
+    const response = await fetch(`/api/client/events/${clientUserId}?type=past`);
+    
+    if (!response.ok) { // +1
+      return { events: [], error: `Erro HTTP: ${response.status}` };
+    }
+
+    const data = await response.json();
+    
+    if (!data.success) { // +1
+      return { events: [], error: data.error || 'Erro ao carregar eventos passados' };
+    }
+
+    return { events: data.data || [], error: null };
+  } catch (error) {
+    console.error('Error fetching past events:', error);
+    return { events: [], error: 'Erro de conexão. Tente novamente.' };
+  }
+}
+
+// ✅ COMPLEXIDADE: 3 pontos (1 base + 2 condições)
 export function ClientPastEventsCollapsible({ clientUserId }: ClientPastEventsCollapsibleProps) {
   const [events, setEvents] = useState<ClientEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,16 +58,6 @@ export function ClientPastEventsCollapsible({ clientUserId }: ClientPastEventsCo
   const [hasLoaded, setHasLoaded] = useState(false);
   const [pastEventsCount, setPastEventsCount] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-
-  // ✅ FUNÇÃO: Format date (Complexidade: 1)
-  const formatEventDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return {
-      day: date.getDate().toString().padStart(2, '0'),
-      month: date.toLocaleDateString('pt-PT', { month: 'short' }).toUpperCase(),
-      year: date.getFullYear()
-    };
-  };
 
   // ✅ FUNÇÃO: Format time (Complexidade: 2)
   const formatEventTime = (timeString: string | null) => {
