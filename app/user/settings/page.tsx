@@ -118,9 +118,9 @@ export default function ClientSettingsPage() {
                   </div>
                   <div className="pt-4">
                     <Link href="/user/settings/edit-profile">
-                      <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
-                        Editar Perfil
-                      </Button>
+                    <Button className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700">
+                      Editar Perfil
+                    </Button>
                     </Link>
                   </div>
                 </div>

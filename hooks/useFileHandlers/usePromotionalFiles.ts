@@ -1,0 +1,110 @@
+'use client'
+
+import { useState } from 'react'
+import { toast } from '@/components/ui/use-toast'
+
+const MAX_PROMO_IMAGES = 3
+const MAX_FILE_SIZE_MB = 5
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+// Hook para arquivos promocionais
+export function usePromotionalFiles(form: any) {
+  const [promotionalFiles, setPromotionalFiles] = useState<File[]>([])
+  const [promotionalPreviews, setPromotionalPreviews] = useState<string[]>([])
+
+  const handlePromotionalFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files
+    if (!selectedFiles) {
+      setPromotionalFiles([])
+      setPromotionalPreviews([])
+      form.setValue('promotionalImages', undefined)
+      return
+    }
+
+    const newFilesArray = Array.from(selectedFiles)
+    const combinedFiles = [...promotionalFiles, ...newFilesArray].slice(0, MAX_PROMO_IMAGES)
+
+    const validFiles: File[] = []
+    const fileProcessingPromises: Promise<string>[] = []
+
+    combinedFiles.forEach((file, index) => {
+      if (!file.type.startsWith('image/')) {
+        if (index >= promotionalFiles.length) {
+          toast({ 
+            title: "Tipo Inválido", 
+            description: `'${file.name}' não é uma imagem.`, 
+            variant: "destructive" 
+          })
+        }
+        return
+      }
+      
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        if (index >= promotionalFiles.length) {
+          toast({ 
+            title: "Tamanho Excedido", 
+            description: `'${file.name}' excede ${MAX_FILE_SIZE_MB}MB.`, 
+            variant: "destructive" 
+          })
+        }
+        return
+      }
+
+      validFiles.push(file)
+
+      const readerPromise = new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      fileProcessingPromises.push(readerPromise)
+    })
+
+    setPromotionalFiles(validFiles)
+
+    Promise.all(fileProcessingPromises).then(previews => {
+      setPromotionalPreviews(previews)
+    }).catch(error => {
+      console.error("Erro ao gerar previews:", error)
+      toast({ 
+        title: "Erro de Preview", 
+        description: "Não foi possível gerar a pré-visualização de uma imagem.", 
+        variant: "destructive" 
+      })
+    })
+
+    const dataTransfer = new DataTransfer()
+    validFiles.forEach(file => dataTransfer.items.add(file))
+    form.setValue('promotionalImages', dataTransfer.files.length > 0 ? dataTransfer.files : undefined, { 
+      shouldValidate: true, 
+      shouldDirty: true 
+    })
+
+    e.target.value = ''
+  }
+
+  const removePromotionalImage = (indexToRemove: number) => {
+    const updatedFiles = promotionalFiles.filter((_, index) => index !== indexToRemove)
+    const updatedPreviews = promotionalPreviews.filter((_, index) => index !== indexToRemove)
+
+    setPromotionalFiles(updatedFiles)
+    setPromotionalPreviews(updatedPreviews)
+
+    const dataTransfer = new DataTransfer()
+    updatedFiles.forEach(file => dataTransfer.items.add(file))
+    form.setValue('promotionalImages', dataTransfer.files.length > 0 ? dataTransfer.files : undefined, { 
+      shouldValidate: true, 
+      shouldDirty: true 
+    })
+  }
+
+  return {
+    promotionalFiles,
+    promotionalPreviews,
+    handlePromotionalFilesChange,
+    removePromotionalImage,
+    MAX_PROMO_IMAGES,
+    MAX_FILE_SIZE_MB
+  }
+}
