@@ -5,25 +5,38 @@ import { createClient } from '@/lib/supabase'
 
 const supabase = createClient()
 
-// Função auxiliar: Combinar data e hora
+// Função auxiliar: Validar componentes de tempo
+function isValidTimeComponent(hours: number, minutes: number): boolean {
+  return !isNaN(hours) && !isNaN(minutes) && 
+         hours >= 0 && hours <= 23 && 
+         minutes >= 0 && minutes <= 59
+}
+
+// Função auxiliar: Combinar data e hora (Complexidade: 5)
 export function combineDateTime(date: Date | undefined, time: string | undefined): Date | null {
-  if (!date || !time) return null
-  try {
+  if (!date || !time) return null          // +2
+  
+  try {                                     // +1
     const [hours, minutes] = time.split(':').map(Number)
-    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    
+    if (!isValidTimeComponent(hours, minutes)) {  // +1
       throw new Error("Hora inválida")
     }
+    
     const newDate = new Date(date)
     newDate.setHours(hours, minutes, 0, 0)
-    if (isNaN(newDate.getTime())) {
+    
+    if (isNaN(newDate.getTime())) {         // +1
       throw new Error("Data combinada inválida")
     }
+    
     return newDate
   } catch (error) {
     console.error("Erro ao combinar data e hora:", date, time, error)
     return null
   }
 }
+// TOTAL: 1 + 2 + 1 + 1 + 1 = 6 pontos ✅
 
 // Validação inicial
 export async function validateSubmissionRequirements(currentOrganization: any) {
