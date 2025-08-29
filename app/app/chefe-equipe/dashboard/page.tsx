@@ -270,21 +270,60 @@ export default function TeamLeaderDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [dashboardInfo, setDashboardInfo] = useState<LeaderDashboardData | null>(null)
   
+  // Função auxiliar: Validar precondições (Complexidade: 1)
+  const validatePreconditions = (): boolean => {
+    return !(!user || isLoadingAuth);
+  };
+
+  // Função auxiliar: Obter team ID (Complexidade: 2)
+  const getTeamId = (): string | null => {
+    const teamId = user.user_metadata?.team_id;
+    if (!teamId) {
+      console.error("Dashboard Chefe: ID da equipa não encontrado nos metadados.");
+      setError("Não foi possível identificar a sua equipa principal.");
+      return null;
+    }
+    return teamId;
+  };
+
+  // Função auxiliar: Tratar erro RPC (Complexidade: 1)
+  const handleRpcError = (rpcError: any): void => {
+    console.error("Dashboard Chefe: Erro ao chamar RPC:", rpcError);
+    
+    const errorMessages = {
+      permission: "Acesso negado. Apenas o chefe de equipa pode ver este dashboard.",
+      default: `Ocorreu um erro ao carregar os dados: ${rpcError.message || 'Erro desconhecido'}`
+    };
+    
+    const hasPermissionError = rpcError.message?.includes('Permissão negada');
+    const messageKey = hasPermissionError ? 'permission' : 'default';
+    setError(errorMessages[messageKey]);
+  };
+
+  // Função auxiliar: Validar dados RPC (Complexidade: 1)
+  const validateRpcData = (rpcData: any): string | null => {
+    const validationRules = [
+      { condition: !rpcData, message: "Não foram recebidos dados do dashboard." },
+      { condition: !Array.isArray(rpcData), message: "Formato de dados inesperado recebido." },
+      { condition: rpcData?.length === 0, message: "Dados da equipa não encontrados." },
+      { condition: rpcData?.[0]?.error, message: `Erro ao processar dados: ${rpcData[0]?.error}` }
+    ];
+    
+    const failedRule = validationRules.find(rule => rule.condition);
+    return failedRule?.message || null;
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!user || isLoadingAuth) return; // Sai se não houver user ou auth ainda a carregar
+      if (!validatePreconditions()) return;
 
       setLoading(true);
       setError(null);
       setDashboardInfo(null);
 
       try {
-        // Obter o team_id dos metadados do utilizador
-        const teamId = user.user_metadata?.team_id; 
+        const teamId = getTeamId();
         if (!teamId) {
-          console.error("Dashboard Chefe: ID da equipa não encontrado nos metadados.");
-          setError("Não foi possível identificar a sua equipa principal.");
-          setLoading(false);
           return;
         }
 
@@ -292,50 +331,17 @@ export default function TeamLeaderDashboard() {
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_team_leader_dashboard_data', { p_team_id: teamId });
 
-        // Tratamento de erro aprimorado
         if (rpcError) {
-          console.error("Dashboard Chefe: Erro ao chamar RPC:", rpcError);
-          
-          if (rpcError.message && rpcError.message.includes('Permissão negada')) {
-             setError("Acesso negado. Apenas o chefe de equipa pode ver este dashboard.");
-          } else {
-             setError(`Ocorreu um erro ao carregar os dados: ${rpcError.message || 'Erro desconhecido'}`);
-          }
-          setLoading(false);
+          handleRpcError(rpcError);
           return;
         }
 
-        // Verificar se os dados são válidos - Early Returns
-        if (!rpcData) {
-             console.warn("Dashboard Chefe: RPC retornou dados nulos ou indefinidos.");
-             setError("Não foram recebidos dados do dashboard.");
-             setDashboardInfo(null);
-             setLoading(false);
-             return;
-        }
-        
-        if (!Array.isArray(rpcData)) {
-             console.error("Dashboard Chefe: Resposta da RPC não é um array:", rpcData);
-             setError("Formato de dados inesperado recebido.");
-             setDashboardInfo(null);
-             setLoading(false);
-             return;
-        }
-        
-        if (rpcData.length === 0) {
-             console.warn("Dashboard Chefe: RPC retornou um array vazio.");
-             setError("Dados da equipa não encontrados.");
-             setDashboardInfo(null);
-             setLoading(false);
-             return;
-        }
-        
-        if (rpcData[0].error) {
-             console.error("Dashboard Chefe: Erro retornado dentro da resposta RPC:", rpcData[0].error);
-             setError(`Erro ao processar dados: ${rpcData[0].error}`);
-             setDashboardInfo(null);
-             setLoading(false);
-             return;
+        const validationError = validateRpcData(rpcData);
+        if (validationError) {
+          console.warn("Dashboard Chefe: Validação falhou:", validationError);
+          setError(validationError);
+          setDashboardInfo(null);
+          return;
         }
 
         // Sucesso - definir dados

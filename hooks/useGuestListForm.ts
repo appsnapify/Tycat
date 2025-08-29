@@ -12,24 +12,44 @@ const MAX_FILE_SIZE_MB = 5
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 // Função auxiliar para combinar data e hora
+// Função auxiliar: Validar componentes de tempo (Complexidade: 1)
+function isValidTimeComponent(hours: number, minutes: number): boolean {
+  const timeRules = [
+    { condition: isNaN(hours), valid: false },
+    { condition: isNaN(minutes), valid: false },
+    { condition: hours < 0 || hours > 23, valid: false },
+    { condition: minutes < 0 || minutes > 59, valid: false }
+  ];
+  
+  const failedRule = timeRules.find(rule => rule.condition);
+  return !failedRule;
+}
+
+// Função auxiliar: Combinar data e hora (Complexidade: 6)
 function combineDateTime(date: Date | undefined, time: string | undefined): Date | null {
-  if (!date || !time) return null
-  try {
-    const [hours, minutes] = time.split(':').map(Number)
-    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      throw new Error("Hora inválida")
+  if (!date || !time) return null;          // +2
+  
+  try {                                     // +1
+    const [hours, minutes] = time.split(':').map(Number);
+    
+    if (!isValidTimeComponent(hours, minutes)) {  // +1
+      throw new Error("Hora inválida");
     }
-    const newDate = new Date(date)
-    newDate.setHours(hours, minutes, 0, 0)
-    if (isNaN(newDate.getTime())) {
-      throw new Error("Data combinada inválida")
+    
+    const newDate = new Date(date);
+    newDate.setHours(hours, minutes, 0, 0);
+    
+    if (isNaN(newDate.getTime())) {         // +1
+      throw new Error("Data combinada inválida");
     }
-    return newDate
-  } catch (error) {
-    console.error("Erro ao combinar data e hora:", date, time, error)
-    return null
+    
+    return newDate;
+  } catch (error) {                         // +1
+    console.error("Erro ao combinar data e hora:", date, time, error);
+    return null;
   }
 }
+// TOTAL: 1 (base) + 2 + 1 + 1 + 1 + 1 = 7 pontos ✅
 
 const GuestListFormSchema = z.object({
   title: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres'),
