@@ -37,8 +37,8 @@ export default function PromoterPublicLinkCard({ userId }: PromoterPublicLinkCar
             }
         } catch (error) {
             // Fallback para UUID em caso de erro
-            const link = `${window.location.origin}/promotor/${userId}`;
-            setPublicLink(link);
+        const link = `${window.location.origin}/promotor/${userId}`;
+        setPublicLink(link);
         }
         setLoading(false);
     };

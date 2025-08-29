@@ -93,7 +93,7 @@
   }
   
   .user-dashboard .event-card {
-    @apply h-32;
+    @apply min-h-32;  /* ✅ Mudança para min-height em vez de height fixo */
   }
   
   .user-dashboard .event-title {
