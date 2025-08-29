@@ -38,67 +38,6 @@ function buildDateCondition(type: string | null) {
   return null;
 }
 
-// ✅ FUNÇÃO AUXILIAR: Verificar cliente (Complexidade: 3)
-async function checkClientExists(clientId: string) {
-  const { data: client, error: clientError } = await supabase
-    .from('client_users')
-    .select('id')
-    .eq('id', clientId)
-    .eq('is_active', true)
-    .maybeSingle();
-  
-  if (clientError) { // +1
-    console.error('Client check error:', clientError);
-    return { success: false, error: 'Erro interno do servidor', code: 'DATABASE_ERROR' };
-  }
-  
-  if (!client) { // +1
-    return { success: false, error: 'Cliente não encontrado', code: 'CLIENT_NOT_FOUND' };
-  }
-  
-  return { success: true, data: client };
-}
-
-// ✅ FUNÇÃO AUXILIAR: Construir query de eventos (Complexidade: 3)
-function buildEventsQuery(clientId: string, type: string | null) {
-  let query = supabase
-    .from('guests')
-    .select(`
-      id,
-      qr_code,
-      qr_code_url,
-      checked_in,
-      check_in_time,
-      source,
-      events:event_id (
-        id,
-        title,
-        description,
-        date,
-        time,
-        end_time,
-        location,
-        flyer_url,
-        organizations:organization_id (
-          id,
-          name
-        )
-      )
-    `)
-    .eq('client_user_id', clientId);
-
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  
-  if (type === 'upcoming') { // +1
-    query = query.gte('events.date', todayStr);
-  } else if (type === 'past') { // +1
-    query = query.lt('events.date', todayStr);
-  }
-
-  return query.order('events(date)', { ascending: type !== 'past' });
-}
-
 // ✅ FUNÇÃO PRINCIPAL: GET client events (Complexidade: 4)
 export async function GET(
   request: NextRequest,
@@ -106,22 +45,78 @@ export async function GET(
 ) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
+    const type = searchParams.get('type'); // upcoming, past, or null for all
+    const limit = searchParams.get('limit');
+    
     const { clientId } = await params;
     
     // Validar parâmetros
     const validationError = validateParams(clientId, type || '');
     if (validationError) return validationError; // +1
     
-    // Verificar cliente
-    const clientCheck = await checkClientExists(clientId);
-    if (!clientCheck.success) { // +1
-      const statusCode = clientCheck.code === 'CLIENT_NOT_FOUND' ? 404 : 500;
-      return NextResponse.json(clientCheck, { status: statusCode });
+    // Verificar se cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from('client_users')
+      .select('id')
+      .eq('id', clientId)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (clientError) { // +1
+      console.error('Client check error:', clientError);
+      return NextResponse.json(
+        { success: false, error: 'Erro interno do servidor', code: 'DATABASE_ERROR' },
+        { status: 500 }
+      );
     }
     
-    // Construir e executar query
-    const query = buildEventsQuery(clientId, type);
+    if (!client) { // +1
+      return NextResponse.json(
+        { success: false, error: 'Cliente não encontrado', code: 'CLIENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Query com filtro de data
+    let query = supabase
+      .from('guests')
+      .select(`
+        id,
+        qr_code,
+        qr_code_url,
+        checked_in,
+        check_in_time,
+        source,
+        events:event_id (
+          id,
+          title,
+          description,
+          date,
+          time,
+          end_time,
+          location,
+          flyer_url,
+          organizations:organization_id (
+            id,
+            name
+          )
+        )
+      `)
+      .eq('client_user_id', clientId);
+
+    // Aplicar filtro de data
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    if (type === 'upcoming') {
+      query = query.gte('events.date', todayStr);
+    } else if (type === 'past') {
+      query = query.lt('events.date', todayStr);
+    }
+
+    // Ordenar por data
+    query = query.order('events(date)', { ascending: type !== 'past' });
+
     const { data: guestEvents, error: eventsError } = await query;
     
     if (eventsError) {

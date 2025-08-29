@@ -3,20 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Eye, EyeOff, Phone, User, Mail, Calendar, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientAuth } from '@/contexts/client/ClientAuthContext';
-import Link from 'next/link';
-import { 
-  PersonalInfoFields, 
-  ContactFields, 
-  AdditionalInfoFields, 
-  PasswordFields, 
-  CityField 
-} from './registration/RegistrationFormFields';
-import { validateForm, prepareRegistrationData } from './registration/RegistrationValidation';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
+import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import Link from 'next/link';
 
 interface FormData {
   phone: string;
@@ -68,14 +64,17 @@ export default function ClientRegistrationForm() {
   const { login } = useClientAuth();
   const router = useRouter();
 
-  // ✅ FUNÇÃO: Validar formulário (Complexidade: 3)
-  const validateFormLocal = (): string | null => {
-    const validation = validateForm(formData);
-    if (!validation.isValid) { // +1
-      return validation.errors[0]; // Retorna o primeiro erro
-    }
+  // ✅ FUNÇÃO: Validar formulário (Complexidade: 8)
+  const validateForm = (): string | null => {
+    if (!formData.phone.trim()) return 'Número de telemóvel é obrigatório'; // +1
+    if (!formData.firstName.trim()) return 'Nome é obrigatório'; // +1
+    if (!formData.lastName.trim()) return 'Apelido é obrigatório'; // +1
+    if (!formData.city.trim()) return 'Cidade é obrigatória'; // +1
+    if (!formData.password) return 'Password é obrigatória'; // +1
+    if (formData.password !== formData.confirmPassword) return 'Passwords não coincidem'; // +1
+    if (formData.password.length < 8) return 'Password deve ter pelo menos 8 caracteres'; // +1
     
-    // Validação adicional do telemóvel
+    // Validação robusta do telemóvel
     const cleanPhone = formData.phone.replace(/\s+/g, '');
     const phoneRegex = /^(\+351|351)?[1-9][0-9]{8}$/;
     if (!phoneRegex.test(cleanPhone)) { // +1
@@ -100,7 +99,7 @@ export default function ClientRegistrationForm() {
     e.preventDefault();
     setError('');
     
-    const validationError = validateFormLocal();
+    const validationError = validateForm();
     if (validationError) { // +1
       setError(validationError);
       return;
