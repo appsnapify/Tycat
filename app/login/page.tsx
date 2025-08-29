@@ -112,40 +112,56 @@ export default function LoginPage() {
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError(null)
+  // ✅ MAPA DE ERROS: Tratamento centralizado (Complexidade: 0)
+  const LOGIN_ERROR_MESSAGES = {
+    credentials: 'Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.',
+    rateLimit: 'Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.',
+    default: (message: string) => `Ocorreu um erro ao fazer login: ${message || 'Erro desconhecido.'}`
+  };
 
-    try {
-      const supabase = createClient()
+  // ✅ FUNÇÃO AUXILIAR: Processar erro de login (Complexidade: 1)
+  const getErrorMessage = (error: any): string => {
+    const message = error?.message ?? '';
+    const errorTypes = [
+      { condition: message.includes('Invalid login credentials') || message.includes('Email ou senha incorretos'), type: 'credentials' },
+      { condition: message.includes('rate limit'), type: 'rateLimit' }
+    ];
+    
+    const errorType = errorTypes.find(type => type.condition);
+    return errorType ? LOGIN_ERROR_MESSAGES[errorType.type] : LOGIN_ERROR_MESSAGES.default(message);
+  };
+
+  // ✅ FUNÇÃO AUXILIAR: Processar sucesso do login (Complexidade: 2)
+  const handleLoginSuccess = (data: any) => {
+    if (!data.user) return;                                  // +1 (if)
+    
+    const userRole = data.user.user_metadata?.role;
+    const redirectUrl = getRedirectUrlByRole(userRole, data.user.user_metadata);
+    router.push(redirectUrl);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {                                                    // +1 (try)
+      const supabase = createClient();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password
-      })
+      });
       
-      if (signInError) {
-        throw signInError
+      if (signInError) {                                     // +1 (if)
+        throw signInError;
       }
 
-      if (data.user) {
-        const userRole = data.user.user_metadata?.role
-        const redirectUrl = getRedirectUrlByRole(userRole, data.user.user_metadata)
-        router.push(redirectUrl)
-      }
+      handleLoginSuccess(data);
 
-    } catch (error: any) {
-      console.error('Erro ao fazer login:', error)
-      setIsLoading(false)
-      
-      if (error?.message?.includes('Invalid login credentials') || 
-          error?.message?.includes('Email ou senha incorretos')) {
-        setError('Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.')
-      } else if (error?.message?.includes('rate limit')) {
-        setError('Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.')
-      } else {
-        setError(`Ocorreu um erro ao fazer login: ${error.message || 'Erro desconhecido.'}`)
-      }
+    } catch (error: any) {                                   // +1 (catch)
+      console.error('Erro ao fazer login:', error);
+      setIsLoading(false);
+      setError(getErrorMessage(error));
     }
   }
 

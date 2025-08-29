@@ -139,22 +139,34 @@ export default function OrganizationsPage() {
           return true;
         };
 
-        // ✅ FUNÇÃO AUXILIAR: Validar tipos de campos obrigatórios (Complexidade: 4)
+        // ✅ PIPELINE DE VALIDAÇÃO: Campos obrigatórios (Complexidade: 2)
+        const REQUIRED_FIELD_VALIDATORS = [
+          { field: 'organization_id', check: (item: RawSupabaseData) => typeof item.organization_id === 'string' },
+          { field: 'role', check: (item: RawSupabaseData) => typeof item.role === 'string' },
+          { field: 'org.id', check: (item: RawSupabaseData, org: any) => typeof org?.id === 'string' },
+          { field: 'org.name', check: (item: RawSupabaseData, org: any) => typeof org?.name === 'string' },
+          { field: 'org.slug', check: (item: RawSupabaseData, org: any) => typeof org?.slug === 'string' }
+        ];
+
         const hasValidRequiredFields = (item: RawSupabaseData, org: any): boolean => {
-          if (typeof item.organization_id !== 'string') return false;
-          if (typeof item.role !== 'string') return false;
-          if (typeof org?.id !== 'string') return false;
-          if (typeof org?.name !== 'string') return false;
-          if (typeof org?.slug !== 'string') return false;
-          return true;
+          const isValid = REQUIRED_FIELD_VALIDATORS.every(validator => 
+            validator.check(item, org)                              // +1
+          );
+          return isValid || false;                                  // +1 (||)
         };
 
-        // ✅ FUNÇÃO AUXILIAR: Validar campos opcionais (Complexidade: 3)
+        // ✅ PIPELINE DE VALIDAÇÃO: Campos opcionais (Complexidade: 2)
+        const OPTIONAL_FIELD_VALIDATORS = [
+          { field: 'logotipo', check: (org: any) => org?.logotipo === null || typeof org?.logotipo === 'string' },
+          { field: 'banner_url', check: (org: any) => org?.banner_url === null || typeof org?.banner_url === 'string' },
+          { field: 'address', check: (org: any) => org?.address === null || typeof org?.address === 'string' }
+        ];
+
         const hasValidOptionalFields = (org: any): boolean => {
-          if (org?.logotipo !== null && typeof org?.logotipo !== 'string') return false;
-          if (org?.banner_url !== null && typeof org?.banner_url !== 'string') return false;
-          if (org?.address !== null && typeof org?.address !== 'string') return false;
-          return true;
+          const isValid = OPTIONAL_FIELD_VALIDATORS.every(validator => 
+            validator.check(org)                                   // +1
+          );
+          return isValid || false;                                 // +1 (||)
         };
 
         // ✅ FUNÇÃO DE FILTRO REFATORADA (Complexidade: 2)

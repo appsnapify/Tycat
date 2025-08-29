@@ -160,21 +160,24 @@ export default function EventDetailsClient({
     // Dados para o gráfico de localizações (formato Recharts)
     const [locationChartData, setLocationChartData] = useState<{name: string, value: number, fill: string}[]>([]);
     
-    // Preparando dados do gráfico de gênero (cores azuis consistentes)
-    const genderChartData = (genderStats?.genderData || []).map((item, index) => {
-            const colorMap: { [key in GenderCode]?: string } = {
-                'M': '#3b82f6',  // blue-500
-                'F': '#1d4ed8',  // blue-700
-                'O': '#60a5fa'   // blue-400
-            };
-        return {
-            name: item?.genderName || 'Indefinido',
-            value: item?.percentage || 0,
-            count: item?.count || 0,
-            percentage: item?.percentage || 0,
-            fill: colorMap[item?.gender] || '#60a5fa'
-        };
+    // Mapa de cores para gêneros (Complexidade: 0)
+    const GENDER_COLOR_MAP: { [key in GenderCode]?: string } = {
+        'M': '#3b82f6',  // blue-500
+        'F': '#1d4ed8',  // blue-700
+        'O': '#60a5fa'   // blue-400
+    };
+
+    // Função auxiliar: Processar item de gênero (Complexidade: 1)
+    const processGenderItem = (item: any) => ({
+        name: item?.genderName ?? 'Indefinido',
+        value: item?.percentage ?? 0,
+        count: item?.count ?? 0,
+        percentage: item?.percentage ?? 0,
+        fill: GENDER_COLOR_MAP[item?.gender] ?? '#60a5fa'
     });
+
+    // Preparando dados do gráfico de gênero (Complexidade: 1)
+    const genderChartData = (genderStats?.genderData ?? []).map(processGenderItem);
 
     const eventId = event.id;
 
