@@ -58,38 +58,23 @@ function generateProcessingKey(): string {
   return 'proc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// ✅ PIPELINE DE VALIDAÇÃO: Redução de complexidade (Complexidade: 2)
+const GUEST_VALIDATION_RULES = [
+  { field: 'phone', check: (data: any) => data.phone && typeof data.phone === 'string', message: 'Phone number is required' },
+  { field: 'firstName', check: (data: any) => data.firstName && typeof data.firstName === 'string' && data.firstName.trim().length >= 2, message: 'First name must be at least 2 characters' },
+  { field: 'lastName', check: (data: any) => data.lastName && typeof data.lastName === 'string' && data.lastName.trim().length >= 2, message: 'Last name must be at least 2 characters' },
+  { field: 'email', check: (data: any) => !data.email || (typeof data.email === 'string' && data.email.includes('@')), message: 'Invalid email format' },
+  { field: 'password', check: (data: any) => data.password && typeof data.password === 'string' && data.password.length >= 6, message: 'Password must be at least 6 characters' },
+  { field: 'eventId', check: (data: any) => data.eventId && typeof data.eventId === 'string', message: 'Event ID is required' },
+  { field: 'promoterId', check: (data: any) => data.promoterId && typeof data.promoterId === 'string', message: 'Promoter ID is required' }
+];
+
 function validateGuestData(data: any) {
-  const errors: string[] = [];
-
-  if (!data.phone || typeof data.phone !== 'string') {
-    errors.push('Phone number is required');
-  }
-
-  if (!data.firstName || typeof data.firstName !== 'string' || data.firstName.trim().length < 2) {
-    errors.push('First name must be at least 2 characters');
-  }
-
-  if (!data.lastName || typeof data.lastName !== 'string' || data.lastName.trim().length < 2) {
-    errors.push('Last name must be at least 2 characters');
-  }
-
-  if (data.email && (typeof data.email !== 'string' || !data.email.includes('@'))) {
-    errors.push('Invalid email format');
-  }
-
-  if (!data.password || typeof data.password !== 'string' || data.password.length < 6) {
-    errors.push('Password must be at least 6 characters');
-  }
-
-  if (!data.eventId || typeof data.eventId !== 'string') {
-    errors.push('Event ID is required');
-  }
-
-  if (!data.promoterId || typeof data.promoterId !== 'string') {
-    errors.push('Promoter ID is required');
-  }
-
-  return errors;
+  const failedRules = GUEST_VALIDATION_RULES.filter(rule => 
+    !rule.check(data)                                                     // +1
+  );
+  
+  return failedRules.length > 0 ? failedRules.map(rule => rule.message) : []; // +1 (ternário)
 }
 
 async function processGuestCreation(data: any, processingKey: string) {

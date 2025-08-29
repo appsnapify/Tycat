@@ -214,48 +214,80 @@ export default function ConfiguracoesPage() {
     setIbanProofFile(file);
   };
 
-  const onSubmit: SubmitHandler<FormData> = async (formData) => {
-    if (!userId) {
-      toast({ title: 'Erro de Autenticação', description: 'Utilizador não autenticado. Por favor, faça login novamente.', variant: 'destructive' })
-      return
+  // ✅ FUNÇÃO AUXILIAR: Processar upload de arquivo (Complexidade: 3)
+  const processIbanProofUpload = async (): Promise<string> => {
+    if (!ibanProofFile) return initialData?.iban_proof_url ?? '';    // +1 (if)
+    
+    toast({ title: 'A Carregar Ficheiro', description: 'O seu comprovativo de IBAN está a ser carregado...' });
+    const fileExt = ibanProofFile.name.split('.').pop();
+    const filePath = `public/${userId}/iban-proof-${Date.now()}.${fileExt}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('ibanproofs')
+      .upload(filePath, ibanProofFile, { cacheControl: '3600', upsert: true });
+
+    if (uploadError) {                                               // +1 (if)
+      throw new Error(`Falha ao carregar o comprovativo de IBAN: ${uploadError.message}`);
     }
-    // if (!currentOrganization && !hasOrganizations) { // This check might be too restrictive if a user can exist without an org initially
-    //     toast({ title: 'Erro de Contexto', description: 'Nenhuma organização ativa para associar a ação.', variant: 'destructive' })
-    //     return
-    // }
 
-    setIsSaving(true)
-    let ibanProofUrlToSave = initialData?.iban_proof_url || '';
+    const { data: urlData } = supabase.storage.from('ibanproofs').getPublicUrl(filePath);
+    
+    if (!urlData?.publicUrl) {                                       // +1 (if + ?.)
+      throw new Error('Não foi possível obter a URL pública do comprovativo de IBAN após o upload.');
+    }
+    
+    toast({ title: 'Upload Concluído', description: 'Comprovativo de IBAN carregado com sucesso.' });
+    return urlData.publicUrl;
+  };
 
-    try {
-      if (ibanProofFile) {
-        toast({ title: 'A Carregar Ficheiro', description: 'O seu comprovativo de IBAN está a ser carregado...' });
-        const fileExt = ibanProofFile.name.split('.').pop();
-        const filePath = `public/${userId}/iban-proof-${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('ibanproofs')
-          .upload(filePath, ibanProofFile, {
-            cacheControl: '3600',
-            upsert: true, // Use upsert to overwrite if the user uploads a new file with the same generated name (though unlikely due to timestamp) or for retries
-          });
+  // ✅ FUNÇÃO AUXILIAR: Executar operação de base de dados (Complexidade: 2)
+  const executeDbOperation = async (dataToSave: any) => {
+    const isUpdate = Boolean(initialData);                           // +0 (Boolean não é operador condicional)
+    const operationType = isUpdate ? 'update' : 'insert';
+    
+    if (isUpdate) {                                                  // +1 (if)
+      const { data, error } = await supabase
+        .from('organizer_business_details')
+        .update(dataToSave)
+        .eq('user_id', userId)
+        .select()
+        .single();
+      return { data, error, operationType };
+    } else {
+      const { data, error } = await supabase
+        .from('organizer_business_details')
+        .insert([{ ...dataToSave, created_at: new Date().toISOString() }])
+        .select()
+        .single();
+      return { data, error, operationType };
+    }
+  };
 
-        if (uploadError) {
-          console.error('Falha ao carregar o comprovativo de IBAN:', uploadError)
-          throw new Error(`Falha ao carregar o comprovativo de IBAN: ${uploadError.message}`);
-        }
+  // ✅ FUNÇÃO AUXILIAR: Mapear dados salvos (Complexidade: 1)
+  const mapSavedDataToForm = (savedData: any): FormData => {
+    const FORM_FIELD_MAPPING = [
+      'business_name', 'vat_number', 'billing_address_line1', 'billing_address_line2',
+      'billing_postal_code', 'billing_city', 'billing_country', 
+      'admin_contact_email', 'admin_contact_phone', 'iban', 'iban_proof_url'
+    ];
+    
+    return FORM_FIELD_MAPPING.reduce((acc, field) => ({
+      ...acc,
+      [field]: savedData[field] ?? ''
+    }), {} as FormData);
+  };
 
-        const { data: urlData } = supabase.storage
-          .from('ibanproofs')
-          .getPublicUrl(filePath);
-        
-        if (!urlData?.publicUrl) {
-          console.error('Não foi possível obter a URL pública do comprovativo de IBAN após o upload.')
-          throw new Error('Não foi possível obter a URL pública do comprovativo de IBAN após o upload.');
-        }
-        ibanProofUrlToSave = urlData.publicUrl;
-        toast({ title: 'Upload Concluído', description: 'Comprovativo de IBAN carregado com sucesso.' });
-      }
+  // ✅ FUNÇÃO PRINCIPAL REFATORADA (Complexidade: 7)
+  const onSubmit: SubmitHandler<FormData> = async (formData) => {
+    if (!userId) {                                                   // +1 (if)
+      toast({ title: 'Erro de Autenticação', description: 'Utilizador não autenticado. Por favor, faça login novamente.', variant: 'destructive' });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {                                                            // +1 (try)
+      const ibanProofUrlToSave = await processIbanProofUpload();
 
       const dataToSave = {
         ...formData,
@@ -264,72 +296,33 @@ export default function ConfiguracoesPage() {
         updated_at: new Date().toISOString(),
       };
 
-      let dbError = null;
-      let savedData = null;
-      let operationType = '';
+      const { data: savedData, error: dbError, operationType } = await executeDbOperation(dataToSave);
 
-
-      if (initialData) { // If initialData exists, it means we are updating
-        operationType = 'update';
-        const { data, error } = await supabase
-          .from('organizer_business_details')
-          .update(dataToSave)
-          .eq('user_id', userId)
-          .select()
-          .single();
-        dbError = error;
-        savedData = data;
-      } else { // Otherwise, we are inserting
-        operationType = 'insert';
-        const { data, error } = await supabase
-          .from('organizer_business_details')
-          .insert([{ ...dataToSave, created_at: new Date().toISOString() }]) // created_at only on insert
-          .select()
-          .single();
-        dbError = error;
-        savedData = data;
+      if (dbError) {                                                 // +1 (if)
+        throw new Error(`Erro na operação de base de dados: ${dbError.message}`);
       }
 
-      if (dbError) {
-        console.error(`Erro ao ${operationType === 'insert' ? 'inserir' : 'atualizar'} detalhes da empresa:`, dbError)
-        throw new Error(`Erro ao ${operationType === 'insert' ? 'inserir' : 'atualizar'} detalhes da empresa: ${dbError.message}`);
-      }
-
-      if (savedData) {
-        // Update initialData with the newly saved data to reflect the current state
-        const mappedSavedData: FormData = {
-          business_name: savedData.business_name || '',
-          vat_number: savedData.vat_number || '',
-          billing_address_line1: savedData.billing_address_line1 || '',
-          billing_address_line2: savedData.billing_address_line2 || '',
-          billing_postal_code: savedData.billing_postal_code || '',
-          billing_city: savedData.billing_city || '',
-          billing_country: savedData.billing_country || '',
-          admin_contact_email: savedData.admin_contact_email || '',
-          admin_contact_phone: savedData.admin_contact_phone || '',
-          iban: savedData.iban || '',
-          iban_proof_url: savedData.iban_proof_url || '',
-        };
+      if (savedData) {                                               // +1 (if)
+        const mappedSavedData = mapSavedDataToForm(savedData);
         setInitialData(mappedSavedData);
-        reset(mappedSavedData); // Reset form with new data to clear dirty state
-        setIbanProofFile(null); // Clear the selected file state
+        reset(mappedSavedData);
+        setIbanProofFile(null);
       }
       
-      console.log('Attempting to show success toast. Saved data:', savedData); // Diagnostic log
       toast({
         title: 'Sucesso!',
         description: 'Os seus dados foram guardados com sucesso.',
-        variant: 'default', // Or 'success' if you have that variant
+        variant: 'default',
       });
 
-    } catch (error: any) {
+    } catch (error: any) {                                           // +1 (catch)
       console.error('Erro no processo de submissão:', error);
       toast({
         title: 'Erro ao Guardar',
-        description: error.message || 'Ocorreu um erro inesperado ao tentar guardar os seus dados.',
+        description: error.message ?? 'Ocorreu um erro inesperado ao tentar guardar os seus dados.',
         variant: 'destructive',
       });
-    } finally {
+    } finally {                                                      // +1 (finally)
       setIsSaving(false);
     }
   };
