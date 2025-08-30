@@ -37,7 +37,7 @@ function clientAuthReducer(state: ClientAuthState, action: ClientAuthAction): Cl
   switch (action.type) {
     case 'AUTH_START':
       return { ...state, isLoading: true, error: null };
-    
+
     case 'AUTH_SUCCESS':
       return {
         ...state,
@@ -47,7 +47,7 @@ function clientAuthReducer(state: ClientAuthState, action: ClientAuthAction): Cl
         session: action.payload.session,
         error: null
       };
-    
+
     case 'AUTH_ERROR':
       return {
         ...state,
@@ -57,7 +57,7 @@ function clientAuthReducer(state: ClientAuthState, action: ClientAuthAction): Cl
         session: null,
         error: action.payload
       };
-    
+
     case 'AUTH_LOGOUT':
       return {
         ...state,
@@ -67,17 +67,17 @@ function clientAuthReducer(state: ClientAuthState, action: ClientAuthAction): Cl
         session: null,
         error: null
       };
-    
+
     case 'CLEAR_ERROR':
       return { ...state, error: null };
-    
+
     case 'UPDATE_USER_DATA':
       if (!state.user) return state;
       const updatedUser = { ...state.user, ...action.payload };
       // Atualizar localStorage
       localStorage.setItem('client_user_data', JSON.stringify(updatedUser));
       return { ...state, user: updatedUser };
-    
+
     default:
       return state;
   }
@@ -105,7 +105,7 @@ export function ClientAuthProvider({ children }: { children: React.ReactNode }) 
     try {
       const token = localStorage.getItem('client_access_token');
       const userData = localStorage.getItem('client_user_data');
-      
+
       if (!token || !userData) { // +1
         dispatch({ type: 'AUTH_LOGOUT' });
         return;
@@ -114,24 +114,24 @@ export function ClientAuthProvider({ children }: { children: React.ReactNode }) 
       // ✅ SEGURANÇA: Usar dados guardados em vez de chamada API
       const user = JSON.parse(userData);
       const refreshToken = localStorage.getItem('client_refresh_token') || '';
-      
-      const session: ClientSession = {
-        user,
-        accessToken: token,
-        refreshToken,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15min
-      };
 
-      dispatch({ 
-        type: 'AUTH_SUCCESS', 
+        const session: ClientSession = {
+        user,
+          accessToken: token,
+        refreshToken,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15min
+        };
+
+        dispatch({ 
+          type: 'AUTH_SUCCESS', 
         payload: { user, session } 
       });
       
     } catch (error) {
       console.error('Error checking existing session:', error);
       // ✅ SEGURANÇA: Limpar todos os dados em caso de erro
-      localStorage.removeItem('client_access_token');
-      localStorage.removeItem('client_refresh_token');
+        localStorage.removeItem('client_access_token');
+        localStorage.removeItem('client_refresh_token');
       localStorage.removeItem('client_user_data');
       dispatch({ type: 'AUTH_LOGOUT' });
     }
@@ -142,12 +142,12 @@ export function ClientAuthProvider({ children }: { children: React.ReactNode }) 
 
     try {
       const response = await clientApi.post('/auth/login', data);
-      
+
       if (response.success && response.data) {
         // Armazenar tokens
         localStorage.setItem('client_access_token', response.data.accessToken);
         localStorage.setItem('client_refresh_token', response.data.refreshToken);
-        
+
         // ✅ SEGURANÇA: Guardar dados do utilizador para verificação de sessão
         localStorage.setItem('client_user_data', JSON.stringify(response.data.user));
 
@@ -180,7 +180,7 @@ export function ClientAuthProvider({ children }: { children: React.ReactNode }) 
 
     try {
       const response = await clientApi.post('/auth/register', data);
-      
+
       if (response.success) {
         dispatch({ type: 'AUTH_LOGOUT' }); // Redirecionar para login
         return response;
@@ -216,12 +216,12 @@ export function ClientAuthProvider({ children }: { children: React.ReactNode }) 
       if (!refreshToken) return false;
 
       const response = await clientApi.post('/auth/refresh', { refreshToken });
-      
+
       if (response.success && response.data) {
         localStorage.setItem('client_access_token', response.data.accessToken);
         return true;
       }
-      
+
       return false;
     } catch (error) {
       console.error('Token refresh error:', error);

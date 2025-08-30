@@ -64,3 +64,71 @@ export const exportCsv = (filteredCommissions: Commission[]) => {
   link.click()
   document.body.removeChild(link)
 }
+
+// ✅ FUNÇÃO AUXILIAR: calculateTotalsLogic (Complexidade: 5 pontos)
+export const calculateTotalsLogic = (commissions: Commission[]) => {
+  const newTotals = {
+    all: 0,
+    pending: 0,
+    processing: 0,
+    paid: 0,
+    rejected: 0
+  }
+  
+  commissions.forEach(commission => {
+    newTotals.all += commission.promoterAmount
+    
+    if (commission.status === 'pending') { // +1
+      newTotals.pending += commission.promoterAmount
+    } else if (commission.status === 'processing') { // +1
+      newTotals.processing += commission.promoterAmount
+    } else if (commission.status === 'paid') { // +1
+      newTotals.paid += commission.promoterAmount
+    } else if (commission.status === 'rejected') { // +1
+      newTotals.rejected += commission.promoterAmount
+    }
+  })
+  
+  return newTotals
+}
+
+// ✅ FUNÇÃO AUXILIAR: applyFiltersLogic (Complexidade: 8 pontos)
+export const applyFiltersLogic = (commissions: Commission[], filter: any) => {
+  let filtered = [...commissions]
+  
+  if (filter.status !== 'all') { // +1
+    filtered = filtered.filter(commission => commission.status === filter.status)
+  }
+  
+  if (filter.team !== 'all') { // +1
+    filtered = filtered.filter(commission => commission.teamId === filter.team)
+  }
+  
+  if (filter.search) { // +1
+    const searchLower = filter.search.toLowerCase()
+    filtered = filtered.filter(commission => 
+      commission.eventName.toLowerCase().includes(searchLower) ||
+      commission.organizationName.toLowerCase().includes(searchLower) ||
+      commission.receiptCode?.toLowerCase().includes(searchLower)
+    )
+  }
+  
+  if (filter.startDate) { // +1
+    const startDate = new Date(filter.startDate)
+    filtered = filtered.filter(commission => {
+      const commissionDate = new Date(commission.createdAt)
+      return commissionDate >= startDate
+    })
+  }
+  
+  if (filter.endDate) { // +1
+    const endDate = new Date(filter.endDate)
+    endDate.setHours(23, 59, 59, 999)
+    filtered = filtered.filter(commission => {
+      const commissionDate = new Date(commission.createdAt)
+      return commissionDate <= endDate
+    })
+  }
+  
+  return filtered
+}

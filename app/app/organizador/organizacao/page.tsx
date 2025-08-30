@@ -84,26 +84,26 @@ export default function OrganizacaoPage() {
         {/* Preview Column */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="sticky top-8 border-l-4 border-l-fuchsia-500">
-            <CardHeader>
-              <CardTitle>Pré-visualização</CardTitle>
-              <CardDescription>Como a sua organização aparecerá.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <OrganizationPreview 
-                name={editFormData.name}
-                email={editFormData.email}
-                address={editFormData.address}
-                logo={editFormData.logoFile || logoPreview || undefined}
-                banner={editFormData.bannerFile || bannerPreview || undefined}
-                instagram={editFormData.instagram}
-                facebook={editFormData.facebook}
-                youtube={editFormData.youtube}
-                tiktok={editFormData.tiktok}
-              />
-            </CardContent>
+             <CardHeader>
+                <CardTitle>Pré-visualização</CardTitle>
+                <CardDescription>Como a sua organização aparecerá.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                   <OrganizationPreview 
+                      name={editFormData.name}
+                      email={editFormData.email}
+                      address={editFormData.address}
+                      logo={editFormData.logoFile || logoPreview || undefined}
+                      banner={editFormData.bannerFile || bannerPreview || undefined}
+                      instagram={editFormData.instagram}
+                      facebook={editFormData.facebook}
+                      youtube={editFormData.youtube}
+                      tiktok={editFormData.tiktok}
+                   />
+             </CardContent>
           </Card>
         </div>
       </div>
     </div>
   )
-}
+} 

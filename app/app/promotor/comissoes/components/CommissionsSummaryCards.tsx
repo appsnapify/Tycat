@@ -1,78 +1,46 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CommissionTotals } from '../types/Commission'
-import { formatCurrency } from '../utils/commissionUtils'
+import { SummaryCard } from './SummaryCard'
 
 interface CommissionsSummaryCardsProps {
   totals: CommissionTotals
 }
 
-// ✅ COMPONENTE DE CARDS DE RESUMO (Complexidade: 1 ponto)
+// ✅ CONFIGURAÇÃO DE CARDS (Complexidade: 1 ponto)
+const SUMMARY_CARDS = [
+  {
+    key: 'pending',
+    title: 'Total Pendente',
+    description: 'Aguardando pagamento'
+  },
+  {
+    key: 'processing', 
+    title: 'Em Processamento',
+    description: 'Pagamentos sendo processados'
+  },
+  {
+    key: 'paid',
+    title: 'Total Pago', 
+    description: 'Valor já recebido'
+  },
+  {
+    key: 'all',
+    title: 'Total Geral',
+    description: 'Todas as comissões'
+  }
+] as const
+
+// ✅ COMPONENTE DE CARDS DE RESUMO REFATORADO (Complexidade: 1 ponto)
 export const CommissionsSummaryCards = ({ totals }: CommissionsSummaryCardsProps) => {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Total Pendente
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {formatCurrency(totals.pending)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Aguardando pagamento
-          </p>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Em Processamento
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {formatCurrency(totals.processing)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Pagamentos sendo processados
-          </p>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Total Pago
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {formatCurrency(totals.paid)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Valor já recebido
-          </p>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Total Geral
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {formatCurrency(totals.all)}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Todas as comissões
-          </p>
-        </CardContent>
-      </Card>
+      {SUMMARY_CARDS.map(card => (
+        <SummaryCard
+          key={card.key}
+          title={card.title}
+          value={totals[card.key]}
+          description={card.description}
+        />
+      ))}
     </div>
   )
 }
