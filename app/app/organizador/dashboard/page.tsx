@@ -34,10 +34,10 @@ function useDashboardData() {
   const [loadingKpis, setLoadingKpis] = useState(true)
   const [loadingTeams, setLoadingTeams] = useState(true)
   const [loadingError, setLoadingError] = useState(false)
-
+  
   const supabase = createClient()
   const [tableCache] = useState(() => new Map<string, boolean>())
-
+  
   // Função para verificar se tabela existe (Complexidade: 3 pontos)
   const checkTableExists = useCallback(async (tableName: string) => {
     if (tableCache.has(tableName)) {
@@ -110,7 +110,7 @@ function useDashboardData() {
       return { data: [], error: e }
     }
   }
-
+  
   // Carregar KPIs (Complexidade: 6 pontos)
   const loadKpis = useCallback(async (organizationId: string) => {
     setLoadingKpis(true)
@@ -288,7 +288,7 @@ export default function OrganizadorDashboardPage() {
     setOrganizationCode(generatedOrgCode)
   }
 
-  return (
+    return (
     <DashboardContent
       kpis={kpis}
       teams={teams}
@@ -298,4 +298,4 @@ export default function OrganizadorDashboardPage() {
       onRefresh={loadOrganizationAndData}
     />
   )
-}
+} 

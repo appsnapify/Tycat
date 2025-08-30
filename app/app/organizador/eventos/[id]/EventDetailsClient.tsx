@@ -118,5 +118,5 @@ export default function EventDetailsClient({
             </TabsContent>
         </Tabs>
     );
-}
+} 
 

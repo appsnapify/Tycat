@@ -163,9 +163,9 @@ const useTeamData = (user: any, isTeamLeader: boolean | null | undefined) => {
 
   const loadTeams = async () => {
     if (!user?.id) {
-      console.log("EquipesPage: loadTeams chamado sem user ID.");
+        console.log("EquipesPage: loadTeams chamado sem user ID.");
       setLoading(false);
-      return;
+        return;
     }
     setLoading(true);
     try {

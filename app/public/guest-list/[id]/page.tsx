@@ -79,58 +79,84 @@ export default function GuestListPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  // ✅ FUNÇÕES AUXILIARES (Complexidade: ≤3 pontos cada)
+  const validateFormData = () => {
+    return formData.name && formData.phone;
+  };
+
+  const showValidationError = () => {
+    toast({
+      title: "Campos incompletos",
+      description: "Por favor, preencha todos os campos",
+      variant: "destructive"
+    });
+  };
+
+  const buildRequestPayload = () => ({
+    eventId: event?.id ?? null,
+    name: formData.name,
+    phone: formData.phone
+  });
+
+  const sendGuestRegistration = async (payload: any) => {
+    const response = await fetch('/api/guests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error ?? 'Erro ao registrar');
+    }
+    
+    return data;
+  };
+
+  const showSuccessMessage = () => {
+    toast({
+      title: "Registro confirmado!",
+      description: "Você está na guest list. Apresente o QR code na entrada do evento.",
+    });
+  };
+
+  const getErrorMessage = (error: unknown): string => {
+    return error instanceof Error ? error.message : "Ocorreu um erro ao processar seu registro. Tente novamente.";
+  };
+
+  const showErrorMessage = (error: unknown) => {
+    toast({
+      title: "Erro ao registrar",
+      description: getErrorMessage(error),
+      variant: "destructive"
+    });
+  };
+
+  // ✅ FUNÇÃO PRINCIPAL SIMPLIFICADA (Complexidade: 4 pontos)
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    if (!formData.name || !formData.phone) {
-      toast({
-        title: "Campos incompletos",
-        description: "Por favor, preencha todos os campos",
-        variant: "destructive"
-      })
-      return
+    if (!validateFormData()) {                                // +1
+      showValidationError();
+      return;
     }
     
-    try {
-      setSubmitting(true)
+    try {                                                     // +1
+      setSubmitting(true);
       
-      // Enviar dados para a API
-      const response = await fetch('/api/guests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          eventId: event?.id,
-          name: formData.name,
-          phone: formData.phone
-        })
-      })
+      const payload = buildRequestPayload();
+      const data = await sendGuestRegistration(payload);
       
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao registrar')
-      }
-      
-      // Definir o QR code retornado pela API
-      setQrCode(data.qrCode)
-      
-      toast({
-        title: "Registro confirmado!",
-        description: "Você está na guest list. Apresente o QR code na entrada do evento.",
-      })
-    } catch (err) {
-      console.error('Erro ao registrar:', err)
-      toast({
-        title: "Erro ao registrar",
-        description: err instanceof Error ? err.message : "Ocorreu um erro ao processar seu registro. Tente novamente.",
-        variant: "destructive"
-      })
-    } finally {
-      setSubmitting(false)
+      setQrCode(data.qrCode);
+      showSuccessMessage();
+    } catch (err) {                                           // +1
+      console.error('Erro ao registrar:', err);
+      showErrorMessage(err);
+    } finally {                                               // +1
+      setSubmitting(false);
     }
-  }
+  };
 
   // Função para formatação de data
   const formatEventDate = (dateString: string) => {
