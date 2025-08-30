@@ -30,76 +30,11 @@ import {
   saveEventToDatabase,
 } from '@/lib/guest-list-submission'
 
-// Componente de loading
-function LoadingSkeleton() {
-  return (
-    <div className="p-4 md:p-8 lg:p-10 space-y-6 animate-pulse">
-      <Skeleton className="h-10 w-1/3 rounded" />
-      <Card className="max-w-4xl mx-auto">
-        <CardContent className="p-6 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Skeleton className="h-10 w-full rounded" />
-            <Skeleton className="h-10 w-full rounded" />
-          </div>
-          <Skeleton className="h-24 w-full rounded" />
-          <div className="space-y-4 p-4 border rounded-md">
-            <Skeleton className="h-6 w-1/4 rounded mb-2" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-              <Skeleton className="h-10 w-full rounded" />
-              <Skeleton className="h-10 w-full rounded" />
-              <Skeleton className="h-10 w-full rounded" />
-              <Skeleton className="h-10 w-full rounded" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+// Importar componente de loading
+import LoadingSkeleton from './components/LoadingSkeleton'
 
-// Hook para lógica de submissão
-function useGuestListSubmission(
-  currentOrganization: any,
-  isEditMode: boolean,
-  existingFlyerUrl: string | null,
-  eventId: string | null,
-  promotionalFiles: File[]
-) {
-  const router = useRouter()
-
-  const processPromotionalMaterials = async (savedEventId: string) => {
-    // Implementação simplificada para reduzir complexidade
-    if (promotionalFiles.length === 0) {
-      return true
-    }
-    // TODO: Implementar upload de materiais promocionais
-    console.log(`Processando ${promotionalFiles.length} materiais para evento ${savedEventId}`)
-    return true
-  }
-
-  const handleSubmissionSuccess = (title: string) => {
-    toast({
-      title: `Evento ${isEditMode ? 'Atualizado' : 'Criado'}!`,
-      description: `O evento "${title}" foi salvo com sucesso.`,
-    })
-    router.push('/app/organizador/eventos')
-  }
-
-  const handleSubmissionError = (error: any) => {
-    console.error("Erro inesperado durante o upsert:", error)
-    let errorMessage = "Ocorreu um erro inesperado ao processar a operação."
-    if (error instanceof Error && error.message) {
-      errorMessage = error.message
-    }
-    toast({ title: "Erro Inesperado", description: errorMessage, variant: "destructive" })
-  }
-
-  return {
-    processPromotionalMaterials,
-    handleSubmissionSuccess,
-    handleSubmissionError
-  }
-}
+// Importar hook de submissão
+import { useGuestListSubmission } from './hooks/useGuestListSubmission'
 
 // Componente principal refatorado
 export default function GuestListPage() {

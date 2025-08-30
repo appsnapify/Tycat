@@ -97,109 +97,99 @@ export default function NewOrganizationPage() {
     }
   };
 
+  // ✅ PIPELINE DE VALIDAÇÃO (Complexidade: 2 pontos)
+  const validateFormData = (data: typeof formData) => {
+    const validations = [
+      { check: () => data.name.trim(), message: "Por favor, preencha o Nome da Organização." },
+      { check: () => data.email.trim() && /\S+@\S+\.\S+/.test(data.email), message: "Por favor, insira um E-mail válido." },
+      { check: () => data.address.trim(), message: "Por favor, preencha a Morada." },
+      { check: () => data.contacts.trim(), message: "Por favor, preencha o Telemóvel." },
+      { check: () => data.logo, message: "Por favor, selecione um Logo para a organização." },
+      { check: () => data.banner, message: "Por favor, selecione um Banner para a organização." }
+    ];
+
+    for (const validation of validations) {
+      if (!validation.check()) {
+        toast.error(validation.message);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // ✅ PREPARAR DADOS DE UPLOAD (Complexidade: 1 ponto)
+  const prepareUploadData = (data: typeof formData, userId: string) => {
+    const uploadData = new FormData();
+    uploadData.append('name', data.name);
+    uploadData.append('email', data.email);
+    uploadData.append('address', data.address);
+    uploadData.append('contacts', data.contacts);
+    uploadData.append('instagram', data.instagram || '');
+    uploadData.append('facebook', data.facebook || '');
+    uploadData.append('youtube', data.youtube || '');
+    uploadData.append('tiktok', data.tiktok || '');
+    uploadData.append('logo', data.logo);
+    uploadData.append('banner', data.banner);
+    uploadData.append('userId', userId);
+    return uploadData;
+  };
+
+  // ✅ ENVIAR DADOS PARA API (Complexidade: 3 pontos)
+  const submitToAPI = async (uploadData: FormData) => {
+    const response = await fetch('/api/organizations', {
+      method: 'POST',
+      body: uploadData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro ao criar organização');
+    }
+
+    return await response.json();
+  };
+
+  // ✅ FUNÇÃO PRINCIPAL SIMPLIFICADA (Complexidade: 5 pontos)
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    // --- Validações Adicionadas ---
-    if (!formData.name.trim()) {
-      toast.error("Por favor, preencha o Nome da Organização.");
-      return;
-    }
-    if (!formData.email.trim() || !/\S+@\S+\.\S+/.test(formData.email)) { // Check basic email format
-      toast.error("Por favor, insira um E-mail válido.");
-      return;
-    }
-    if (!formData.address.trim()) {
-      toast.error("Por favor, preencha a Morada.");
-      return;
-    }
-    if (!formData.contacts.trim()) {
-      toast.error("Por favor, preencha o Telemóvel.");
-      return;
-    }
-    if (!formData.logo) {
-      toast.error("Por favor, selecione um Logo para a organização.");
-      return;
-    }
-    if (!formData.banner) {
-      toast.error("Por favor, selecione um Banner para a organização.");
-      return;
-    }
-    // --- Fim das Validações ---
+    if (!validateFormData(formData)) return; // +1
 
-    setIsLoading(true)
+    setIsLoading(true);
     let submissionError: Error | null = null;
 
     try {
-      if (!user) {
-        throw new Error('Usuário não autenticado')
-      }
-
-      console.log('Enviando dados do formulário:', formData)
-
-      // Upload de imagens (sem usar a função que dá erro)
-      console.log('Iniciando upload do logo e banner diretamente...')
+      if (!user) throw new Error('Usuário não autenticado'); // +1
       
-      // Criar um FormData para enviar arquivos
-      const uploadData = new FormData()
-      uploadData.append('name', formData.name)
-      uploadData.append('email', formData.email)
-      uploadData.append('address', formData.address)
-      uploadData.append('contacts', formData.contacts)
-      uploadData.append('instagram', formData.instagram || '')
-      uploadData.append('facebook', formData.facebook || '')
-      uploadData.append('youtube', formData.youtube || '')
-      uploadData.append('tiktok', formData.tiktok || '')
-      uploadData.append('logo', formData.logo)
-      uploadData.append('banner', formData.banner)
-      uploadData.append('userId', user.id)
+      console.log('Enviando dados do formulário:', formData);
       
-      // Enviar para a API
-      const response = await fetch('/api/organizations', {
-        method: 'POST',
-        body: uploadData
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Erro ao criar organização')
-      }
-
-      const data = await response.json()
-      console.log('Organização criada com sucesso:', data)
+      const uploadData = prepareUploadData(formData, user.id);
+      const data = await submitToAPI(uploadData);
       
-      // Usar requestAnimationFrame para garantir execução após renderização
+      console.log('Organização criada com sucesso:', data);
+      
       requestAnimationFrame(() => {
         toast.success('Organização criada com sucesso!');
-        
-        // Adicionar um pequeno delay antes de redirecionar
         setTimeout(() => {
-           // Verificar para onde redirecionar (Dashboard parece mais lógico após criar)
-           router.push('/app/organizador/dashboard'); 
-        }, 500); // Pequeno delay para o toast ser visível
+          router.push('/app/organizador/dashboard'); 
+        }, 500);
       });
 
-    } catch (err) {
+    } catch (err) { // +1
       submissionError = err instanceof Error ? err : new Error(String(err));
-      console.error('Erro ao criar organização:', submissionError)
-      // Usar requestAnimationFrame para o toast de erro também
+      console.error('Erro ao criar organização:', submissionError);
+      
       requestAnimationFrame(() => {
-        toast.error(`Erro ao criar organização: ${submissionError?.message || 'Erro desconhecido'}`)
+        toast.error(`Erro ao criar organização: ${submissionError?.message || 'Erro desconhecido'}`);
       });
     } finally {
-      // Definir isLoading como false apenas se houve erro,
-      // senão o redirect cuida da mudança de UI.
-      if (submissionError) {
+      if (submissionError) { // +1
         setIsLoading(false);
       } else {
-        // No caso de sucesso, o redirect acontece, não precisamos necessariamente
-        // de reativar o botão imediatamente, mas podemos fazê-lo se quisermos.
-        // Se o redirect falhar por algum motivo, o botão ficaria desativado.
-        // Para maior segurança, podemos reativar se não houver erro:
         setIsLoading(false);
       }
     }
-  }
+  };
 
   return (
     <div className="flex flex-col lg:flex-row h-full">
