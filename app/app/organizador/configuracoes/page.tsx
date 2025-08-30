@@ -218,25 +218,25 @@ export default function ConfiguracoesPage() {
   const processIbanProofUpload = async (): Promise<string> => {
     if (!ibanProofFile) return initialData?.iban_proof_url ?? '';    // +1 (if)
     
-    toast({ title: 'A Carregar Ficheiro', description: 'O seu comprovativo de IBAN está a ser carregado...' });
-    const fileExt = ibanProofFile.name.split('.').pop();
-    const filePath = `public/${userId}/iban-proof-${Date.now()}.${fileExt}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('ibanproofs')
+        toast({ title: 'A Carregar Ficheiro', description: 'O seu comprovativo de IBAN está a ser carregado...' });
+        const fileExt = ibanProofFile.name.split('.').pop();
+        const filePath = `public/${userId}/iban-proof-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('ibanproofs')
       .upload(filePath, ibanProofFile, { cacheControl: '3600', upsert: true });
 
     if (uploadError) {                                               // +1 (if)
-      throw new Error(`Falha ao carregar o comprovativo de IBAN: ${uploadError.message}`);
-    }
+          throw new Error(`Falha ao carregar o comprovativo de IBAN: ${uploadError.message}`);
+        }
 
     const { data: urlData } = supabase.storage.from('ibanproofs').getPublicUrl(filePath);
-    
+        
     if (!urlData?.publicUrl) {                                       // +1 (if + ?.)
-      throw new Error('Não foi possível obter a URL pública do comprovativo de IBAN após o upload.');
-    }
+          throw new Error('Não foi possível obter a URL pública do comprovativo de IBAN após o upload.');
+        }
     
-    toast({ title: 'Upload Concluído', description: 'Comprovativo de IBAN carregado com sucesso.' });
+        toast({ title: 'Upload Concluído', description: 'Comprovativo de IBAN carregado com sucesso.' });
     return urlData.publicUrl;
   };
 
@@ -246,19 +246,19 @@ export default function ConfiguracoesPage() {
     const operationType = isUpdate ? 'update' : 'insert';
     
     if (isUpdate) {                                                  // +1 (if)
-      const { data, error } = await supabase
-        .from('organizer_business_details')
-        .update(dataToSave)
-        .eq('user_id', userId)
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('organizer_business_details')
+          .update(dataToSave)
+          .eq('user_id', userId)
+          .select()
+          .single();
       return { data, error, operationType };
     } else {
-      const { data, error } = await supabase
-        .from('organizer_business_details')
+        const { data, error } = await supabase
+          .from('organizer_business_details')
         .insert([{ ...dataToSave, created_at: new Date().toISOString() }])
-        .select()
-        .single();
+          .select()
+          .single();
       return { data, error, operationType };
     }
   };

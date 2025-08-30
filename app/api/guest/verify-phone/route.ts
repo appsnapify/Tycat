@@ -13,50 +13,52 @@ const rateLimits = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minuto
 const MAX_REQUESTS_PER_MINUTE = 20;
 
-function validateInternationalPhone(phone: string): string {
-  // Remover espaços e caracteres especiais
-  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-  
-  // console.log('🔍 validateInternationalPhone - input:', phone);
-  // console.log('🔍 validateInternationalPhone - cleaned:', cleaned);
-  
-  // ✅ ACEITAR NÚMEROS INTERNACIONAIS (começam com +)
-  if (cleaned.startsWith('+')) {
-    // Validação básica: + seguido de 1-3 dígitos de país + 4-15 dígitos
-    if (/^\+[1-9][0-9]{1,3}[0-9]{4,14}$/.test(cleaned)) {
-      // console.log('✅ Valid international format:', cleaned);
-      return cleaned;
-    }
-  }
-  
-  // ✅ VERIFICAR SE É PORTUGUÊS E JÁ ESTÁ NORMALIZADO
-  if (cleaned.startsWith('+351') && /^\+3519[1236][0-9]{7}$/.test(cleaned)) {
-    // console.log('✅ Valid Portuguese format (already normalized):', cleaned);
-    return cleaned; // Já está correto
-  }
-  
-  // ✅ PADRÕES PORTUGUESES (sem +)
+// ✅ FUNÇÕES AUXILIARES (Complexidade: ≤3 pontos cada)
+const cleanPhoneNumber = (phone: string): string => phone.replace(/[\s\-\(\)\.]/g, '');
+
+const isValidInternationalFormat = (cleaned: string): boolean => 
+  cleaned.startsWith('+') && /^\+[1-9][0-9]{1,3}[0-9]{4,14}$/.test(cleaned);
+
+const isValidPortugueseFormat = (cleaned: string): boolean =>
+  cleaned.startsWith('+351') && /^\+3519[1236][0-9]{7}$/.test(cleaned);
+
+const isPortugueseNumber = (cleaned: string): boolean => {
   const portuguesePatterns = [
     /^(\+351|351|0)?9[1236][0-9]{7}$/, // Telemóveis: 91x, 92x, 93x, 96x
     /^(\+351|351|0)?2[1-9][0-9]{7}$/   // Fixos (opcional)
   ];
+  return portuguesePatterns.some(pattern => pattern.test(cleaned));
+};
+
+const normalizePortugueseNumber = (cleaned: string): string => {
+  let normalized = cleaned;
+  if (normalized.startsWith('+351')) {
+    normalized = normalized.substring(4);
+  } else if (normalized.startsWith('351')) {
+    normalized = normalized.substring(3);
+  } else if (normalized.startsWith('0')) {
+    normalized = normalized.substring(1);
+  }
+  return '+351' + normalized;
+};
+
+// ✅ FUNÇÃO PRINCIPAL SIMPLIFICADA (Complexidade: 5 pontos)
+function validateInternationalPhone(phone: string): string {
+  const cleaned = cleanPhoneNumber(phone);
   
-  const isPortuguese = portuguesePatterns.some(pattern => pattern.test(cleaned));
+  // Verificar formato internacional válido
+  if (isValidInternationalFormat(cleaned)) {
+    return cleaned;
+  }
   
-  if (isPortuguese) {
-    // Normalizar formato português
-    let normalized = cleaned;
-    if (normalized.startsWith('+351')) {
-      normalized = normalized.substring(4); // Remove +351
-    } else if (normalized.startsWith('351')) {
-      normalized = normalized.substring(3); // Remove 351
-    } else if (normalized.startsWith('0')) {
-      normalized = normalized.substring(1); // Remove 0
-    }
-    
-    const result = '+351' + normalized;
-    // console.log('✅ Normalized Portuguese:', result);
-    return result;
+  // Verificar se já está normalizado como português
+  if (isValidPortugueseFormat(cleaned)) {
+    return cleaned;
+  }
+  
+  // Verificar e normalizar número português
+  if (isPortugueseNumber(cleaned)) {
+    return normalizePortugueseNumber(cleaned);
   }
   
   console.log('❌ Invalid phone format');

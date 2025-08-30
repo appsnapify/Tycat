@@ -110,11 +110,8 @@ interface BusinessDetailsData {
   iban_proof_url?: string | null; 
 }
 
-export async function upsertOrganizerBusinessDetails(details: BusinessDetailsData) {
-  console.log("[Action:upsertOrganizerBusinessDetails] Iniciando action com detalhes:", details);
-  noStore();
-  
-  // Logar cookies recebidos pela Server Action
+// ✅ FUNÇÕES AUXILIARES (Complexidade: ≤3 pontos cada)
+const logCookies = () => {
   try {
     const cookieStore = cookies();
     const allCookies = cookieStore.getAll();
@@ -122,56 +119,78 @@ export async function upsertOrganizerBusinessDetails(details: BusinessDetailsDat
   } catch (e) {
     console.error("[Action:upsertOrganizerBusinessDetails] Erro ao tentar ler cookies:", e);
   }
+};
 
-  let supabase;
+const createSupabaseClient = async () => {
   try {
-    supabase = await createClient();
+    const supabase = await createClient();
     console.log("[Action:upsertOrganizerBusinessDetails] Cliente Supabase criado:", supabase ? 'Objeto Cliente OK' : 'Cliente UNDEFINED');
     if (!supabase) {
       return { success: false, error: 'Falha ao criar cliente Supabase na action upsert.', data: null };
     }
+    return { success: true, client: supabase };
   } catch (error: any) {
     console.error("[Action:upsertOrganizerBusinessDetails] Erro ao criar cliente Supabase:", error);
     return { success: false, error: `Falha ao criar cliente Supabase na action upsert: ${error.message}`, data: null };
   }
+};
+
+const getAuthenticatedUser = async (supabase: any) => {
+  console.log("[Action:upsertOrganizerBusinessDetails] Tentando obter usuário...");
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("[Action:upsertOrganizerBusinessDetails] Erro ao obter usuário:", userError);
+    return { success: false, error: `Erro ao obter usuário no upsert: ${userError.message}`, data: null };
+  }
+  if (!user) {
+    console.log("[Action:upsertOrganizerBusinessDetails] Nenhum usuário autenticado encontrado para upsert.");
+    return { success: false, error: 'Nenhum usuário autenticado para upsert.', data: null };
+  }
+  console.log("[Action:upsertOrganizerBusinessDetails] Usuário obtido para upsert:", user.id);
+  return { success: true, user };
+};
+
+const executeUpsert = async (supabase: any, details: BusinessDetailsData, userId: string) => {
+  const dataToUpsert = {
+    ...details,
+    user_id: userId,
+    admin_contact_phone: details.admin_contact_phone || null,
+    billing_address_line2: details.billing_address_line2 || null,
+    iban_proof_url: details.iban_proof_url || null,
+  };
+  console.log("[Action:upsertOrganizerBusinessDetails] Dados para upsert:", dataToUpsert);
+
+  const { data, error } = await supabase
+    .from('organizer_business_details')
+    .upsert(dataToUpsert, { onConflict: 'user_id', ignoreDuplicates: false })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[Action:upsertOrganizerBusinessDetails] Erro no upsert dos detalhes da empresa:", error);
+    return { success: false, error: `Erro no upsert: ${error.message}`, data: null };
+  }
+
+  console.log("[Action:upsertOrganizerBusinessDetails] Detalhes da empresa atualizados/inseridos:", data);
+  return { success: true, data };
+};
+
+// ✅ FUNÇÃO PRINCIPAL SIMPLIFICADA (Complexidade: 6 pontos)
+export async function upsertOrganizerBusinessDetails(details: BusinessDetailsData) {
+  console.log("[Action:upsertOrganizerBusinessDetails] Iniciando action com detalhes:", details);
+  noStore();
+  
+  logCookies();
+
+  const clientResult = await createSupabaseClient();
+  if (!clientResult.success) return clientResult;
 
   try {
-    console.log("[Action:upsertOrganizerBusinessDetails] Tentando obter usuário...");
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const userResult = await getAuthenticatedUser(clientResult.client);
+    if (!userResult.success) return userResult;
 
-    if (userError) {
-      console.error("[Action:upsertOrganizerBusinessDetails] Erro ao obter usuário:", userError);
-      return { success: false, error: `Erro ao obter usuário no upsert: ${userError.message}`, data: null };
-    }
-    if (!user) {
-      console.log("[Action:upsertOrganizerBusinessDetails] Nenhum usuário autenticado encontrado para upsert.");
-      return { success: false, error: 'Nenhum usuário autenticado para upsert.', data: null };
-    }
-    console.log("[Action:upsertOrganizerBusinessDetails] Usuário obtido para upsert:", user.id);
-
-    const dataToUpsert = {
-      ...details,
-      user_id: user.id,
-      admin_contact_phone: details.admin_contact_phone || null,
-      billing_address_line2: details.billing_address_line2 || null,
-      iban_proof_url: details.iban_proof_url || null,
-    };
-    console.log("[Action:upsertOrganizerBusinessDetails] Dados para upsert:", dataToUpsert);
-
-    const { data, error } = await supabase
-      .from('organizer_business_details')
-      .upsert(dataToUpsert, { onConflict: 'user_id', ignoreDuplicates: false })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[Action:upsertOrganizerBusinessDetails] Erro no upsert dos detalhes da empresa:", error);
-      return { success: false, error: `Erro no upsert: ${error.message}`, data: null };
-    }
-
-    console.log("[Action:upsertOrganizerBusinessDetails] Detalhes da empresa atualizados/inseridos:", data);
-    return { success: true, data };
-
+    return await executeUpsert(clientResult.client, details, userResult.user.id);
   } catch (e: any) {
     console.error("[Action:upsertOrganizerBusinessDetails] Erro inesperado na action de upsert:", e);
     return { success: false, error: `Erro inesperado na action de upsert: ${e.message}`, data: null };

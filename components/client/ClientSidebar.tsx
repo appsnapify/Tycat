@@ -58,14 +58,14 @@ export function ClientSidebar() {
             </div>
 
             {/* Menu Button */}
-            <Button
-              variant="ghost"
-              size="icon"
+      <Button
+        variant="ghost"
+        size="icon"
               className="bg-white/80 backdrop-blur-sm shadow-lg hover:bg-white"
-              onClick={() => setIsOpen(!isOpen)}
-            >
-              {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </Button>
           </div>
         </div>
       </header>

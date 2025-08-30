@@ -42,13 +42,19 @@ export default function EventChartsSection({
     'O': '#60a5fa'   // blue-400
   };
 
-  // Função auxiliar: Processar item de gênero
+  // ✅ FUNÇÕES UTILITÁRIAS (Complexidade: 1 ponto cada)
+  const getGenderName = (item: any) => item?.genderName ?? 'Indefinido';
+  const getPercentage = (item: any) => item?.percentage ?? 0;
+  const getCount = (item: any) => item?.count ?? 0;
+  const getGenderColor = (gender: string) => GENDER_COLOR_MAP[gender as keyof GenderCode] ?? '#60a5fa';
+
+  // ✅ FUNÇÃO PRINCIPAL SIMPLIFICADA (Complexidade: 1 ponto)
   const processGenderItem = (item: any) => ({
-    name: item?.genderName ?? 'Indefinido',
-    value: item?.percentage ?? 0,
-    count: item?.count ?? 0,
-    percentage: item?.percentage ?? 0,
-    fill: GENDER_COLOR_MAP[item?.gender as keyof GenderCode] ?? '#60a5fa'
+    name: getGenderName(item),
+    value: getPercentage(item),
+    count: getCount(item),
+    percentage: getPercentage(item),
+    fill: getGenderColor(item?.gender)
   });
 
   // Preparando dados do gráfico de gênero
