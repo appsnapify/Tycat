@@ -97,7 +97,12 @@ export default function GuestListPage() {
 
   // Função principal de submissão (complexidade reduzida)
   const onSubmitGuestList = async (data: GuestListFormValues) => {
-    console.log("Submetendo formulário com dados:", data)
+    console.log("Submetendo formulário com dados:", { 
+      title: data.title, 
+      location: data.location, 
+      hasStartDate: !!data.startDate,
+      hasEndDate: !!data.endDate 
+    })
 
     const validation = await validateSubmissionRequirements(currentOrganization)
     if (!validation.isValid) return

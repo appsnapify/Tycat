@@ -133,7 +133,7 @@ export default function OrganizationClient({ slug }: OrganizationClientProps) {
         if (pastError) throw pastError
         setPastEvents(past ?? [])
       } catch (error) {
-        console.error('Erro ao carregar organização:', error)
+        console.error('Erro ao carregar organização:', error?.message || 'Erro desconhecido')
       } finally {
         setIsLoading(false)
       }

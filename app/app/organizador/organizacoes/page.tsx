@@ -65,8 +65,8 @@ export default function OrganizationsPage() {
       try {
         const supabase = createClient()
         
-        console.log('OrganizationsPage: Buscando organizações para o usuário:', user.id)
-        console.log('OrganizationsPage: Email do usuário:', user.email)
+        console.log('OrganizationsPage: Buscando organizações para o usuário:', user.id.substring(0, 8) + '...')
+        console.log('OrganizationsPage: Email do usuário:', user.email ? user.email.substring(0, 3) + '***@' + user.email.split('@')[1] : 'N/A')
         
         // Buscar organizações do usuário
         const { data: userOrgs, error: userOrgsError } = await supabase

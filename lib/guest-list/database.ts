@@ -59,7 +59,12 @@ export function handleDatabaseError(upsertError: any): void {
 
 // Salvar evento no database
 export async function saveEventToDatabase(eventData: any): Promise<string | null> {
-  console.log("Dados a serem enviados para upsert:", eventData)
+  console.log("Dados a serem enviados para upsert:", { 
+    title: eventData.title, 
+    type: eventData.type, 
+    organization_id: eventData.organization_id ? eventData.organization_id.substring(0, 8) + '...' : null,
+    id: eventData.id ? eventData.id.substring(0, 8) + '...' : 'novo'
+  })
 
   const { data: upsertResult, error: upsertError } = await supabase
     .from('events')
@@ -73,6 +78,6 @@ export async function saveEventToDatabase(eventData: any): Promise<string | null
   }
 
   const savedEventId = upsertResult?.id
-  console.log("Upsert do evento bem-sucedido. Evento ID:", savedEventId)
+  console.log("Upsert do evento bem-sucedido. Evento ID:", savedEventId ? savedEventId.substring(0, 8) + '...' : 'null')
   return savedEventId || null
 }

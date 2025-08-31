@@ -169,7 +169,7 @@ const useTeamData = (user: any, isTeamLeader: boolean | null | undefined) => {
     }
     setLoading(true);
     try {
-      console.log("EquipesPage: Carregando equipes para o usuário:", user.id);
+      console.log("EquipesPage: Carregando equipes para o usuário:", user.id.substring(0, 8) + '...');
 
       const { data: memberData, error: memberError } = await createClient()
         .from('team_members')

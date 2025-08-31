@@ -25,7 +25,7 @@ const OrganizationProvider = ({ children }) => {
         
         // Se tiver um usuário, buscar suas organizações
         try {
-          console.log('OrganizationContext: Buscando organizações para o usuário:', currentUser.id)
+          console.log('OrganizationContext: Buscando organizações para o usuário:', currentUser.id.substring(0, 8) + '...')
           
           // Buscar relações de organizações do usuário
           const { data: orgRelations, error: orgRelationsError } = await supabase

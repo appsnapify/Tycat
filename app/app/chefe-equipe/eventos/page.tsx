@@ -139,7 +139,7 @@ function EventListContent({ orgId }: EventListContentProps) {
 
         // 1.5. Fetch Team ID for the current user in this organization
         if (user?.id) {
-          console.log('[CHEFE EQUIPE] Buscando team_id para userId:', user.id, 'orgId:', orgId);
+          console.log('[CHEFE EQUIPE] Buscando team_id para userId:', user.id.substring(0, 8) + '...', 'orgId:', orgId);
           
           // Query CORRIGIDA: buscar team via team_members -> organization_teams
           const { data: teamData, error: teamError } = await supabase

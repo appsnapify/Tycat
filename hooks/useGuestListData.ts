@@ -52,7 +52,7 @@ export function useGuestListData(
       if (eventId && currentOrganization?.id) {
         setIsLoading(true)
         try {
-          console.log("Carregando evento para edição:", eventId)
+          console.log("Carregando evento para edição:", eventId.substring(0, 8) + '...')
           const { data: event, error: eventError } = await supabase
             .from('events')
             .select('*')

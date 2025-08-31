@@ -47,7 +47,7 @@ async function getAuthenticatedUser(supabase: any) {
     throw new Error('Nenhum usuário autenticado.');
   }
   
-  console.log("[Action:getOrganizerBusinessDetails] Usuário obtido:", user.id);
+  console.log("[Action:getOrganizerBusinessDetails] Usuário obtido:", user.id.substring(0, 8) + '...');
   return user;
 }
 
@@ -147,7 +147,7 @@ const getAuthenticatedUser = async (supabase: any) => {
     console.log("[Action:upsertOrganizerBusinessDetails] Nenhum usuário autenticado encontrado para upsert.");
     return { success: false, error: 'Nenhum usuário autenticado para upsert.', data: null };
   }
-  console.log("[Action:upsertOrganizerBusinessDetails] Usuário obtido para upsert:", user.id);
+  console.log("[Action:upsertOrganizerBusinessDetails] Usuário obtido para upsert:", user.id.substring(0, 8) + '...');
   return { success: true, user };
 };
 

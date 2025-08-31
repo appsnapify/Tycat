@@ -145,7 +145,7 @@ export default function CriarEquipePage() {
       }
       
       console.log("Criando equipa com os dados:", formData);
-      console.log("ID do utilizador:", user.id);
+      console.log("ID do utilizador:", user.id.substring(0, 8) + '...');
       console.log("Metadados atuais do utilizador:", user.user_metadata);
       
       // Chamar a função RPC para criar a equipe

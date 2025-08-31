@@ -38,12 +38,12 @@ export async function handleEditModeFlyer(
       .upload(filePath, file, { upsert: true })
     if (uploadError) throw uploadError
     const { data: urlData } = supabase.storage.from('event-flyers').getPublicUrl(uploadData.path)
-    console.log("Modo Edição: Novo flyer carregado. URL:", urlData?.publicUrl)
+    console.log("Modo Edição: Novo flyer carregado. URL:", urlData?.publicUrl ? '[URL_MASCARADA]' : 'null')
     return urlData?.publicUrl || null
   }
   
   if (data.flyer && data.flyer.length > 0 && data.flyer[0].name === 'flyer-placeholder.png') {
-    console.log("Modo Edição: Placeholder detetado. Mantendo flyer URL existente:", existingFlyerUrl)
+    console.log("Modo Edição: Placeholder detetado. Mantendo flyer URL existente:", existingFlyerUrl ? '[URL_MASCARADA]' : 'null')
     return existingFlyerUrl
   }
   

@@ -144,35 +144,53 @@ interface Event {
 
 // Verificar se um evento já ocorreu com base no status ou nas datas
 function isEventPast(event: Event): boolean {
-  // Se o evento tiver status, usar ele como primeira verificação
+  // Se o evento tiver status 'completed', sempre é passado
   if (event.status === 'completed') {
     return true;
   }
   
-  // Se não tiver status, verificar pela data (fallback)
+  // Se não tiver data, não pode determinar se é passado
   if (!event.date) return false;
   
-  // Criar data do evento com horário 23:59:59 (ou usar end_date se disponível)
+  // Determinar a hora de término do evento
   let eventEndDate: Date;
   
   if (event.end_date) {
-    eventEndDate = new Date(event.end_date);
+    // Se tem data de fim específica, usar ela (interpretando como data local)
+    const [year, month, day] = event.end_date.split('-').map(Number);
+    eventEndDate = new Date(year, month - 1, day); // month é 0-based
     if (event.end_time) {
       const [hours, minutes] = event.end_time.split(':').map(Number);
-      eventEndDate.setHours(hours, minutes);
+      eventEndDate.setHours(hours, minutes, 0);
     } else {
       eventEndDate.setHours(23, 59, 59);
     }
   } else {
-    eventEndDate = new Date(event.date);
+    // Usar data do evento como base (interpretando como data local)
+    const [year, month, day] = event.date.split('-').map(Number);
+    eventEndDate = new Date(year, month - 1, day); // month é 0-based
+    
+    if (event.end_time) {
+      // Se tem hora de término definida, usar ela
+      const [hours, minutes] = event.end_time.split(':').map(Number);
+      eventEndDate.setHours(hours, minutes, 0);
+    } else if (event.time) {
+      // Se só tem hora de início, assumir duração de 4 horas
+      const [startHours, startMinutes] = event.time.split(':').map(Number);
+      eventEndDate.setHours(startHours + 4, startMinutes, 0);
+    } else {
+      // Fallback: final do dia
     eventEndDate.setHours(23, 59, 59);
   }
+  }
   
-  // Adicionar 8 horas de margem para eventos noturnos
-  eventEndDate.setHours(eventEndDate.getHours() + 8);
+  // Comparar com o momento atual (sem margem adicional)
+  const now = new Date();
+  const result = eventEndDate < now;
   
-  const today = new Date();
-  return eventEndDate < today;
+
+  
+  return result;
 }
 
 // Função para duplicar um evento
@@ -265,6 +283,7 @@ export default function EventosPage() {
           const eventsWithStatus = data?.map(event => {
             if (!event.status) {
               const isPast = isEventPast({...event, status: undefined});
+
               return {
                 ...event,
                 status: isPast ? 'completed' : new Date(event.date) <= new Date() ? 'active' : 'scheduled'
@@ -346,7 +365,11 @@ export default function EventosPage() {
 
   // Separar eventos em próximos e passados
   const upcomingEvents = eventList
-    .filter(event => !isEventPast(event))
+    .filter(event => {
+      const isPast = isEventPast(event);
+
+      return !isPast;
+    })
     .sort((a, b) => {
       // Ordenar próximos eventos por data crescente (mais próximos primeiro)
       if (!a.date) return 1;
@@ -366,6 +389,8 @@ export default function EventosPage() {
       const dateB = new Date(b.date);
       return dateB.getTime() - dateA.getTime();
     });
+
+
 
   const handleAction = (action: string, eventId: string) => {
     switch (action) {
@@ -445,14 +470,8 @@ export default function EventosPage() {
             <Calendar className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhum evento próximo</h3>
             <p className="mt-2 text-sm text-gray-500">
-              Você não tem eventos programados. Comece criando seu próximo evento.
+              Você não tem eventos programados.
             </p>
-            <Button 
-              onClick={() => router.push('/app/organizador/eventos/criar')} 
-              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white shadow-[0px_0px_15px_rgba(0,0,0,0.09)] hover:shadow-[0px_0px_20px_rgba(0,0,0,0.12)] transition-all duration-200"
-            >
-              Criar Evento
-            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

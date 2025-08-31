@@ -1,25 +1,12 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useAuth } from '@/app/app/_providers/auth-provider'
 import { useOrganization } from '@/app/contexts/organization-context'
 import { DashboardContent } from '@/components/dashboard/dashboard-content'
 
-// Types
-interface Team {
-  id: string
-  name: string
-  members_count: number
-}
-
-interface Activity {
-  type: string
-  title: string
-  description: string
-  timestamp: string
-}
+// Types removidos - não utilizados no dashboard simplificado
 
 // Hook customizado para dados do dashboard (Complexidade: 8 pontos)
 function useDashboardData() {
@@ -29,10 +16,12 @@ function useDashboardData() {
     teamsCount: 0,
     promotersCount: 0
   })
-  const [teams, setTeams] = useState<Team[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [activities, setActivities] = useState<any[]>([])
+  const [userProfile, setUserProfile] = useState<{ first_name: string; last_name: string } | null>(null)
   const [loadingKpis, setLoadingKpis] = useState(true)
   const [loadingTeams, setLoadingTeams] = useState(true)
+  const [loadingProfile, setLoadingProfile] = useState(true)
   const [loadingError, setLoadingError] = useState(false)
   
   const supabase = createClient()
@@ -50,27 +39,50 @@ function useDashboardData() {
       tableCache.set(tableName, exists)
       return exists
     } catch (e) {
-      console.error(`Erro ao verificar tabela ${tableName}:`, e)
+      console.error('Erro ao verificar existência de tabela:', e)
       return false
     }
   }, [supabase, tableCache])
 
-  // Função para verificar se coluna existe (Complexidade: 4 pontos)
+  // Função para verificar se coluna existe (Complexidade: 3 pontos)
   const checkColumnExists = async (tableName: string, columnName: string) => {
     try {
       const tableExists = await checkTableExists(tableName)
       if (!tableExists) return false
       
-      const query = `select ${columnName} from ${tableName} limit 0`
-      const { error } = await supabase.rpc('run_sql_query', { query })
+      // Usar select direto em vez de run_sql_query (que não existe)
+      const { error } = await supabase
+        .from(tableName)
+        .select(columnName)
+        .limit(1)
         
-      if (error?.code === '42703') return false
-      return !error
+      return !error || error.code !== '42703'
     } catch (e) {
-      console.error(`Exceção ao verificar coluna '${columnName}':`, e)
+      console.error('Erro ao verificar existência de coluna:', e)
       return false
     }
   }
+
+  // Contar promotores nas equipas da organização (Complexidade: 4 pontos)
+  const getPromotersCount = useCallback(async (organizationId: string): Promise<number> => {
+    try {
+      if (!organizationId) return 0
+
+      const { data, error } = await supabase.rpc('count_organization_promoters', {
+        org_id: organizationId
+      })
+
+      if (error) {
+        console.warn('Erro ao contar promotores:', error.message)
+        return 0
+      }
+
+      return data || 0
+    } catch (error) {
+      console.warn('Erro ao executar contagem de promotores:', error)
+      return 0
+    }
+  }, [supabase])
 
   // Query segura (Complexidade: 8 pontos)
   const safeQuery = async (tableName: string, options: any = {}) => {
@@ -91,10 +103,8 @@ function useDashboardData() {
       let query = supabase.from(tableName).select(select)
       
       if (organizationId) {
-        const hasOrgColumn = await checkColumnExists(tableName, 'organization_id')
-        if (hasOrgColumn) {
-          query = query.eq('organization_id', organizationId)
-        }
+        // organization_id existe em todas as tabelas principais, não precisa verificar
+        query = query.eq('organization_id', organizationId)
       }
       
       if (orderColumn) {
@@ -106,7 +116,7 @@ function useDashboardData() {
       
       return await query.limit(limit)
     } catch (e) {
-      console.error(`Exceção em safeQuery para '${tableName}':`, e)
+      console.error('Erro ao executar consulta segura:', e)
       return { data: [], error: e }
     }
   }
@@ -153,11 +163,14 @@ function useDashboardData() {
       
       const teamsCount = teamsResponse.data?.length ?? 0
 
+      // Contar promotores nas equipas da organização
+      const promotersCount = await getPromotersCount(organizationId)
+
       setKpis({
         totalEvents: completedEvents + upcomingEvents,
         upcomingEvents,
         teamsCount,
-        promotersCount: 0
+        promotersCount
       })
       
     } catch (error) {
@@ -212,90 +225,125 @@ function useDashboardData() {
     }
   }, [])
 
+  // Carregar perfil do usuário (Complexidade: 3 pontos)
+  const loadUserProfile = useCallback(async (userId: string) => {
+    setLoadingProfile(true)
+    
+    try {
+      if (!userId) {
+        setUserProfile(null)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', userId)
+        .single()
+
+      if (error) {
+        console.warn('Erro ao carregar perfil:', error.message)
+        setUserProfile(null)
+      } else {
+        setUserProfile(data)
+      }
+    } catch (error) {
+      console.error('Erro ao executar busca do perfil:', error)
+      setUserProfile(null)
+    } finally {
+      setLoadingProfile(false)
+    }
+  }, [supabase])
+
   return {
     kpis,
     teams,
     activities,
+    userProfile,
     loadingKpis,
     loadingTeams,
+    loadingProfile,
     loadingError,
     loadKpis,
     loadTeams,
     loadActivities,
+    loadUserProfile,
     setLoadingError
   }
 }
 
 // Componente principal (Complexidade: 5 pontos)
 export default function OrganizadorDashboardPage() {
-  const router = useRouter()
   const { user } = useAuth()
   const { currentOrganization } = useOrganization()
   
   const [loading, setLoading] = useState(true)
-  const [organizationCode, setOrganizationCode] = useState<string | null>(null)
 
   const {
     kpis,
     teams,
     activities,
+    userProfile,
     loadingKpis,
     loadingTeams,
+    loadingProfile,
     loadingError,
     loadKpis,
     loadTeams,
     loadActivities,
+    loadUserProfile,
     setLoadingError
   } = useDashboardData()
 
-  // Carregar dados da organização (Complexidade: 4 pontos)
-  const loadOrganizationAndData = useCallback(async () => {
-    if (!user) return
+  // Carregar dados da organização com useRef para evitar loop (Complexidade: 3 pontos)
+  useEffect(() => {
+    if (!user || !currentOrganization) {
+      setLoading(false)
+      setLoadingError(true)
+      return
+    }
     
-    try {
-      if (currentOrganization) {
+    const loadData = async () => {
+      try {
         const organizationId = currentOrganization.id
-        
-        generateOrganizationCode(organizationId)
         
         loadKpis(organizationId)
         loadTeams(organizationId)
         loadActivities()
+        loadUserProfile(user.id)
         
         setLoading(false)
-        return
+      } catch (error) {
+        console.error('OrganizadorDashboard: Erro ao carregar organização:', error)
+        setLoading(false)
+        setLoadingError(true)
       }
-
-      setLoading(false)
-      setLoadingError(true)
-      
-    } catch (error) {
-      console.error('OrganizadorDashboard: Erro ao carregar organização:', error)
-      setLoading(false)
-      setLoadingError(true)
     }
-  }, [user, currentOrganization, loadKpis, loadTeams, loadActivities])
+    
+    loadData()
+  }, [user?.id, currentOrganization?.id])
 
-  useEffect(() => {
+  // Função de refresh para o botão (Complexidade: 1 ponto)
+  const handleRefresh = () => {
     if (user && currentOrganization) {
-      loadOrganizationAndData()
+      const organizationId = currentOrganization.id
+      loadKpis(organizationId)
+      loadTeams(organizationId)
+      loadActivities()
+      loadUserProfile(user.id)
     }
-  }, [user, currentOrganization, loadOrganizationAndData])
-  
-  // Gerar código da organização (Complexidade: 1 ponto)
-  const generateOrganizationCode = (organizationId: string) => {
-    const generatedOrgCode = `ORG-${organizationId.substring(0, 6).toUpperCase()}`
-    setOrganizationCode(generatedOrgCode)
   }
 
-    return (
+  return (
     <DashboardContent
       kpis={kpis}
       teams={teams}
+      userProfile={userProfile}
       loadingKpis={loadingKpis}
       loadingTeams={loadingTeams}
+      loadingProfile={loadingProfile}
       loadingError={loadingError} 
-      onRefresh={loadOrganizationAndData}
+      onRefresh={handleRefresh}
     />
   )
 } 

@@ -72,7 +72,7 @@ export default function ConfiguracoesPage() {
         }
 
         const user = session.user
-        console.log('Usuário encontrado:', user.id)
+        console.log('Usuário encontrado:', user.id.substring(0, 8) + '...')
 
         const { data: profile, error: profileError } = await supabase
           .from('profiles')

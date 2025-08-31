@@ -30,7 +30,7 @@ export default function PromotorComissoesPage() {
     exportCsv(filteredCommissions)
     toast.success('Relatório exportado com sucesso')
   }
-
+  
   if (loading) { // +1
     return <CommissionsLoading />
   }
@@ -69,4 +69,4 @@ export default function PromotorComissoesPage() {
       />
     </div>
   )
-}
+} 
