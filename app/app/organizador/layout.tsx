@@ -1,31 +1,26 @@
 "use client"
 
-import { ReactNode, useState } from 'react'
+import React, { ReactNode, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { OrganizationSelector } from '@/components/organization-selector'
 import { useOrganization } from '@/app/contexts/organization-context'
+
 import { Button } from '@/components/ui/button'
 import { LogOut, Menu, X } from 'lucide-react'
 import { logout } from '@/lib/auth'
 import { toast } from 'sonner'
-import { buttonVariants } from '@/components/ui/button'
+
 import {
-  BadgePercent,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   LayoutDashboard,
-  QrCode,
-  TicketCheck,
   Users,
   Settings,
   FileText,
-  Building,
   Ticket,
   ScanLine,
-  Store,
+  Store
 } from 'lucide-react'
 
 // Estilos Atualizados - Migração para azul
@@ -154,22 +149,27 @@ export default function OrganizadorLayout({
         {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Sidebar - Redesenhada com novo esquema de cores */}
+      {/* Sidebar - Design Limpo e Elegante */}
       <aside 
         className={cn(
           "fixed inset-y-0 left-0 z-20 w-64 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static",
-          colors.sidebar.bg, "border-r", colors.sidebar.border,
+          "bg-gray-900 border-r border-gray-800",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
+        {/* Header Limpo */}
         <div className="flex h-16 items-center justify-center border-b border-gray-800 px-6">
           <div className="text-xl font-bold text-white">Tycat</div>
         </div>
+        
+        {/* Organization Selector */}
         <div className="px-4 py-4">
           <OrganizationSelector />
         </div>
-        <nav className="space-y-1 px-2 py-4 flex flex-col h-[calc(100%-9rem)]">
-          <div className="flex-1 space-y-1">
+        
+        {/* Navigation Limpa */}
+        <nav className="space-y-1 px-2 py-4">
+          <div className="space-y-1">
             {sidebarLinks.map(link => (
               <NavItem 
                 key={link.href}
@@ -182,15 +182,17 @@ export default function OrganizadorLayout({
             ))}
           </div>
           
-          {/* Botão de Logout - Redesenhado */}
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start mt-auto text-gray-400 hover:bg-gray-800 hover:text-red-400"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair da conta
-          </Button>
+          {/* Logout Button - Reposicionado */}
+          <div className="pt-2 mt-2 border-t border-gray-700">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-gray-400 hover:bg-gray-800 hover:text-red-400 mx-2"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair da conta
+            </Button>
+          </div>
         </nav>
       </aside>
 
@@ -202,9 +204,9 @@ export default function OrganizadorLayout({
         />
       )}
 
-      {/* Conteúdo principal - Redesenhado com novo esquema de cores */}
-      <main className={cn("flex-1 overflow-auto pt-16 md:pt-0", colors.main.bg)}>
-        {/* Header com breadcrumbs e ações */}
+      {/* Conteúdo principal - Normal */}
+      <main className="flex-1 min-h-screen pt-16 md:pt-0">
+        {/* Header Normal */}
         <div className="bg-white border-b p-4 md:py-4 md:px-8 flex justify-between items-center sticky top-0 z-10">
           <div>
             <h1 className="text-xl font-semibold">{getCurrentPageTitle(pathname)}</h1>

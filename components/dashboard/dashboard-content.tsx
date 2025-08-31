@@ -1,22 +1,13 @@
 'use client'
 
 import React from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { StatCard } from '@/components/dashboard/stat-card'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   CalendarDays,
-  CalendarPlus,
   TicketCheck,
   Users,
-  Percent,
-  UserPlus,
-  TrendingUp,
-  ArrowRight,
   RefreshCw,
   AlertCircle
 } from 'lucide-react'
@@ -34,8 +25,13 @@ interface DashboardContentProps {
     name: string
     eventCount: number
   }>
+  userProfile: {
+    first_name: string
+    last_name: string
+  } | null
   loadingKpis: boolean
   loadingTeams: boolean
+  loadingProfile: boolean
   loadingError: boolean
   onRefresh: () => void
 }
@@ -71,13 +67,13 @@ const dashboardColors = {
 export function DashboardContent({
   kpis,
   teams,
+  userProfile,
   loadingKpis,
   loadingTeams,
+  loadingProfile,
   loadingError,
   onRefresh
 }: DashboardContentProps) {
-  const router = useRouter()
-  
   if (loadingError) {
     return (
       <div className={cn("p-6 rounded-lg border", dashboardColors.badge.red)}>
@@ -101,89 +97,52 @@ export function DashboardContent({
   }
   
   return (
-    <div className="space-y-6">
-      {/* KPIs / Métricas principais */}
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Mensagem de Boas-vindas */}
+      <div className="mb-8">
+        {loadingProfile ? (
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-200 animate-pulse rounded-md w-64"></div>
+            <div className="h-4 bg-gray-200 animate-pulse rounded-md w-96"></div>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              Olá, {userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Organizador'}! 👋
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Bem-vindo ao seu painel de controle. Aqui pode gerir os seus eventos e equipas.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* KPIs / Métricas principais - Cards Elegantes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard
-          title="Eventos Completos"
+          title="Total de Eventos"
           value={loadingKpis ? "..." : kpis.totalEvents}
-          icon={<CalendarDays size={18} />}
-          color="primary"
+          icon={CalendarDays}
           loading={loadingKpis}
         />
         <StatCard
           title="Eventos Próximos"
           value={loadingKpis ? "..." : kpis.upcomingEvents} 
-          icon={<TicketCheck size={18} />}
-          color="accent"
+          icon={TicketCheck}
           loading={loadingKpis}
         />
         <StatCard
           title="Equipas"
           value={loadingKpis ? "..." : kpis.teamsCount}
-          icon={<Users size={18} />}
-          color="secondary"
+          icon={Users}
           loading={loadingKpis}
         />
         <StatCard
           title="Promotores"
           value={loadingKpis ? "..." : kpis.promotersCount}
-          icon={<Users size={18} />}
-          color="neutral"
+          icon={Users}
           loading={loadingKpis}
         />
-      </div>
-      
-      {/* Ações rápidas */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6">
-        <Card className="border rounded-xl p-4 md:p-6">
-          <div className="space-y-2 mb-4 md:mb-5">
-            <h3 className="text-lg md:text-xl font-bold">Acções Rápidas</h3>
-            <p className="text-sm md:text-base text-gray-500">Aceda rapidamente às principais funções</p>
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div 
-                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => router.push('/app/organizador/evento/criar')}
-              >
-                <span className="flex-shrink-0">
-                  <CalendarPlus className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-                </span>
-                <span className="text-sm md:text-base font-medium">Criar Evento</span>
-              </div>
-              <div 
-                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => router.push('/app/organizador/equipes')}
-              >
-                <span className="flex-shrink-0">
-                  <UserPlus className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-                </span>
-                <span className="text-sm md:text-base font-medium">Gerir Equipas</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div 
-                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => router.push('/app/organizador/check-in')}
-              >
-                <span className="flex-shrink-0">
-                  <TicketCheck className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-                </span>
-                <span className="text-sm md:text-base font-medium">Gestão de Check-in</span>
-              </div>
-              <div 
-                className="flex items-center gap-3 py-3 md:py-4 px-3 md:px-4 rounded-xl border border-gray-100 opacity-50 cursor-not-allowed"
-              >
-                <span className="flex-shrink-0">
-                  <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-gray-400" />
-                </span>
-                <span className="text-sm md:text-base font-medium text-gray-400">Ver Relatórios</span>
-                <span className="text-xs text-gray-400 ml-auto">(Em breve)</span>
-              </div>
-            </div>
-          </div>
-        </Card>
       </div>
 
     </div>
