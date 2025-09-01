@@ -4,9 +4,11 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Ticket, BarChart2, Users, LayoutDashboard, LogOut, Sparkles, Zap, Shield } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
+
+// ✅ LAZY LOAD Framer Motion para reduzir TBT - Corrigido para Next.js 15.5.2
+import { motion, AnimatePresence } from 'framer-motion'
 
 // Paleta de cores elegante para TYCAT - Código limpo
 const colors = {
