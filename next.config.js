@@ -1,8 +1,4 @@
 /** @type {import('next').NextConfig} */
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-})
-
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -42,4 +38,4 @@ const nextConfig = {
   compress: true, // Habilita compressão Gzip
 }
 
-module.exports = withBundleAnalyzer(nextConfig) 
+module.exports = nextConfig 

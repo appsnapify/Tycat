@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { ClientAuthProvider } from '@/contexts/client/ClientAuthContext';
 import { ClientSessionProvider } from '@/contexts/client/ClientSessionContext';
 import { Toaster } from '@/components/ui/sonner';
-import '../globals.css';
+// CSS global já importado no root layout (app/layout.tsx)
 
 export const metadata: Metadata = {
   title: 'TYCAT - Área do Cliente',

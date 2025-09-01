@@ -1,6 +1,6 @@
 "use client"
 
-import '@/app/globals.css'
+// CSS global já importado no root layout (app/layout.tsx)
 // import Link from 'next/link' // Comentado se não usado diretamente neste ficheiro
 import { useRouter } from 'next/navigation' // Mantido para AppLayoutContent
 import { Toaster } from 'sonner'
