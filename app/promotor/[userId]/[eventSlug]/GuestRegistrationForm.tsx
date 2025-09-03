@@ -169,8 +169,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
       // 🔧 FIX: Usar o telefone normalizado do cliente encontrado
       const phoneToUse = clientUser?.phone || phone;
       
-      // 🚨 SISTEMA GUEST ISOLADO - Usar API específica para guests
-      const response = await fetch('/api/guest/login', {
+      // ✅ ENHANCED API: Usar API enhanced com structured errors
+      const response = await fetch('/api/guest/login-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -260,8 +260,8 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
       console.log('promoterId:', promoterId);
       console.log('===============================');
 
-      // 🚨 SISTEMA GUEST ISOLADO - Usar API específica para guests
-      const response = await fetch('/api/guest/register', {
+      // ✅ ENHANCED API: Usar API enhanced com structured errors
+      const response = await fetch('/api/guest/register-enhanced', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

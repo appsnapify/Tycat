@@ -28,22 +28,21 @@ const nextConfig = {
     dangerouslyAllowSVG: false, // ✅ SEGURANÇA
     unoptimized: false, // ✅ GARANTIR otimização
   },
-  experimental: {
+    experimental: {
     optimizeCss: true,
     optimizePackageImports: [
-      '@supabase/supabase-js', 
-      'lucide-react', 
+      '@supabase/supabase-js',
+      'lucide-react',
       'framer-motion',
       '@hookform/resolvers',
       'zod',
       'react-hook-form'
-    ], // ✅ EXPANDIR OTIMIZAÇÕES
-    webpackBuildWorker: true, // ✅ BUILD PARALELO
-    // serverComponentsHmrCache: false, // ✅ REMOVIDO - instável no Next.js 15
-    
-    // ✅ BUNDLE SPLITTING AGRESSIVO
-    esmExternals: 'loose',
+    ],
+    webpackBuildWorker: true,
     serverMinification: true,
+    // ✅ ADICIONAR OTIMIZAÇÕES MCP CONTEXT7
+    webpackMemoryOptimizations: true, // ✅ REDUZIR MEMORY USAGE
+    preloadEntriesOnStart: false, // ✅ REDUZIR MEMORY FOOTPRINT
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {
@@ -63,40 +62,14 @@ const nextConfig = {
     },
   },
   
-  // ✅ WEBPACK OPTIMIZATIONS AGRESSIVAS
+  // ✅ WEBPACK MINIMAL (COMPATÍVEL NEXT.JS 15)
   webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // ✅ Code splitting mais agressivo
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            priority: 10,
-            chunks: 'all',
-          },
-          supabase: {
-            test: /[\\/]node_modules[\\/]@supabase[\\/]/,
-            name: 'supabase',
-            priority: 20,
-            chunks: 'all',
-          },
-          common: {
-            name: 'common',
-            minChunks: 2,
-            priority: 5,
-            chunks: 'all',
-            enforce: true,
-          },
-        },
-      };
-      
-      // ✅ Tree shaking agressivo
+    // ✅ ONLY minimal changes que não interferem com chunks
+    if (!dev) {
       config.optimization.usedExports = true;
-      config.optimization.sideEffects = false;
     }
     
+    // ✅ SEMPRE retornar config sem modificar splitChunks
     return config;
   },
   // ✅ HEADERS DE PERFORMANCE

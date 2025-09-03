@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Database } from '@/lib/database.types';
 import GuestRegistrationForm from './GuestRegistrationForm';
 import EventDescription from './EventDescription';
-import GuestRegistrationWrapper from './GuestRegistrationWrapper';
+import Head from 'next/head';
 
 interface PageProps {
   params: Promise<{
@@ -61,12 +61,13 @@ export default async function EventGuestPage({ params }: PageProps) {
       .eq('id', (eventSlugData as any).event_id)
       .single();
 
-    // 4. Buscar team_id do promotor
+    // 4. Buscar team_id do promotor (CORRIGIDO: pode ter múltiplas equipas)
     const { data: teamData } = await supabase
       .from('team_members')
-      .select('team_id')
+      .select('team_id, teams(name)')
       .eq('user_id', promoterData.id)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (eventError || !eventData) {
       console.error('Event data fetch failed:', eventError);
@@ -80,8 +81,17 @@ export default async function EventGuestPage({ params }: PageProps) {
     const isGuestListOpen = now >= guestListOpen && now <= guestListClose;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 font-['Inter',sans-serif]">
-        {/* Elementos decorativos de fundo */}
+      <>
+        <Head>
+          {/* ✅ PRELOAD APIS ENHANCED ESPECÍFICAS PARA GUEST REGISTRATION */}
+          <link rel="preload" href="/api/guest/verify-phone" as="fetch" crossOrigin="anonymous" />
+          <link rel="preload" href="/api/guest/login-enhanced" as="fetch" crossOrigin="anonymous" />
+          <link rel="preload" href="/api/guest/register-enhanced" as="fetch" crossOrigin="anonymous" />
+          <link rel="dns-prefetch" href="https://api.qrserver.com" />
+        </Head>
+        
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 font-['Inter',sans-serif]">
+          {/* Elementos decorativos de fundo */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none" aria-hidden="true">
           <div className="absolute -top-40 -left-40 w-80 h-80 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
           <div className="absolute top-40 right-40 w-80 h-80 bg-violet-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -208,7 +218,7 @@ export default async function EventGuestPage({ params }: PageProps) {
                     </div>
                   </div>
                 ) : (
-                  <GuestRegistrationWrapper
+                  <GuestRegistrationForm
                     eventId={eventData.id}
                     promoterId={promoterData.id}
                     eventTitle={eventData.title}
@@ -218,8 +228,9 @@ export default async function EventGuestPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+          </div>
         </div>
-      </div>
+      </>
     );
 
   } catch (error) {

@@ -248,7 +248,7 @@ function renderNoEventsPage(userData: any): JSX.Element {
       );
     }
 
-// ✅ FUNÇÃO AUXILIAR 6: Renderizar página com eventos (Complexidade: 2)
+// ✅ FUNÇÃO AUXILIAR 6: Renderizar página com eventos + PREFETCH (Complexidade: 2)
 function renderEventsPage(userData: any, futureEvents: EventForList[], promoterSlug: string): JSX.Element {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
@@ -276,6 +276,7 @@ function renderEventsPage(userData: any, futureEvents: EventForList[], promoterS
               <Link 
                 key={event.event_id}
                   href={eventUrl}
+                  prefetch={true}
                     className="block group break-inside-avoid"
                   >
                     <div className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 group-hover:scale-[1.02]">
