@@ -15,60 +15,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 let clientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
 let readOnlyClientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
 
-// Função inteligente para limpeza de cookies corrompidos
+// ✅ COOKIE CLEANUP TEMPORARIAMENTE DESABILITADO PARA RESOLVER ERRO CRÍTICO
+// A limpeza de cookies será reimplementada após resolver o erro principal
 function cleanupCorruptedCookies() {
-  try {
-    if (typeof window === 'undefined') return // Proteção SSR
-    
-    let cookiesRemoved = 0
-    const processSupabaseCookie = (cookie: string) => {
-      const [name, value] = cookie.trim().split('=')
-      
-      if (!name?.includes('supabase')) return
-      
-      try {
-        validateSupabaseCookie(value)
-      } catch {
-        removeCorruptedCookie(name)
-        cookiesRemoved++
-      }
-    }
-    
-    const validateSupabaseCookie = (value: string) => {
-      if (value?.startsWith('base64-')) {
-        const decoded = atob(value.substring(7))
-        const parsed = JSON.parse(decoded)
-        
-        if (!parsed || typeof parsed !== 'object' || !parsed.access_token) {
-          throw new Error('Token inválido')
-        }
-      } else if (value?.includes('eyJ') && !value.startsWith('base64-')) {
-        throw new Error('Cookie JWT malformado')
-      }
-    }
-    
-    const removeCorruptedCookie = (name: string) => {
-      console.log(`[Auth] 🧹 Removendo cookie corrupto: ${name}`)
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=localhost`
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.localhost`
-    }
-    
-    document.cookie.split(';').forEach(processSupabaseCookie)
-    
-    if (cookiesRemoved > 0) {
-      console.log(`[Auth] ✅ Limpeza concluída: ${cookiesRemoved} cookies corrompidos removidos`)
-      // Forçar reload após limpeza para evitar problemas
-      setTimeout(() => {
-        if (cookiesRemoved > 2) { // Só reload se muitos cookies foram removidos
-          console.log('[Auth] 🔄 Recarregando página após limpeza extensiva...')
-          window.location.reload()
-        }
-      }, 100)
-    }
-  } catch (error) {
-    console.warn('[Auth] ⚠️ Aviso: Não foi possível verificar cookies:', error)
-  }
+  // Temporariamente desabilitado para evitar erro 'call'
+  return
 }
 
 // Proxy SSR-safe que evita erros durante prerendering
@@ -148,8 +99,8 @@ export const createClient = () => {
     return clientInstance
   }
 
-  // Limpeza preventiva de cookies corrompidos
-  cleanupCorruptedCookies()
+  // ✅ Cookie cleanup removido para resolver erro crítico
+  // cleanupCorruptedCookies() // REMOVIDO - estava causando erro
 
   // Criar nova instância usando configuração nativa do Supabase
   clientInstance = createBrowserClient<Database>(

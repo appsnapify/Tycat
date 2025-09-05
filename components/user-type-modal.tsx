@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
+// motion removed for performance
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Building, Users } from "lucide-react"
 
@@ -15,20 +15,10 @@ export default function UserTypeModal({ isOpen, onClose }: UserTypeModalProps) {
   const router = useRouter()
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-3xl shadow-xl p-6 w-full max-w-md relative"
-          >
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 w-full max-w-md relative">
             <div className="flex justify-between items-center mb-6">
               <Button
                 variant="ghost"
@@ -85,9 +75,9 @@ export default function UserTypeModal({ isOpen, onClose }: UserTypeModalProps) {
                 </Button>
               </Link>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   )
 } 

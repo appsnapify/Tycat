@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { motion } from 'framer-motion'
+// motion removed for performance
 import { ArrowLeft, Mail, Lock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -199,11 +199,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md z-10 mt-24"
-      >
+      <div className="w-full max-w-md z-10 mt-24">
         <div className="border border-slate-200 rounded-xl shadow-lg p-8 bg-white/90 backdrop-blur-lg relative overflow-hidden">
           {/* Borda decorativa lateral - cores TYCAT */}
           <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-emerald-500 to-violet-500"></div>
@@ -286,7 +282,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

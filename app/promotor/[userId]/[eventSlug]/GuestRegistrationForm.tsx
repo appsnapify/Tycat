@@ -98,7 +98,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
 
   // Validate phone number (now handled by react-phone-number-input)
   const validatePhone = (phoneNumber: string): string | null => {
-    console.log('📞 validatePhone - input:', phoneNumber);
+    // Phone validation (log removed for security)
     if (!phoneNumber || phoneNumber.length < 8) {
       return null;
     }
@@ -112,7 +112,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
     setError(null);
 
     try {
-      // console.log('📞 handlePhoneSubmit - phone value:', phone);
+      // Phone submit validation (log removed for security)
       
       if (!phone || phone.length < 8) {
         setError('Número de telemóvel inválido');
@@ -249,16 +249,7 @@ export default function GuestRegistrationForm({ eventId, promoterId, eventTitle,
         return;
       }
 
-      // 🔍 DEBUG: Log dos dados antes de enviar
-      console.log('=== FRONTEND REGISTER DEBUG ===');
-      console.log('phone:', phone);
-      console.log('firstName:', firstName.trim());
-      console.log('lastName:', lastName.trim());
-      console.log('email:', email.trim());
-      console.log('password length:', password?.length);
-      console.log('eventId:', eventId);
-      console.log('promoterId:', promoterId);
-      console.log('===============================');
+      // 🔍 DEBUG: Dados validados (logs removidos por segurança)
 
       // ✅ ENHANCED API: Usar API enhanced com structured errors
       const response = await fetch('/api/guest/register-enhanced', {

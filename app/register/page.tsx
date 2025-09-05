@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { motion } from 'framer-motion'
+// motion removed for performance
 import { ArrowLeft, User, Mail, Building2, Lock, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -135,11 +135,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md z-10 mt-24"
-      >
+      <div className="w-full max-w-md z-10 mt-24">
         <div className="border border-slate-200 rounded-xl shadow-lg p-8 bg-white/90 backdrop-blur-lg relative overflow-hidden">
           {/* Borda decorativa lateral - TYCAT */}
           <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-emerald-500 to-violet-500"></div>
@@ -340,7 +336,7 @@ export default function RegisterPage() {
         
         {/* Sombra adicional para profundidade */}
         <div className="h-2 mx-8 bg-gradient-to-r from-transparent via-slate-200 to-transparent rounded-full opacity-50 mt-1"></div>
-      </motion.div>
+      </div>
     </div>
   )
 }

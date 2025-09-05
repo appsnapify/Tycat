@@ -7,7 +7,7 @@ import { User, Phone, Mail, Building, Briefcase, CreditCard, MapPin, Hash } from
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { motion } from "framer-motion"
+// motion removed for performance
 
 export default function EventCreationForm() {
   const [formData, setFormData] = useState({
@@ -41,23 +41,13 @@ export default function EventCreationForm() {
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-4xl">
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="flex justify-center mb-12"
-      >
+      <div className="flex justify-center mb-12">
         <div className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
           T3cket
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.2 }}
-        className="bg-white/80 backdrop-blur-md rounded-3xl shadow-xl border border-white/20 p-8 md:p-12"
-      >
+      <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-xl border border-white/20 p-8 md:p-12">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent mb-4">
             Cria o teu primeiro evento
@@ -78,7 +68,7 @@ export default function EventCreationForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-10">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.4 }}>
+          <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center">
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center mr-2">
                 <User className="h-4 w-4 text-white" />
@@ -136,9 +126,9 @@ export default function EventCreationForm() {
                 <Mail className="h-4 w-4 text-gray-400 absolute left-3 top-3" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.6 }}>
+          <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center">
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center mr-2">
                 <Building className="h-4 w-4 text-white" />
@@ -280,23 +270,18 @@ export default function EventCreationForm() {
                 />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="pt-6"
-          >
+          <div className="pt-6">
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-6 rounded-xl text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300"
             >
               Continuar
             </Button>
-          </motion.div>
+          </div>
         </form>
-      </motion.div>
+      </div>
     </div>
   )
 }

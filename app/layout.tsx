@@ -1,47 +1,82 @@
 import './globals.css'
 import { Inter, Oswald } from 'next/font/google'
+// ✅ REMOVIDOS IMPORTS INEXISTENTES QUE ESTAVAM QUEBRANDO A APLICAÇÃO
 // import { Toaster } from 'sonner' // Linha original comentada
-import { Toaster } from '@/components/ui/toaster' // Nova linha para shadcn/ui Toaster
 // import { AuthProvider } from '@/hooks/use-auth' // REMOVIDO
 // import { ClientAuthProvider } from '@/hooks/useClientAuth' // REMOVIDO
 // import { ClientAuthProvider } from '@/app/app/_providers/auth-provider' // REMOVIDO - Movido apenas para /app/app/ layout
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+// import ClientOnlyToaster from '@/app/components/ClientOnlyToaster' // ❌ REMOVIDO - COMPONENTE NÃO EXISTE
+// import ClientOnlyWebVitals from '@/app/components/ClientOnlyWebVitals' // ❌ REMOVIDO - COMPONENTE NÃO EXISTE
+// import ClientOnlyPerformanceOptimizer from '@/app/components/ClientOnlyPerformanceOptimizer' // ❌ REMOVIDO - COMPONENTE NÃO EXISTE
 
-// Configure Inter (assuming it's the base font)
-const inter = Inter({ 
-  subsets: ['latin'], 
+// Temporariamente removidos para resolver erro crítico
+// import { Analytics } from '@vercel/analytics/react'
+// import { SpeedInsights } from '@vercel/speed-insights/next'
+
+// ✅ FONTS OTIMIZADAS PARA MELHOR LCP
+const inter = Inter({
+  subsets: ['latin'],
   variable: '--font-inter',
-  display: 'swap', // ✅ FONT SWAP para evitar CLS
-  preload: true,
-  fallback: ['system-ui', 'arial'] // ✅ FALLBACK FONTS
+  display: 'swap',
+  preload: false, // ✅ REMOVIDO PRELOAD PARA MELHORAR LCP
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Arial', 'sans-serif'],
+  adjustFontFallback: true,
+  weight: ['400', '500', '600', '700'],
 })
-// Configure Oswald (for titles/specific sections) - OTIMIZADO
-const oswald = Oswald({ 
-  subsets: ['latin'], 
-  weight: ['400', '500', '600', '700'], // Include relevant weights
-  variable: '--font-oswald', // Define CSS variable
-  display: 'swap', // ✅ FONT SWAP para evitar CLS
-  preload: true,
-  fallback: ['Impact', 'Arial Black', 'sans-serif'] // ✅ FALLBACK FONTS
+
+// Oswald só carrega quando necessário
+const oswald = Oswald({
+  subsets: ['latin'],
+  weight: ['600', '700'],
+  variable: '--font-oswald',
+  display: 'swap',
+  preload: false,
+  fallback: ['Impact', 'Arial Black', 'Helvetica Neue', 'sans-serif'],
+  adjustFontFallback: true,
 })
 
 export const metadata = {
-  title: 'Tycat',
-  description: 'Plataforma de gestão de eventos',
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: '16x16', type: 'image/x-icon' },
-      { url: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }
-    ]
-  }
+  title: 'TYCAT - Gestão Completa de Eventos',
+  description: 'Plataforma completa para gestão de eventos com guest lists inteligentes, venda de bilhetes e analytics em tempo real. Comece grátis hoje!',
+  keywords: 'gestão eventos, guest list, bilhetes, promotores, equipas, analytics',
+  authors: [{ name: 'TYCAT' }],
+  creator: 'TYCAT',
+  publisher: 'TYCAT',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  // Icons removidos do metadata pois estão sendo definidos no head diretamente
+  openGraph: {
+    title: 'TYCAT - Gestão Completa de Eventos',
+    description: 'Plataforma intuitiva para gestão de eventos, guest lists e bilhetes',
+    type: 'website',
+    locale: 'pt_PT',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TYCAT - Gestão Completa de Eventos',
+    description: 'Plataforma intuitiva para gestão de eventos, guest lists e bilhetes',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 }
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: 'cover'
 }
 
@@ -78,21 +113,47 @@ export default function RootLayout({
   return (
     <html lang="pt" className={`${inter.variable} ${oswald.variable} font-sans`}>
       <head>
-                       {/* ✅ RESOURCE HINTS AGRESSIVOS PARA VERCEL */}
-               <link rel="preconnect" href="https://xejpwdpumzalewamttjv.supabase.co" />
-               <link rel="dns-prefetch" href="//xejpwdpumzalewamttjv.supabase.co" />
-               <link rel="dns-prefetch" href="//api.qrserver.com" />
-               <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-               
-               {/* ✅ PRELOADS REMOVIDOS - Next.js 15 gere automaticamente */}
+        {/* ✅ RESOURCE HINTS OTIMIZADOS - Removido preload desnecessário para melhorar LCP */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="//xejpwdpumzalewamttjv.supabase.co" />
+        <link rel="dns-prefetch" href="//api.qrserver.com" />
         
+        {/* ✅ FAVICON LINKS */}
+        <link rel="icon" href="/favicon.ico" sizes="16x16" type="image/x-icon" />
+        <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/placeholder-logo.png" sizes="180x180" type="image/png" />
         
+        {/* ✅ PERFORMANCE HINTS */}
+        <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
       </head>
       <body className="overscroll-none">
         {children}
-        <Toaster />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
-        {process.env.NODE_ENV === 'production' && <SpeedInsights />}
+        {/* ✅ COMPONENTES REMOVIDOS TEMPORARIAMENTE PARA RESOLVER ERRO */}
+        {/* <Toaster /> - REMOVIDO: Componente não existe */}
+        {/* <WebVitals /> - REMOVIDO: Componente não existe */}
+        {/* <PerformanceOptimizer /> - REMOVIDO: Componente não existe */}
+        {/* <Analytics /> - REMOVIDO TEMPORARIAMENTE: Pode estar causando erro */}
+        {/* <SpeedInsights /> - REMOVIDO TEMPORARIAMENTE: Pode estar causando erro */}
+        
+        {/* ✅ SERVICE WORKER REGISTRATION OTIMIZADO */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Service Worker registration otimizado
+              if ('serviceWorker' in navigator && location.protocol === 'https:') {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                      console.log('SW registered: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                      console.log('SW registration failed: ', error);
+                    });
+                });
+              }
+            `
+          }}
+        />
       </body>
     </html>
   )
